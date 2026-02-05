@@ -1,0 +1,6 @@
+mkdocs
+requests
+pandas
+pyarrow
+numpy
+tabulate
