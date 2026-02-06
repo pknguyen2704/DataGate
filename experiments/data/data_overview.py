@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-Data Discovery / EDA for a folder of datasets (Parquet/CSV/JSON).
-Outputs per-file Markdown report + a global summary CSV.
-
-Usage:
-  python3 data_discovery.py --input ./experiments/data/yellow_taxi_trip_records --out ./experiments/reports
-  python3 data_discovery.py --input ./experiments/data --pattern "yellow_tripdata_2025-*.parquet" --max-files 5
-"""
-
 import argparse
 import os
 import re

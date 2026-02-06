@@ -1,4 +1,4 @@
-.venv/bin/python3 ./experiments/data/data_overview.py \
-  --input ./experiments/data \
+../.venv/bin/python3 ./data/data_overview.py \
+  --input ./data/parquet \
   --pattern "*.parquet" \
-  --out ./experiments/data/overview
+  --out ./data/overview
