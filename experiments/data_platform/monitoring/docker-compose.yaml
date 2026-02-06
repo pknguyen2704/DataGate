@@ -1,0 +1,26 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: datagate_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - datagate_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: datagate_grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - datagate_net
+
+networks:
+  datagate_net:
+    external: true

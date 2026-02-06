@@ -1,0 +1,14 @@
+services:
+  trino:
+    image: trinodb/trino:latest
+    container_name: datagate_trino
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./conf/catalog:/etc/trino/catalog
+    networks:
+      - datagate_net
+
+networks:
+  datagate_net:
+    external: true

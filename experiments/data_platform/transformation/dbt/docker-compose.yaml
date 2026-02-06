@@ -1,0 +1,15 @@
+services:
+  dbt:
+    build: .
+    container_name: datagate_dbt
+    command: debug
+    profiles:
+      - ./profiles.yml:/root/.dbt/profiles.yml
+    volumes:
+      - ./project:/usr/app
+    networks:
+      - datagate_net
+
+networks:
+  datagate_net:
+    external: true
