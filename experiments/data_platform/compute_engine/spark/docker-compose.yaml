@@ -1,10 +1,10 @@
 services:
-  spark_master:
+  data_platform_spark_master:
     build:
       context: .
-      dockerfile: docker/Dockerfile
-    container_name: platform_spark_master
-    hostname: platform_spark_master
+      dockerfile: ./docker/Dockerfile
+    hostname: data-platform-spark-master
+    container_name: data_platform_spark_master
     env_file:
       - ./.env
     ports:
@@ -13,12 +13,13 @@ services:
       - "4040:4040"
     volumes:
       - ./conf:/opt/spark/conf
-    entrypoint:
-      - /bin/bash
-      - -c
-      - /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host platform_spark_master --port 7077 --webui-port 8080
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host data-platform-spark-master
+      --port 7077
+      --webui-port 8080
     networks:
-      - platform_net
+      - data_platform_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1"]
@@ -27,14 +28,14 @@ services:
       retries: 20
       start_period: 20s
 
-  spark_worker:
+  data_platform_spark_worker:
     build:
       context: .
-      dockerfile: docker/Dockerfile
-    container_name: platform_spark_worker
-    hostname: platform_spark_worker
+      dockerfile: ./docker/Dockerfile
+    hostname: data-platform-spark-worker
+    container_name: data_platform_spark_worker
     depends_on:
-      spark_master:
+      data_platform_spark_master:
         condition: service_healthy
     ports:
       - "8081:8081"
@@ -42,12 +43,14 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-    entrypoint:
-      - /bin/bash
-      - -c
-      - /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://platform_spark_master:7077 --cores 4 --memory 4G --webui-port 8081
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      --cores 2
+      --memory 4G
+      --webui-port 8081
+      spark://data-platform-spark-master:7077
     networks:
-      - platform_net
+      - data_platform_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ || exit 1"]
@@ -57,5 +60,5 @@ services:
       start_period: 20s
 
 networks:
-  platform_net:
+  data_platform_net:
     external: true

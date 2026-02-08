@@ -1,46 +1,64 @@
 services:
-  spark_master:
-    build: 
+  datagate_spark_master:
+    build:
       context: .
       dockerfile: ./docker/Dockerfile
+    hostname: datagate-spark-master
     container_name: datagate_spark_master
-    hostname: datagate_spark_master
-    environment:
-      - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
+    env_file:
+      - ./.env
     ports:
-      - "8080:8080"
-      - "7077:7077"
+      - "18080:8080"
+      - "17077:7077"
+      - "14040:4040"
+    volumes:
+      - ./conf:/opt/spark/conf
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host datagate-spark-master
+      --port 7077
+      --webui-port 8080
     networks:
       - datagate_net
-      - platform_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
 
-  spark_worker:
-    build: 
+  datagate_spark_worker:
+    build:
       context: .
       dockerfile: ./docker/Dockerfile
+    hostname: datagate-spark-worker
     container_name: datagate_spark_worker
-    hostname: datagate_spark_worker
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=4G
-      - SPARK_WORKER_CORES=2
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
     depends_on:
-      - spark_master
+      spark_master:
+        condition: service_healthy
+    ports:
+      - "18081:8081"
+    env_file:
+      - ./.env
+    volumes:
+      - ./conf:/opt/spark/conf
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      --cores 2
+      --memory 4G
+      --webui-port 8081
+      spark://datagate-spark-master:7077
     networks:
       - datagate_net
-      - platform_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
 
 networks:
   datagate_net:
-    external: true
-  platform_net:
     external: true

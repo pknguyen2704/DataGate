@@ -4,14 +4,14 @@ services:
       catalog_db:
         condition: service_healthy
     image: tabulario/iceberg-rest:latest
-    container_name: platform_catalog
+    container_name: data_platform_catalog
     hostname: iceberg_rest
     ports:
       - "8181:8181"
     env_file:
       - ./.env
     networks:
-      - platform_net
+      - data_platform_net
     restart: unless-stopped 
     healthcheck:
       test: ["CMD-SHELL", "timeout 5s bash -c ':> /dev/tcp/127.0.0.1/8181' || exit 1"]
@@ -22,12 +22,12 @@ services:
 
   catalog_db:
     image: postgres:15
-    container_name: platform_catalog_db
+    container_name: data_platform_catalog_db
     hostname: catalog_db
     env_file:
       - ./.env
     networks:
-      - platform_net
+      - data_platform_net
     expose:
       - "5432"
     volumes:
@@ -40,5 +40,5 @@ services:
       retries: 5
 
 networks:
-  platform_net:
+  data_platform_net:
     external: true
