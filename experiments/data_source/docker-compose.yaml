@@ -1,12 +1,9 @@
 services:
-  datasource_postgresql:
+  datasource_database:
     image: postgres:15
-    container_name: datasource_postgresql
-    environment:
-      - TZ=Asia/Ho_Chi_Minh
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=Postgres123@
-      - POSTGRES_DB=postgres
+    container_name: datasource_database
+    env_file:
+      - ./.env
     ports:
       - "54321:5432"
     volumes:
@@ -16,7 +13,7 @@ services:
       - "-c"
       - "shared_preload_libraries=pg_stat_statements"
     networks:
-      - datagate_net
+      - data_platform_net
 networks:
-  datagate_net:
+  data_platform_net:
     external: true

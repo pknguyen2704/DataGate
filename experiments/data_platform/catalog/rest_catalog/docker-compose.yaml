@@ -21,7 +21,7 @@ services:
       start_period: 30s
 
   catalog_db:
-    image: postgres:15
+    image: postgres:15  
     container_name: data_platform_catalog_db
     hostname: catalog_db
     env_file:

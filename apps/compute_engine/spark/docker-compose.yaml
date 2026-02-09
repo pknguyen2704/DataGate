@@ -35,7 +35,7 @@ services:
     hostname: datagate-spark-worker
     container_name: datagate_spark_worker
     depends_on:
-      spark_master:
+      datagate_spark_master:
         condition: service_healthy
     ports:
       - "18081:8081"

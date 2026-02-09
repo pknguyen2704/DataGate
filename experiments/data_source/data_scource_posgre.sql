@@ -1,2 +1,2 @@
-SELECT * from yellow_trip_data ytd
-select count(*) from yellow_trip_data
+SELECT * from yellow_tripdata
+select count(*) from yellow_tripdata

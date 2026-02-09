@@ -17,6 +17,11 @@ fi
 DATA_DIR="$PROJECT_ROOT/experiments/data/parquet"
 
 echo "Starting data upload..."
-python3 "$SCRIPT_DIR/../data/upload_to_postgres.py" "$@"
+if [ $# -eq 0 ]; then
+    echo "No arguments provided. Using default data directory: $DATA_DIR"
+    python3 "$SCRIPT_DIR/../data/upload_to_postgres.py" --data-dir "$DATA_DIR"
+else
+    python3 "$SCRIPT_DIR/../data/upload_to_postgres.py" "$@"
+fi
 
 echo "Upload process finished."
