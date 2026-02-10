@@ -1,17 +1,36 @@
 services:
-  iceberg_rest:
+  catalog-db:
+    image: postgres:15  
+    container_name: data-platform-catalog-db
+    hostname: catalog-db
+    env_file:
+      - ./.env
+    networks:
+      - data-platform-net
+    expose:
+      - "5432"
+    volumes:
+      - ./catalog-data:/var/lib/postgresql/data
+    restart: unless-stopped 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  iceberg-rest:
     depends_on:
-      catalog_db:
+      catalog-db:
         condition: service_healthy
     image: tabulario/iceberg-rest:latest
-    container_name: data_platform_catalog
-    hostname: iceberg_rest
+    container_name: data-platform-iceberg-rest
+    hostname: iceberg-rest
     ports:
       - "8181:8181"
     env_file:
       - ./.env
     networks:
-      - data_platform_net
+      - data-platform-net
     restart: unless-stopped 
     healthcheck:
       test: ["CMD-SHELL", "timeout 5s bash -c ':> /dev/tcp/127.0.0.1/8181' || exit 1"]
@@ -20,25 +39,7 @@ services:
       retries: 20
       start_period: 30s
 
-  catalog_db:
-    image: postgres:15  
-    container_name: data_platform_catalog_db
-    hostname: catalog_db
-    env_file:
-      - ./.env
-    networks:
-      - data_platform_net
-    expose:
-      - "5432"
-    volumes:
-      - ./catalog_data:/var/lib/postgresql/data
-    restart: unless-stopped 
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
 networks:
-  data_platform_net:
+  data-platform-net:
     external: true
