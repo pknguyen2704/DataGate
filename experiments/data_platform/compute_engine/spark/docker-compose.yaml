@@ -1,10 +1,11 @@
+name: data_platform
 services:
-  data-platform-spark-master:
+  data_platform_spark_master:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-master
-    container_name: data-platform-spark-master
+    container_name: data_platform_spark_master
     env_file:
       - ./.env
     ports:
@@ -12,15 +13,15 @@ services:
     volumes:
       - ./conf:/opt/spark/conf
       - ./volumes/spark-events:/tmp/spark-events
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/apps/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/apps/java:ro
+      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
+      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
       --host data-platform-spark-master
       --port 7077
       --webui-port 8080
     networks:
-      - data-platform-net
+      - data_platform_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1"]
@@ -29,14 +30,14 @@ services:
       retries: 20
       start_period: 20s
 
-  data-platform-spark-worker-1:
+  data_platform_spark_worker_1:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-worker-1
-    container_name: data-platform-spark-worker-1
+    container_name: data_platform_spark_worker_1
     depends_on:
-      data-platform-spark-master:
+      data_platform_spark_master:
         condition: service_healthy
     ports:
       - "8081:8081"
@@ -45,8 +46,8 @@ services:
     volumes:
       - ./conf:/opt/spark/conf
       - ./volumes/spark-events:/tmp/spark-events
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/apps/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/apps/java:ro
+      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
+      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
       --cores 2
@@ -54,7 +55,7 @@ services:
       --webui-port 8081
       spark://data-platform-spark-master:7077
     networks:
-      - data-platform-net
+      - data_platform_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ || exit 1"]
@@ -63,14 +64,14 @@ services:
       retries: 20
       start_period: 20s
 
-  data-platform-spark-worker-2:
+  data_platform_spark_worker_2:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-worker-2
-    container_name: data-platform-spark-worker-2
+    container_name: data_platform_spark_worker_2
     depends_on:
-      data-platform-spark-master:
+      data_platform_spark_master:
         condition: service_healthy
     ports:
       - "8082:8082"
@@ -79,8 +80,8 @@ services:
     volumes:
       - ./conf:/opt/spark/conf
       - ./volumes/spark-events:/tmp/spark-events
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/apps/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/apps/java:ro
+      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
+      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
       --cores 2
@@ -88,7 +89,7 @@ services:
       --webui-port 8082
       spark://data-platform-spark-master:7077
     networks:
-      - data-platform-net
+      - data_platform_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/ || exit 1"]
@@ -97,12 +98,12 @@ services:
       retries: 20
       start_period: 20s
 
-  data-platform-spark-client:
+  data_platform_spark_client:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-client
-    container_name: data-platform-spark-client
+    container_name: data_platform_spark_client
     depends_on:
       data_platform_spark_master:
         condition: service_healthy
@@ -115,11 +116,11 @@ services:
     volumes:
       - ./conf:/opt/spark/conf
       - ./volumes/spark-events:/tmp/spark-events
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/apps/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/apps/java:ro
+      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
+      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: ["bash", "-lc", "tail -f /dev/null"]
     networks:
-      - data-platform-net
+      - data_platform_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "test -x /opt/spark/bin/spark-submit"]
@@ -129,5 +130,5 @@ services:
       start_period: 10s
 
 networks:
-  data-platform-net:
+  data_platform_net:
     external: true
