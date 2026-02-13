@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import pandas as pd
 from sqlalchemy import create_engine, text
+from dotenv import load_dotenv
 
 def main():
     parser = argparse.ArgumentParser(description="Upload Parquet files to PostgreSQL.")
@@ -13,8 +14,21 @@ def main():
     group.add_argument("--data-dir", help="Directory containing Parquet files")
     group.add_argument("--file", dest="files", action="append", help="Specific file(s) to upload. Can be used multiple times.")
     
+    # Load .env file from the same directory as the script
+    script_dir = Path(__file__).parent.resolve()
+    load_dotenv(script_dir / ".env")
+
+    # Get DB config from env or use defaults
+    pg_user = os.getenv("POSTGRES_USER", "admin")
+    pg_password = os.getenv("POSTGRES_PASSWORD", "postgrepassword")
+    pg_db = os.getenv("POSTGRES_DB", "postgres")
+    
+    # Construct default URL
+    # Assuming running locally and port mapped to 54321 as per docker-compose
+    default_db_url = f"postgresql://{pg_user}:{pg_password}@localhost:54321/{pg_db}"
+
     parser.add_argument("--pattern", default="*.parquet", help="File pattern to match (only used with --data-dir)")
-    parser.add_argument("--db-url", default="postgresql://admin:postgrepassword@localhost:54321/postgres", help="Database connection string")
+    parser.add_argument("--db-url", default=default_db_url, help="Database connection string")
     parser.add_argument("--table", help="Target table name. If set, all files merge into this table.")
     parser.add_argument("--table-prefix", default="tlc_data_", help="Prefix for table names (only used if --table is NOT set)")
     parser.add_argument("--mode", choices=["replace", "append"], default="append", help="Upload mode. 'replace' overwrites the table; 'append' adds to it.")

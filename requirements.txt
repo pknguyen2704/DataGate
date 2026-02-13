@@ -6,3 +6,4 @@ numpy
 tabulate
 sqlalchemy
 psycopg2-binary
+dotenv

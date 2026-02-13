@@ -1,8 +1,8 @@
-name: data-source
+name: data_source
 services:
-  datasource-database:
+  datasource_postgres:
     image: postgres:15
-    container_name: datasource-database
+    container_name: datasource_postgres
     env_file:
       - ./.env
     ports:
@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - data-platform-net
+      - data_platform_net
 networks:
-  data-platform-net:
+  data_platform_net:
     external: true

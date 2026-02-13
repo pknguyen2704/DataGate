@@ -36,7 +36,7 @@ services:
     hostname: data-platform-spark-worker-1
     container_name: data-platform-spark-worker-1
     depends_on:
-      data_platform_spark_master:
+      data-platform-spark-master:
         condition: service_healthy
     ports:
       - "8081:8081"
