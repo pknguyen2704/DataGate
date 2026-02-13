@@ -1,3 +1,4 @@
+name: data-platform
 services:
   minio:
     image: minio/minio:latest
@@ -31,6 +32,9 @@ services:
       /bin/sh -c "
       /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
       /usr/bin/mc mb -p myminio/lakehouse;
+      /usr/bin/mc pipe myminio/lakehouse/bronze/.keep;
+      /usr/bin/mc pipe myminio/lakehouse/silver/.keep;
+      /usr/bin/mc pipe myminio/lakehouse/gold/.keep;
       exit 0;
       "
     env_file:
