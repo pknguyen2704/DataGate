@@ -17,7 +17,7 @@ def main():
     parser.add_argument("--db-url", default="postgresql://postgres:Postgres123%40@localhost:54321/postgres", help="Database connection string")
     parser.add_argument("--table", help="Target table name. If set, all files merge into this table.")
     parser.add_argument("--table-prefix", default="tlc_data_", help="Prefix for table names (only used if --table is NOT set)")
-    parser.add_argument("--mode", choices=["replace", "append"], default="replace", help="Upload mode. 'replace' overwrites the table; 'append' adds to it.")
+    parser.add_argument("--mode", choices=["replace", "append"], default="append", help="Upload mode. 'replace' overwrites the table; 'append' adds to it.")
     
     args = parser.parse_args()
 
@@ -88,4 +88,9 @@ def main():
             print(f"  [ERR] Failed uploading {file_path.name}: {e}")
 
 if __name__ == "__main__":
-    main()
+    import time
+    start_time = time.time()
+    try:
+        main()
+    finally:
+        print(f"Total execution time: {time.time() - start_time:.2f} seconds")

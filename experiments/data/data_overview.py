@@ -313,4 +313,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import time
+    start_time = time.time()
+    try:
+        main()
+    finally:
+        print(f"Total execution time: {time.time() - start_time:.2f} seconds")
