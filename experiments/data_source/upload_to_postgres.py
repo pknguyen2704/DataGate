@@ -14,7 +14,7 @@ def main():
     group.add_argument("--file", dest="files", action="append", help="Specific file(s) to upload. Can be used multiple times.")
     
     parser.add_argument("--pattern", default="*.parquet", help="File pattern to match (only used with --data-dir)")
-    parser.add_argument("--db-url", default="postgresql://postgres:Postgres123%40@localhost:54321/postgres", help="Database connection string")
+    parser.add_argument("--db-url", default="postgresql://admin:postgrepassword@localhost:54321/postgres", help="Database connection string")
     parser.add_argument("--table", help="Target table name. If set, all files merge into this table.")
     parser.add_argument("--table-prefix", default="tlc_data_", help="Prefix for table names (only used if --table is NOT set)")
     parser.add_argument("--mode", choices=["replace", "append"], default="append", help="Upload mode. 'replace' overwrites the table; 'append' adds to it.")
