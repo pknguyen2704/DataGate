@@ -1,0 +1,22 @@
+name: data_platform
+
+services:
+  iceberg_rest:
+    image: apache/iceberg-rest-fixture:1.10.1
+    container_name: data_platform_iceberg_rest
+    hostname: iceberg-rest
+    env_file:
+      - ./.env
+    ports:
+      - "8181:8181"
+    networks:
+      - data_platform_net
+    restart: unless-stopped
+    environment:
+      CATALOG_URI: jdbc:sqlite:/var/lib/iceberg/iceberg_catalog.db
+    volumes:
+      - ./catalog_data:/var/lib/iceberg
+
+networks:
+  data_platform_net:
+    external: true

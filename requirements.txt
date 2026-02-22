@@ -5,5 +5,5 @@ pyarrow
 numpy
 tabulate
 sqlalchemy
-psycopg2-binary
 dotenv
+psycopg2-binary

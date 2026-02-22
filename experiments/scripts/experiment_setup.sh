@@ -3,4 +3,7 @@
 # Setup platform
 docker network create data_gate_net --driver bridge
 docker network create data_platform_net --driver bridge
-``
+
+# Setup minio
+cd ../data_platform/storage/minio
+docker compose up -d
