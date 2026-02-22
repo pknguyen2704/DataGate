@@ -1,9 +1,10 @@
 name: data_platform
+
 services:
   minio:
     image: minio/minio:latest
-    hostname: minio
     container_name: data_platform_minio
+    hostname: minio
     command: server /data --console-address ":9001"
     env_file:
       - ./.env
@@ -13,10 +14,13 @@ services:
     volumes:
       - ./minio_data:/data
     networks:
-      - data_platform_net
+      data_platform_net:
+        aliases:
+          - minio
+          - lakehouse.minio
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/ready"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 10

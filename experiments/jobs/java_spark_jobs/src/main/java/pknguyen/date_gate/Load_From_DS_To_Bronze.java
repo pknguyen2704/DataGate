@@ -3,6 +3,7 @@ package pknguyen.date_gate;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+
 import java.util.Properties;
 
 public class Load_From_DS_To_Bronze {
@@ -18,6 +19,7 @@ public class Load_From_DS_To_Bronze {
         String pgUser = "admin";
         String pgPass = "postgrespassword";
 
+        // MinIO (S3-compatible)
         String s3Endpoint = "http://minio:9000";
         String s3AccessKey = "admin";
         String s3SecretKey = "miniopassword";
@@ -25,26 +27,16 @@ public class Load_From_DS_To_Bronze {
         // Override with arguments if provided
         // Usage: java ... <sourceTable> <targetNamespace> <pgHost> <pgPort> <pgDb>
         // <pgUser> <pgPass> <s3Endpoint> <s3AccessKey> <s3SecretKey>
-        if (args.length >= 1)
-            sourceTable = args[0];
-        if (args.length >= 2)
-            targetNamespace = args[1];
-        if (args.length >= 3)
-            pgHost = args[2];
-        if (args.length >= 4)
-            pgPort = args[3];
-        if (args.length >= 5)
-            pgDb = args[4];
-        if (args.length >= 6)
-            pgUser = args[5];
-        if (args.length >= 7)
-            pgPass = args[6];
-        if (args.length >= 8)
-            s3Endpoint = args[7];
-        if (args.length >= 9)
-            s3AccessKey = args[8];
-        if (args.length >= 10)
-            s3SecretKey = args[9];
+        if (args.length >= 1) sourceTable = args[0];
+        if (args.length >= 2) targetNamespace = args[1];
+        if (args.length >= 3) pgHost = args[2];
+        if (args.length >= 4) pgPort = args[3];
+        if (args.length >= 5) pgDb = args[4];
+        if (args.length >= 6) pgUser = args[5];
+        if (args.length >= 7) pgPass = args[6];
+        if (args.length >= 8) s3Endpoint = args[7];
+        if (args.length >= 9) s3AccessKey = args[8];
+        if (args.length >= 10) s3SecretKey = args[9];
 
         System.out.println("---------------------------------------------");
         System.out.println("Job Config:");
@@ -54,7 +46,6 @@ public class Load_From_DS_To_Bronze {
         System.out.println("  MinIO Endpoint: " + s3Endpoint);
         System.out.println("---------------------------------------------");
 
-        // Initialize Spark Session
         SparkSession spark = createSparkSession(s3Endpoint, s3AccessKey, s3SecretKey);
 
         // Postgres Connection
@@ -63,29 +54,23 @@ public class Load_From_DS_To_Bronze {
         connectionProperties.put("user", pgUser);
         connectionProperties.put("password", pgPass);
         connectionProperties.put("driver", "org.postgresql.Driver");
-        // Optimization for large tables
         connectionProperties.put("fetchsize", "5000");
 
         try {
-            // Read data from Postgres
             System.out.println("Reading data from Postgres table: " + sourceTable);
-            Dataset<Row> jdbcDF = spark.read()
-                    .jdbc(jdbcUrl, sourceTable, connectionProperties);
+            Dataset<Row> jdbcDF = spark.read().jdbc(jdbcUrl, sourceTable, connectionProperties);
 
             System.out.println("Source Schema:");
             jdbcDF.printSchema();
 
-            // Define Iceberg target
             String catalogName = "rest_prod";
-            String tableName = sourceTable; // Use same table name as source, or pass as arg if needed
+            String tableName = sourceTable;
             String fullTableName = catalogName + "." + targetNamespace + "." + tableName;
 
             System.out.println("Target Iceberg table: " + fullTableName);
 
-            // Create Namespace if not exists
             createNamespaceIfNotExists(spark, catalogName, targetNamespace);
 
-            // Write to Iceberg (Bronze Layer)
             System.out.println("Writing data to Bronze layer...");
             jdbcDF.writeTo(fullTableName).createOrReplace();
 
@@ -99,24 +84,38 @@ public class Load_From_DS_To_Bronze {
         }
     }
 
+    /**
+     * SDK v2 path: Iceberg S3FileIO + s3://
+     * IMPORTANT: This requires Iceberg AWS bundle (or equivalent AWS SDK v2 deps) on Spark classpath.
+     */
     private static SparkSession createSparkSession(String s3Endpoint, String s3AccessKey, String s3SecretKey) {
         return SparkSession.builder()
                 .appName("DataGate - Load DS to Bronze")
 
-                // Iceberg REST Catalog Configuration
+                // Iceberg extensions
                 .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+
+                // (Optional but nice) default catalog
+                .config("spark.sql.defaultCatalog", "rest_prod")
+
+                // REST catalog
                 .config("spark.sql.catalog.rest_prod", "org.apache.iceberg.spark.SparkCatalog")
                 .config("spark.sql.catalog.rest_prod.type", "rest")
                 .config("spark.sql.catalog.rest_prod.uri", "http://iceberg-rest:8181")
-                .config("spark.sql.catalog.rest_prod.warehouse", "s3a://lakehouse/bronze")
 
-                // S3/MinIO Configuration for Hadoop AWS
-                .config("spark.hadoop.fs.s3a.endpoint", s3Endpoint)
-                .config("spark.hadoop.fs.s3a.access.key", s3AccessKey)
-                .config("spark.hadoop.fs.s3a.secret.key", s3SecretKey)
-                .config("spark.hadoop.fs.s3a.path.style.access", "true")
-                .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-                .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+                // IMPORTANT: use s3:// (not s3a://) when using S3FileIO (SDK v2)
+                .config("spark.sql.catalog.rest_prod.warehouse", "s3://lakehouse/")
+
+                // Force Iceberg to use AWS SDK v2 S3FileIO
+                .config("spark.sql.catalog.rest_prod.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+
+                // MinIO / S3FileIO settings (Iceberg properties, not Hadoop fs.s3a)
+                .config("spark.sql.catalog.rest_prod.s3.endpoint", s3Endpoint)
+                .config("spark.sql.catalog.rest_prod.s3.path-style-access", "true")
+                .config("spark.sql.catalog.rest_prod.s3.access-key-id", s3AccessKey)
+                .config("spark.sql.catalog.rest_prod.s3.secret-access-key", s3SecretKey)
+                .config("spark.sql.catalog.rest_prod.s3.ssl.enabled", "false")
+                .config("spark.sql.catalog.rest_prod.s3.region", "us-east-1")
 
                 .getOrCreate();
     }
