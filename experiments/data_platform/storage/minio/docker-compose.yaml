@@ -14,10 +14,7 @@ services:
     volumes:
       - ./minio_data:/data
     networks:
-      data_platform_net:
-        aliases:
-          - minio
-          - lakehouse.minio
+      - data_platform_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/ready"]
