@@ -10,7 +10,7 @@ public class Load_From_DS_To_Bronze {
     public static void main(String[] args) {
         // Default Configuration
         String sourceTable = "yellow_tripdata";
-        String targetNamespace = "nyc_taxi";
+        String targetNamespace = "bronze";
 
         String pgHost = "data_source_postgres";
         String pgPort = "5432";
