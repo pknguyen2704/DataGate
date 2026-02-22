@@ -11,7 +11,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio_data:/data
+      - ./minio_data:/data
     networks:
       - data_platform_net
     restart: unless-stopped
@@ -42,8 +42,8 @@ services:
     networks:
       - data_platform_net
 
-volumes:
-  minio_data:
+# volumes:
+#   minio_data:
 
 networks:
   data_platform_net:

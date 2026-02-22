@@ -15,7 +15,7 @@ docker exec data_platform_spark_client /opt/spark/bin/spark-submit \
   --master spark://data-platform-spark-master:7077 \
   --deploy-mode client \
   --driver-memory 1G \
-  --executor-memory 2G \
+  --executor-memory 4G \
   --executor-cores 2 \
   --conf spark.sql.shuffle.partitions=32 \
   --conf spark.default.parallelism=32 \
