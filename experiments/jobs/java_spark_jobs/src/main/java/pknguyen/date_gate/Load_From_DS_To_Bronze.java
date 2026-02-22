@@ -109,7 +109,7 @@ public class Load_From_DS_To_Bronze {
                 // Force Iceberg to use AWS SDK v2 S3FileIO
                 .config("spark.sql.catalog.rest_prod.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
 
-                // MinIO / S3FileIO settings (Iceberg properties, not Hadoop fs.s3a)
+                // MinIO / S3FileIO settings
                 .config("spark.sql.catalog.rest_prod.s3.endpoint", s3Endpoint)
                 .config("spark.sql.catalog.rest_prod.s3.path-style-access", "true")
                 .config("spark.sql.catalog.rest_prod.s3.access-key-id", s3AccessKey)
