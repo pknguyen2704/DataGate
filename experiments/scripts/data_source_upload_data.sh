@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Activate virtual environment relative to this script
+# Script run
+# ./data_source_upload_data.sh --file ../data/parquet/yellow_tripdata_2025-01.parquet --table yellow_tripdata
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR/../.."
 

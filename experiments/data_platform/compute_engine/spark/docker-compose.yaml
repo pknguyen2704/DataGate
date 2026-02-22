@@ -12,7 +12,6 @@ services:
       - "8080:8080"
     volumes:
       - ./conf:/opt/spark/conf
-      - ./volumes/spark-events:/tmp/spark-events
       - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
       - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: >
@@ -45,7 +44,6 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ./volumes/spark-events:/tmp/spark-events
       - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
       - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: >
@@ -79,7 +77,6 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ./volumes/spark-events:/tmp/spark-events
       - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
       - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: >
@@ -115,7 +112,6 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ./volumes/spark-events:/tmp/spark-events
       - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
       - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: ["bash", "-lc", "tail -f /dev/null"]

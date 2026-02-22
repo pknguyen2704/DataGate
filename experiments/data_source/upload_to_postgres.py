@@ -92,12 +92,33 @@ def main():
         print(f"Processing {file_path.name} -> Table: {table_name} (mode: {current_mode})")
         
         try:
+            print(f"  Reading {file_path.name}...")
             df = pd.read_parquet(file_path)
             # Normalize columns
             df.columns = [c.lower() for c in df.columns]
             
-            df.to_sql(table_name, engine, if_exists=current_mode, index=False, chunksize=10000)
-            print(f"  [OK] Uploaded {len(df)} rows.")
+            print(f"  Uploading {len(df)} rows to database...")
+            
+            chunk_size = 2000
+            total_rows = len(df)
+            
+            for i in range(0, total_rows, chunk_size):
+                chunk = df.iloc[i : i + chunk_size]
+                
+                # Logic to handle replace/append for chunks within the same file
+                # If mode is 'replace', only the very first chunk of the file should replace.
+                # Subsequent chunks must append.
+                chunk_mode = current_mode
+                if current_mode == 'replace' and i > 0:
+                    chunk_mode = 'append'
+                
+                chunk.to_sql(table_name, engine, if_exists=chunk_mode, index=False, method='multi')
+                
+                # Progress indicator
+                pct = int(min(i + chunk_size, total_rows) / total_rows * 100)
+                print(f"    Progress: {pct}% ({min(i + chunk_size, total_rows)}/{total_rows})")
+            
+            print(f"  [OK] Uploaded {total_rows} rows.")
         except Exception as e:
             print(f"  [ERR] Failed uploading {file_path.name}: {e}")
 
