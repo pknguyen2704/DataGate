@@ -12,8 +12,7 @@ services:
       - "8080:8080"
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
+      - ${SPARK_JOBS_DIR}:/opt/spark/functions:ro
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
       --host datagate-spark-master
@@ -44,8 +43,7 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
+      - ${SPARK_JOBS_DIR}:/opt/spark/functions:ro
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
       --cores 2
@@ -77,8 +75,7 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
+      - ${SPARK_JOBS_DIR}:/opt/spark/functions:ro
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
       --cores 2
@@ -112,8 +109,7 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}/pyspark:/opt/spark/jobs/pyspark:ro
-      - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
+      - ${SPARK_JOBS_DIR}:/opt/spark/functions:ro
     command: ["bash", "-lc", "tail -f /dev/null"]
     networks:
       - datagate_net
