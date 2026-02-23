@@ -1,6 +1,6 @@
 name: data_source
 services:
-  datasource_postgres:
+  data_source_postgres:
     image: postgres:15
     container_name: data_source_postgres
     env_file:
@@ -20,9 +20,9 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - data_platform_net
+      - datagate_net
 # volumes:
 #   postgres_data:
 networks:
-  data_platform_net:
+  datagate_net:
     external: true

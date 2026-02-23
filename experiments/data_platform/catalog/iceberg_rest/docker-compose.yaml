@@ -10,7 +10,7 @@ services:
     ports:
       - "8181:8181"
     networks:
-      - data_platform_net
+      - datagate_net
     restart: unless-stopped
     environment:
       CATALOG_URI: jdbc:sqlite:/var/lib/iceberg/iceberg_catalog.db
@@ -18,5 +18,5 @@ services:
       - ./catalog_data:/var/lib/iceberg
 
 networks:
-  data_platform_net:
+  datagate_net:
     external: true

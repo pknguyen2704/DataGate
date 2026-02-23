@@ -1,11 +1,11 @@
-name: data_platform
+name: datagate
 services:
-  data_platform_spark_master:
+  datagate_spark_master:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
-    hostname: data-platform-spark-master
-    container_name: data_platform_spark_master
+    hostname: datagate-spark-master
+    container_name: datagate_spark_master
     env_file:
       - ./.env
     ports:
@@ -16,11 +16,11 @@ services:
       - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
-      --host data-platform-spark-master
+      --host datagate-spark-master
       --port 7077
       --webui-port 8080
     networks:
-      - data_platform_net
+      - datagate_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1"]
@@ -29,14 +29,14 @@ services:
       retries: 20
       start_period: 20s
 
-  data_platform_spark_worker_1:
+  datagate_spark_worker_1:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
-    hostname: data-platform-spark-worker-1
-    container_name: data_platform_spark_worker_1
+    hostname: datagate-spark-worker-1
+    container_name: datagate_spark_worker_1
     depends_on:
-      data_platform_spark_master:
+      datagate_spark_master:
         condition: service_healthy
     ports:
       - "8081:8081"
@@ -51,9 +51,9 @@ services:
       --cores 2
       --memory 4G
       --webui-port 8081
-      spark://data-platform-spark-master:7077
+      spark://datagate-spark-master:7077
     networks:
-      - data_platform_net
+      - datagate_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ || exit 1"]
@@ -62,14 +62,14 @@ services:
       retries: 20
       start_period: 20s
 
-  data_platform_spark_worker_2:
+  datagate_spark_worker_2:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
-    hostname: data-platform-spark-worker-2
-    container_name: data_platform_spark_worker_2
+    hostname: datagate-spark-worker-2
+    container_name: datagate_spark_worker_2
     depends_on:
-      data_platform_spark_master:
+      datagate_spark_master:
         condition: service_healthy
     ports:
       - "8082:8082"
@@ -84,9 +84,9 @@ services:
       --cores 2
       --memory 4G
       --webui-port 8082
-      spark://data-platform-spark-master:7077
+      spark://datagate-spark-master:7077
     networks:
-      - data_platform_net
+      - datagate_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/ || exit 1"]
@@ -95,18 +95,18 @@ services:
       retries: 20
       start_period: 20s
 
-  data_platform_spark_client:
+  datagate_spark_client:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
-    hostname: data-platform-spark-client
-    container_name: data_platform_spark_client
+    hostname: datagate-spark-client
+    container_name: datagate_spark_client
     depends_on:
-      data_platform_spark_master:
+      datagate_spark_master:
         condition: service_healthy
-      data_platform_spark_worker_1:
+      datagate_spark_worker_1:
         condition: service_healthy
-      data_platform_spark_worker_2:
+      datagate_spark_worker_2:
         condition: service_healthy
     env_file:
       - ./.env
@@ -116,7 +116,7 @@ services:
       - ${SPARK_JOBS_DIR}/java:/opt/spark/jobs/java:ro
     command: ["bash", "-lc", "tail -f /dev/null"]
     networks:
-      - data_platform_net
+      - datagate_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "test -x /opt/spark/bin/spark-submit"]
@@ -126,5 +126,5 @@ services:
       start_period: 10s
 
 networks:
-  data_platform_net:
+  datagate_net:
     external: true

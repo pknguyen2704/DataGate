@@ -1,0 +1,1 @@
+docker network create datagate_net --driver bridge

@@ -14,7 +14,7 @@ services:
     volumes:
       - ./minio_data:/data
     networks:
-      - data_platform_net
+      - datagate_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/ready"]
@@ -49,11 +49,11 @@ services:
     env_file:
       - ./.env
     networks:
-      - data_platform_net
+      - datagate_net
 
 # volumes:
 #   minio_data:
 
 networks:
-  data_platform_net:
+  datagate_net:
     external: true
