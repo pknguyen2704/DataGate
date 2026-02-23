@@ -18,16 +18,17 @@ curl -L -o "$TARGET_DIR/iceberg-spark-runtime-3.5_2.12-1.10.1.jar" https://repo1
 # 2. PostgreSQL JDBC Driver (For connecting to Postgres-based catalogs like REST Catalog backend)
 echo "Downloading postgresql-42.7.10.jar..."
 curl -L -o "$TARGET_DIR/postgresql-42.7.10.jar" https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.10/postgresql-42.7.10.jar
+# 3. Iceberg AWS (Enables S3 support in Iceberg, required if using S3 as storage for Iceberg tables)
+echo "Downloading iceberg-aws-1.10.1.jar..."
+curl -L -o "$TARGET_DIR/iceberg-aws-1.10.1.jar" https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws/1.10.1/iceberg-aws-1.10.1.jar
 
-# 3. AWS Java SDK Bundle (Dependency for Hadoop AWS)
-# Version 1.12.262 creates a compatible pair with hadoop-aws 3.3.4
-echo "Downloading aws-java-sdk-bundle-1.12.262.jar..."
-curl -L -o "$TARGET_DIR/aws-java-sdk-bundle-1.12.262.jar" https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+# 4. AWS SDK v2 (Dependency for Iceberg AWS Bundle)
+echo "Downloading aws-sdk-java-v2-2.41.34.jar..."
+curl -L -o "$TARGET_DIR/aws-sdk-java-v2-2.41.34.jar" https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.41.34/bundle-2.41.34.jar
 
-# 4. Iceberg AWS Bundle (AWS SDK v2) - CHỈ CẦN nếu Spark phải dùng S3FileIO
-echo "Downloading iceberg-aws-bundle-1.10.1.jar..."
-curl -L -o "$TARGET_DIR/iceberg-aws-bundle-1.10.1.jar" \
-  https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.10.1/iceberg-aws-bundle-1.10.1.jar
+# 5. Hadoop AWS (Enables S3 support in Hadoop, required if using S3 as storage for Iceberg tables)
+echo "Downloading hadoop-aws-3.4.2.jar..."
+curl -L -o "$TARGET_DIR/hadoop-aws-3.4.2.jar" https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.2/hadoop-aws-3.4.2.jar
 
 echo "All downloads complete!"
 ls -lh "$TARGET_DIR"
