@@ -4,9 +4,8 @@ import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
 import com.amazon.deequ.analyzers._
-import com.amazon.deequ.analyzers.runners.{AnalysisRunner, AnomalyDetectionRunner} // (runner import optional)
-import com.amazon.deequ.profiles.{ColumnProfilerRunner, ColumnProfiles}
-
+import com.amazon.deequ.analyzers.runners.{AnalysisRunner, AnalyzerContext}
+import com.amazon.deequ.profiles.ColumnProfilerRunner
 
 object data_profiling {
 
@@ -83,26 +82,22 @@ object data_profiling {
         // .setRestrictToColumns(Seq("colA", "colB")) // nếu muốn giới hạn cột để nhanh hơn
         .run()
 
-      // Print a readable summary
-      // (profileResult.profiles là Seq[ColumnProfile]; toString khá dài, nhưng dùng được)
-      profileResult.profiles.foreach { p =>
-        println(s"[PROFILE] ${p.column} => ${p}")
+      // profileResult.profiles: Map[String, ColumnProfile]
+      profileResult.profiles.foreach { case (col, prof) =>
+        println(s"[PROFILE] $col => $prof")
       }
 
       // ==========================================================
-      // B) Deequ Analyzer metrics (một số metrics phổ biến)
+      // B) Deequ Analyzer metrics (basic metrics)
       // ==========================================================
       println("[INFO] Running Deequ AnalysisRunner (basic metrics)...")
 
-      // Chọn 1 vài analyzers an toàn (không cần biết trước schema nhiều)
       val analysis = AnalysisRunner
         .onData(df)
         .addAnalyzer(Size())
-        // Ví dụ: completeness cho TẤT CẢ columns (có thể hơi nặng nếu cột rất nhiều)
         .addAnalyzers(df.columns.toSeq.map(Completeness(_)))
         .run()
 
-      // Convert metrics to Spark DF để show
       val metricsDf = AnalyzerContext.successMetricsAsDataFrame(spark, analysis)
       metricsDf.show(200, truncate = false)
 
