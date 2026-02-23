@@ -7,6 +7,7 @@ import com.amazon.deequ.analyzers._
 import com.amazon.deequ.analyzers.runners.{AnalysisRunner, AnomalyDetectionRunner} // (runner import optional)
 import com.amazon.deequ.profiles.{ColumnProfilerRunner, ColumnProfiles}
 
+
 object data_profiling {
 
   // ===== Iceberg REST Catalog =====
