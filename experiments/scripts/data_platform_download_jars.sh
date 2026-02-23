@@ -26,9 +26,5 @@ curl -L -o "$TARGET_DIR/iceberg-aws-1.10.1.jar" https://repo1.maven.org/maven2/o
 echo "Downloading aws-sdk-java-v2-2.41.34.jar..."
 curl -L -o "$TARGET_DIR/aws-sdk-java-v2-2.41.34.jar" https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.41.34/bundle-2.41.34.jar
 
-# 5. Hadoop AWS (Enables S3 support in Hadoop, required if using S3 as storage for Iceberg tables)
-echo "Downloading hadoop-aws-3.4.2.jar..."
-curl -L -o "$TARGET_DIR/hadoop-aws-3.4.2.jar" https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.2/hadoop-aws-3.4.2.jar
-
 echo "All downloads complete!"
 ls -lh "$TARGET_DIR"

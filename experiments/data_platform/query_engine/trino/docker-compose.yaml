@@ -1,14 +1,16 @@
+name: data_platform
+
 services:
   trino:
     image: trinodb/trino:latest
-    container_name: datagate_trino
+    container_name: data_platform_trino
     ports:
-      - "8081:8080"
+      - "8085:8080"
     volumes:
       - ./conf/catalog:/etc/trino/catalog
     networks:
-      - datagate_net
+      - data_platform_net
 
 networks:
-  datagate_net:
+  data_platform_net:
     external: true

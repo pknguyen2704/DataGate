@@ -24,19 +24,27 @@ services:
       start_period: 20s
 
   create_buckets:
-    image: minio/mc
+    image: alpine:3.20
     container_name: data_platform_create_buckets
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
-      /usr/bin/mc mb -p myminio/lakehouse;
-      /usr/bin/mc pipe myminio/lakehouse/bronze/.keep;
-      /usr/bin/mc pipe myminio/lakehouse/silver/.keep;
-      /usr/bin/mc pipe myminio/lakehouse/gold/.keep;
-      exit 0;
+      /bin/sh -ec "
+      apk add --no-cache curl ca-certificates &&
+      curl -sSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc &&
+      chmod +x /usr/local/bin/mc &&
+
+      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb -p myminio/lakehouse &&
+
+      # create prefix objects so folders show up
+      mc cp /dev/null myminio/lakehouse/bronze/.keep &&
+      mc cp /dev/null myminio/lakehouse/silver/.keep &&
+      mc cp /dev/null myminio/lakehouse/gold/.keep &&
+
+      mc ls myminio &&
+      mc ls myminio/lakehouse
       "
     env_file:
       - ./.env
