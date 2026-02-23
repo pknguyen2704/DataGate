@@ -12,6 +12,6 @@ mvn clean package -DskipTests
 echo "[DataGate] Copying jar to functions root..."
 
 # Copy jar ra ngoài thư mục functions/
-cp target/datagate-1.0.jar ..
+cp target/*.jar ..
 
 echo "[DataGate] Build completed."
