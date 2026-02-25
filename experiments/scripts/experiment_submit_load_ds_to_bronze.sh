@@ -26,7 +26,7 @@ echo "  Args:         $*"
 echo "---------------------------------------------"
 
 # ---- Submit ----
-echo "Submitting Spark Job: Load_From_DS_To_Bronze..."
+echo "Submitting Spark Job: Load_from_ds_to_lakehouse..."
 
 docker exec data_platform_spark_client /opt/spark/bin/spark-submit \
   --class pknguyen.datagate.Load_from_ds_to_lakehouse \

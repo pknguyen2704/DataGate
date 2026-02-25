@@ -26,5 +26,9 @@ curl -L -o "$TARGET_DIR/iceberg-aws-1.10.1.jar" https://repo1.maven.org/maven2/o
 echo "Downloading aws-sdk-java-v2-2.41.34.jar..."
 curl -L -o "$TARGET_DIR/aws-sdk-java-v2-2.41.34.jar" https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.41.34/bundle-2.41.34.jar
 
+# 5. Deequ (Data quality library from AWS, useful for data validation in Spark)
+echo "Downloading deequ-2.0.13-spark-3.5.jar..."
+curl -L -o "$TARGET_DIR/deequ-2.0.13-spark-3.5.jar" https://repo1.maven.org/maven2/com/amazon/deequ/deequ/2.0.13-spark-3.5/deequ-2.0.13-spark-3.5.jar
+
 echo "All downloads complete!"
 ls -lh "$TARGET_DIR"
