@@ -4,11 +4,6 @@ set -euo pipefail
 # Usage:
 # ./experiment_submit_load_ds_to_bronze.sh --sourceTable yellow_tripdata --targetNamespace bronze --mode append
 
-# ---- Local jar check (optional, just warn) ----
-LOCAL_JAR_PATH="/Users/andrew/Dev/DataGate/experiments/jobs/java_spark_jobs/target/java_spark_jobs-1.0-SNAPSHOT.jar"
-if [ ! -f "$LOCAL_JAR_PATH" ]; then
-  echo "Warning: local JAR not found at $LOCAL_JAR_PATH (this is OK if jar is already inside spark_client)."
-fi
 
 # ---- Runtime config (from env or defaults) ----
 S3_ENDPOINT="${S3_ENDPOINT:-http://minio:9000}"
@@ -18,7 +13,7 @@ WAREHOUSE="${ICEBERG_WAREHOUSE:-s3://lakehouse/}"
 BUCKET="${WAREHOUSE#s3://}"
 BUCKET="${BUCKET%%/*}"
 
-JAR_IN_CONTAINER="/opt/spark/jobs/java/java_spark_jobs-1.0-SNAPSHOT.jar"
+JAR_IN_CONTAINER="/opt/spark/jobs/experiment_jobs-1.0.jar"
 
 echo "---------------------------------------------"
 echo "Submit Config:"
@@ -30,18 +25,11 @@ echo "  Jar:          ${JAR_IN_CONTAINER}"
 echo "  Args:         $*"
 echo "---------------------------------------------"
 
-# ---- Check jar exists in spark client container ----
-if ! docker exec data_platform_spark_client sh -lc "[ -f '${JAR_IN_CONTAINER}' ]"; then
-  echo "ERROR: JAR not found inside container: ${JAR_IN_CONTAINER}"
-  echo "Fix: copy/bind jar into spark_client at /opt/spark/jobs/java/"
-  exit 1
-fi
-
 # ---- Submit ----
 echo "Submitting Spark Job: Load_From_DS_To_Bronze..."
 
 docker exec data_platform_spark_client /opt/spark/bin/spark-submit \
-  --class pknguyen.date_gate.Load_From_DS_To_Bronze \
+  --class pknguyen.datagate.Load_from_ds_to_lakehouse \
   --master spark://data-platform-spark-master:7077 \
   --deploy-mode client \
   --driver-memory 2G \
