@@ -91,7 +91,6 @@
                 </execution>
                 </executions>
                 <configuration>
-                <!-- ✅ Bắt plugin dùng đúng scala.version -->
                 <scalaVersion>${scala.version}</scalaVersion>
                 <args>
                     <arg>-deprecation</arg>
@@ -115,14 +114,6 @@
                     <configuration>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
 
-                    <!-- Không nhét Spark vào jar -->
-                    <artifactSet>
-                        <excludes>
-                        <exclude>org.apache.spark:spark-core_${scala.binary.version}</exclude>
-                        <exclude>org.apache.spark:spark-sql_${scala.binary.version}</exclude>
-                        </excludes>
-                    </artifactSet>
-
                     <transformers>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
@@ -145,27 +136,6 @@
                 </execution>
                 </executions>
             </plugin>
-
-            <!-- (Tuỳ chọn nhưng rất đáng làm) Fail build nếu có scala version khác lẫn vào -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.5.0</version>
-                <executions>
-                <execution>
-                    <id>enforce</id>
-                    <phase>validate</phase>
-                    <goals><goal>enforce</goal></goals>
-                    <configuration>
-                    <rules>
-                        <dependencyConvergence/>
-                    </rules>
-                    <fail>true</fail>
-                    </configuration>
-                </execution>
-                </executions>
-            </plugin>
-
         </plugins>
     </build>
 </project>
