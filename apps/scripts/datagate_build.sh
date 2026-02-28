@@ -4,7 +4,7 @@ set -e
 echo "[DataGate] Building Maven project..."
 
 # Đi vào thư mục project
-cd ../functions/datagate
+cd ../functions/datagate-functions
 
 # Build
 mvn clean package -DskipTests

@@ -1,4 +1,4 @@
-package pknguyen2704.datagate
+package pknguyen.datagate
 
 object constraints_suggestion {
 

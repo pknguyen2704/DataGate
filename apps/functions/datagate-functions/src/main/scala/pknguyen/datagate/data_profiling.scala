@@ -1,4 +1,4 @@
-package pknguyen2704.datagate
+package pknguyen.datagate
 
 import org.apache.spark.sql.SparkSession
 
@@ -17,6 +17,8 @@ object data_profiling {
     val S3_SECRET_KEY = "miniopassword"
     val AWS_REGION = "us-east-1"
 
+    // Profiling mode
+    val PROFILING_MODE = "table_level"
     val spark = SparkSession.builder()
       .appName(JOB_NAME)
       .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
@@ -36,6 +38,10 @@ object data_profiling {
     try {
       val df = spark.table(s"$CATALOG.$NAMESPACE.$TABLE")
       df.show()
+      // Choose profiling level (table/column)
+
+      // Profiling
+      val result = 
     } finally {
       spark.stop()
     }
