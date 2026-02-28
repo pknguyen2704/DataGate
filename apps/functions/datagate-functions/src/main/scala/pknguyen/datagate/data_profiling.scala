@@ -1,5 +1,6 @@
 package pknguyen.datagate
 
+import com.amazon.deequ.profiles.{ColumnProfilerRunner, NumericColumnProfile}
 import org.apache.spark.sql.SparkSession
 
 object data_profiling {
@@ -38,10 +39,38 @@ object data_profiling {
     try {
       val df = spark.table(s"$CATALOG.$NAMESPACE.$TABLE")
       df.show()
-      // Choose profiling level (table/column)
 
-      // Profiling
-      val result = 
+      // Profiling column level
+      val result = ColumnProfilerRunner()
+        .onData(df)
+        .run()
+
+      result.profiles.foreach { case (productName, profile) =>
+
+        println(s"Column '$productName':\n " +
+          s"\tcompleteness: ${profile.completeness}\n" +
+          s"\tapproximate number of distinct values: ${profile.approximateNumDistinctValues}\n" +
+          s"\tdatatype: ${profile.dataType}\n")
+      }
+
+      /* For numeric columns, we get descriptive statistics */
+      val totalNumberProfile = result.profiles("totalNumber").asInstanceOf[NumericColumnProfile]
+
+      println(s"Statistics of 'totalNumber':\n" +
+        s"\tminimum: ${totalNumberProfile.minimum.get}\n" +
+        s"\tmaximum: ${totalNumberProfile.maximum.get}\n" +
+        s"\tmean: ${totalNumberProfile.mean.get}\n" +
+        s"\tstandard deviation: ${totalNumberProfile.stdDev.get}\n")
+
+      val statusProfile = result.profiles("status")
+
+      /* For columns with a low number of distinct values, we get the full value distribution. */
+      println("Value distribution in 'stats':")
+      statusProfile.histogram.foreach {
+        _.values.foreach { case (key, entry) =>
+          println(s"\t$key occurred ${entry.absolute} times (ratio is ${entry.ratio})")
+        }
+      }
     } finally {
       spark.stop()
     }
