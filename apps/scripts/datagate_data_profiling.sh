@@ -7,6 +7,6 @@ docker exec datagate_spark_client /opt/spark/bin/spark-submit \
   --driver-memory 2G \
   --executor-memory 4G \
   --executor-cores 2 \
-  /opt/spark/functions/datagate-functions-1.0.jar
+  /opt/spark/work-dir/functions/datagate-functions-1.0.jar
 
 echo "[DataGate] Data Profiling job completed"

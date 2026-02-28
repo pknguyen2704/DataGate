@@ -30,5 +30,9 @@ curl -L -o "$TARGET_DIR/aws-sdk-java-v2-2.41.34.jar" https://repo1.maven.org/mav
 echo "Downloading deequ-2.0.13-spark-3.5.jar..."
 curl -L -o "$TARGET_DIR/deequ-2.0.13-spark-3.5.jar" https://repo1.maven.org/maven2/com/amazon/deequ/deequ/2.0.13-spark-3.5/deequ-2.0.13-spark-3.5.jar
 
+# 6. Jackson Scala Module (For JSON processing in Scala, often required by libraries like Deequ)
+echo "Downloading jackson-module-scala_2.12-2.21.1.jar..."
+curl -L -o "$TARGET_DIR/jackson-module-scala_2.12-2.21.1.jar" https://repo1.maven.org/maven2/com/fasterxml/jackson/module/jackson-module-scala_2.12/2.21.1/jackson-module-scala_2.12-2.21.1.jar
+
 echo "All downloads complete!"
 ls -lh "$TARGET_DIR"

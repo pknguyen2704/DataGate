@@ -1,72 +1,115 @@
 package pknguyen.datagate
 
-import org.apache.spark.sql.{SparkSession, DataFrame}
-import org.apache.spark.sql.functions._
+import com.amazon.deequ.profiles.ColumnProfilerRunner
+import org.apache.spark.sql.SparkSession
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+
+import java.io.File
+import java.sql.{Connection, DriverManager, PreparedStatement}
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 object data_profiling {
 
   def main(args: Array[String]): Unit = {
 
-    val JOB_NAME = "[DataGate] Data Profiling"
+    val JOB_NAME = "[DataGate] Profiling"
     val CATALOG = "rest"
     val NAMESPACE = "bronze"
     val TABLE = "yellow_tripdata"
+    val REST_URI = "http://iceberg-rest:8181"
+    val WAREHOUSE = "s3://lakehouse/"
+
+    val S3_ENDPOINT = "http://minio:9000"
+    val S3_ACCESS_KEY = "admin"
+    val S3_SECRET_KEY = "miniopassword"
+    val AWS_REGION = "us-east-1"
+
+    // Postgres config (bạn có thể chuyển sang env sau)
+    val PG_URL = "jdbc:postgresql://datagate_database:5432/datagate"
+    val PG_USER = "admin"
+    val PG_PASS = "datagatepassword"
 
     val spark = SparkSession.builder()
       .appName(JOB_NAME)
       .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-      .config("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
-      .config("spark.sql.catalog.rest.type", "rest")
-      .config("spark.sql.catalog.rest.uri", "http://iceberg-rest:8181")
-      .config("spark.sql.catalog.rest.warehouse", "s3://lakehouse/")
-      .config("spark.sql.catalog.rest.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
-      .config("spark.sql.catalog.rest.s3.endpoint", "http://minio:9000")
-      .config("spark.sql.catalog.rest.s3.path-style-access", "true")
-      .config("spark.sql.catalog.rest.s3.access-key-id", "admin")
-      .config("spark.sql.catalog.rest.s3.secret-access-key", "miniopassword")
-      .config("spark.sql.catalog.rest.s3.region", "us-east-1")
-      .config("spark.sql.catalog.rest.s3.ssl-enabled", "false")
+      .config(s"spark.sql.catalog.$CATALOG", "org.apache.iceberg.spark.SparkCatalog")
+      .config(s"spark.sql.catalog.$CATALOG.type", "rest")
+      .config(s"spark.sql.catalog.$CATALOG.uri", REST_URI)
+      .config(s"spark.sql.catalog.$CATALOG.warehouse", WAREHOUSE)
+      .config(s"spark.sql.catalog.$CATALOG.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+      .config(s"spark.sql.catalog.$CATALOG.s3.endpoint", S3_ENDPOINT)
+      .config(s"spark.sql.catalog.$CATALOG.s3.path-style-access", "true")
+      .config(s"spark.sql.catalog.$CATALOG.s3.access-key-id", S3_ACCESS_KEY)
+      .config(s"spark.sql.catalog.$CATALOG.s3.secret-access-key", S3_SECRET_KEY)
+      .config(s"spark.sql.catalog.$CATALOG.s3.region", AWS_REGION)
+      .config(s"spark.sql.catalog.$CATALOG.s3.ssl-enabled", "false")
       .config("spark.sql.shuffle.partitions", "8")
       .getOrCreate()
 
     try {
 
-      // 🔥 Nếu muốn incremental theo partition:
-      // val df = spark.table(s"$CATALOG.$NAMESPACE.$TABLE")
-      //   .where("date_hour >= '2026-02-28-00'")
-
       val df = spark.table(s"$CATALOG.$NAMESPACE.$TABLE")
 
-      val totalCount = df.count()
+      val result =
+        ColumnProfilerRunner()
+          .onData(df)
+          .printStatusUpdates(true)
+          .run()
 
-      println(s"Total rows: $totalCount")
+      // ----------------------------
+      // Convert to JSON
+      // ----------------------------
 
-      val aggExprs = df.columns.flatMap { colName =>
-        Seq(
-          count(col(colName)).alias(s"${colName}__non_null"),
-          approx_count_distinct(col(colName)).alias(s"${colName}__distinct")
-        )
-      }
+      val mapper = new ObjectMapper()
+      mapper.registerModule(DefaultScalaModule)
 
-      val resultRow = df.agg(aggExprs.head, aggExprs.tail: _*).collect()(0)
+      val prettyJson =
+        mapper.writerWithDefaultPrettyPrinter().writeValueAsString(result)
 
-      df.columns.foreach { colName =>
+      // ----------------------------
+      // Save JSON file
+      // ----------------------------
 
-        val nonNull = resultRow.getAs[Long](s"${colName}__non_null")
-        val distinct = resultRow.getAs[Long](s"${colName}__distinct")
+      val timestamp = LocalDateTime.now()
+        .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
 
-        val completeness = nonNull.toDouble / totalCount.toDouble
-        val dataType = df.schema(colName).dataType.typeName
+      val outputPath =
+        s"/opt/spark/work-dir/functions/datagate_profile_$timestamp.json"
 
-        println(
-          s"""
-Column: $colName
-  completeness: $completeness
-  approx distinct: $distinct
-  datatype: $dataType
-"""
-        )
-      }
+      mapper.writeValue(new File(outputPath), result)
+
+      println(s"\nJSON saved to: $outputPath\n")
+
+      // ----------------------------
+      // Insert into Postgres
+      // ----------------------------
+
+      Class.forName("org.postgresql.Driver")
+      val conn: Connection = DriverManager.getConnection(PG_URL, PG_USER, PG_PASS)
+
+      val sql =
+        """
+          INSERT INTO profile_runs
+          (catalog, namespace, table_name, num_records, profile_json)
+          VALUES (?, ?, ?, ?, ?::jsonb)
+        """
+
+      val stmt: PreparedStatement = conn.prepareStatement(sql)
+
+      stmt.setString(1, CATALOG)
+      stmt.setString(2, NAMESPACE)
+      stmt.setString(3, TABLE)
+      stmt.setLong(4, result.numRecords)
+      stmt.setString(5, prettyJson)
+
+      stmt.executeUpdate()
+
+      stmt.close()
+      conn.close()
+
+      println("Profile inserted into Postgres successfully.")
 
     } finally {
       spark.stop()
