@@ -1,9 +1,9 @@
-name: data_platform
+name: datagate_experiments
 
 services:
   iceberg_rest:
     image: apache/iceberg-rest-fixture:1.10.1
-    container_name: data_platform_iceberg_rest
+    container_name: experiments_data_platform_iceberg_rest
     hostname: iceberg-rest
     env_file:
       - ./.env

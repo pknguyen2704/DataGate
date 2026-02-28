@@ -1,9 +1,9 @@
-name: data_platform
+name: datagate_experiments
 services:
   trino:
     image: 'trinodb/trino:479'
     hostname: trino
-    container_name: data_platform_trino
+    container_name: experiments_data_platform_trino
     ports:
       - '8085:8080'
     volumes:

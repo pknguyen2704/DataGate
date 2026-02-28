@@ -4,7 +4,7 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Define the target directory for jars relative to the script location
-TARGET_DIR="$SCRIPT_DIR/../infrastructure/compute_engine/spark/custom_jars"
+TARGET_DIR="$SCRIPT_DIR/../compute_engine/spark/custom_jars"
 
 # Create the directory if it doesn't exist
 mkdir -p "$TARGET_DIR"

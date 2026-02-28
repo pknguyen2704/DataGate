@@ -1,18 +1,14 @@
-name: data_source
+name: datagate_experiments
 services:
   data_source_postgres:
-    image: postgres:15
-    container_name: data_source_postgres
+    image: postgres:18
+    container_name: experiments_data_source_postgres
     env_file:
       - ./.env
     ports:
       - "54321:5432"
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_preload_libraries=pg_stat_statements"
+      - ./postgres_data:/var/lib/postgresql
     restart: unless-stopped 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]

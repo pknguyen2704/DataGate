@@ -1,9 +1,9 @@
-name: data_platform
+name: datagate_experiments
 
 services:
   minio:
     image: minio/minio:latest
-    container_name: data_platform_minio
+    container_name: experiments_data_platform_minio
     hostname: minio
     command: server /data --console-address ":9001"
     env_file:
@@ -25,7 +25,7 @@ services:
 
   create_buckets:
     image: minio/mc
-    container_name: data_platform_create_buckets
+    container_name: experiments_data_platform_create_buckets
     depends_on:
       minio:
         condition: service_healthy

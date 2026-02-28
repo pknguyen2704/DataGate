@@ -1,11 +1,11 @@
-name: data_platform
+name: datagate_experiments
 services:
   data_platform_spark_master:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-master
-    container_name: data_platform_spark_master
+    container_name: experiments_data_platform_spark_master
     env_file:
       - ./.env
     ports:
@@ -33,7 +33,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-worker-1
-    container_name: data_platform_spark_worker_1
+    container_name: experiments_data_platform_spark_worker_1
     depends_on:
       data_platform_spark_master:
         condition: service_healthy
@@ -65,7 +65,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-worker-2
-    container_name: data_platform_spark_worker_2
+    container_name: experiments_data_platform_spark_worker_2
     depends_on:
       data_platform_spark_master:
         condition: service_healthy
@@ -97,7 +97,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-client
-    container_name: data_platform_spark_client
+    container_name: experiments_data_platform_spark_client
     depends_on:
       data_platform_spark_master:
         condition: service_healthy
