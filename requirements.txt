@@ -1,9 +1,1 @@
 mkdocs
-requests
-pandas
-pyarrow
-numpy
-tabulate
-sqlalchemy
-dotenv
-psycopg2-binary

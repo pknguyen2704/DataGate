@@ -5,16 +5,16 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-master
-    container_name: experiments_data_platform_spark_master
+    container_name: data_platform_spark_master
     env_file:
       - ./.env
     ports:
-      - "18080:8080"
+      - "8080:8080"
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}:/opt/spark/jobs:ro
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.master.Master
       --host data-platform-spark-master
       --port 7077
       --webui-port 8080
@@ -33,23 +33,24 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-worker-1
-    container_name: experiments_data_platform_spark_worker_1
+    container_name: data_platform_spark_worker_1
     depends_on:
       data_platform_spark_master:
         condition: service_healthy
     ports:
-      - "18081:8081"
+      - "8081:8081"
     env_file:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}:/opt/spark/jobs:ro
+      - ${SPARK_JOBS_DIR}:/opt/spark/jobs
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://data-platform-spark-master:7077
       --cores 2
       --memory 4G
       --webui-port 8081
-      spark://data-platform-spark-master:7077
     networks:
       - datagate_net
     restart: unless-stopped
@@ -65,23 +66,24 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-worker-2
-    container_name: experiments_data_platform_spark_worker_2
+    container_name: data_platform_spark_worker_2
     depends_on:
       data_platform_spark_master:
         condition: service_healthy
     ports:
-      - "18082:8082"
+      - "8082:8082"
     env_file:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}:/opt/spark/jobs:ro
+      - ${SPARK_JOBS_DIR}:/opt/spark/jobs
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://data-platform-spark-master:7077
       --cores 2
       --memory 4G
       --webui-port 8082
-      spark://data-platform-spark-master:7077
     networks:
       - datagate_net
     restart: unless-stopped
@@ -97,7 +99,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile
     hostname: data-platform-spark-client
-    container_name: experiments_data_platform_spark_client
+    container_name: data_platform_spark_client
     depends_on:
       data_platform_spark_master:
         condition: service_healthy
@@ -109,7 +111,7 @@ services:
       - ./.env
     volumes:
       - ./conf:/opt/spark/conf
-      - ${SPARK_JOBS_DIR}:/opt/spark/jobs:ro
+      - ${SPARK_JOBS_DIR}:/opt/spark/jobs
     command: ["bash", "-lc", "tail -f /dev/null"]
     networks:
       - datagate_net
