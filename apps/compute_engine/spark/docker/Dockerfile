@@ -18,7 +18,8 @@ FROM spark:3.5.7-scala2.12-java17-python3-ubuntu
 COPY custom_jars/*.jar /opt/spark/jars/
 USER root
 
-RUN pip3 install pydeequ
+COPY requirements.txt /opt/spark/requirements.txt
+RUN pip3 install --no-cache-dir -r /opt/spark/requirements.txt
 
 USER spark
 
