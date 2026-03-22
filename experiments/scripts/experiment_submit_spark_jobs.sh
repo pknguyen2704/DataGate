@@ -66,24 +66,24 @@ echo ""
 echo -e "${BLUE}Submitting Spark Job: Load_from_ds_to_lakehouse...${NC}"
 
 if [ -z "$DATE_HOUR" ]; then
-  docker exec experiments_data_platform_spark_client /opt/spark/bin/spark-submit \
+  docker exec data_platform_spark_client /opt/spark/bin/spark-submit \
     --class pknguyen.datagate.Load_from_ds_to_lakehouse \
     --master spark://data-platform-spark-master:7077 \
-    --deploy-mode client \
+    --deploy-mode cluster \
     --driver-memory 2G \
     --executor-memory 4G \
     --executor-cores 2 \
     /opt/spark/jobs/experiment_jobs-1.0.jar \
     "$TABLE_NAME" "$TABLE_TARGET"
 else
-  docker exec experiments_data_platform_spark_client /opt/spark/bin/spark-submit \
+  docker exec data_platform_spark_client /opt/spark/bin/spark-submit \
     --class pknguyen.datagate.Load_from_ds_to_lakehouse \
     --master spark://data-platform-spark-master:7077 \
-    --deploy-mode client \
+    --deploy-mode cluster \
     --driver-memory 2G \
     --executor-memory 4G \
     --executor-cores 2 \
-    /opt/spark/jobs/experiment_jobs-1.0.jar \
+    /opt/spark/work-dir/jobs/experiment_jobs-1.0.jar \
     "$TABLE_NAME" "$TABLE_TARGET" "$DATE_HOUR"
 fi
 

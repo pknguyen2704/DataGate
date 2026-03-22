@@ -4,8 +4,9 @@ set -euo pipefail
 # =========================================================
 # Run example:
 # ./data_source_upload_data.sh \
-#   --file ../data/parquet/yellow_tripdata_2025-01.parquet \
+#   --file ../data/parquet/yellow/yellow_tripdata_2025-01.parquet \
 #   --table yellow_tripdata
+#   --date-hour "2025-01-01 10:00:00"
 #
 # Or:
 # ./data_source_upload_data.sh
@@ -25,16 +26,6 @@ DATA_DIR="$PROJECT_ROOT/experiments/data/parquet"
 DEFAULT_WORKERS=6          # tốt cho 4C/8T (I/O bound)
 DEFAULT_CHUNK_ROWS=200000  # COPY chunk size
 
-# -----------------------------------------
-# Activate virtualenv
-# -----------------------------------------
-
-if [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
-    source "$PROJECT_ROOT/.venv/bin/activate"
-else
-    echo "❌ Virtual environment not found at $PROJECT_ROOT/.venv"
-    exit 1
-fi
 
 # -----------------------------------------
 # Detect if user already provided workers

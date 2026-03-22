@@ -128,6 +128,7 @@ def upload_file_via_copy(
     chunk_rows: int,
     csv_null: str,
     verbose: bool,
+    date_hour: str = None,
 ):
     t0 = time.time()
 
@@ -135,6 +136,37 @@ def upload_file_via_copy(
         print(f"[{file_path.name}] Reading parquet...")
     df = pd.read_parquet(file_path)
     df = normalize_cols(df)
+
+    # --- Filtering by date_hour if provided ---
+    if date_hour:
+        # Find a suitable datetime column (e.g. pickup or dropoff)
+        datetime_col = None
+        for col in df.columns:
+            if "datetime" in col.lower():
+                if "pickup" in col.lower(): # Prefer pickup for filtering
+                    datetime_col = col
+                    break
+                if not datetime_col:
+                    datetime_col = col
+        
+        if datetime_col:
+            if verbose:
+                print(f"[{file_path.name}] Filtering for date_hour: {date_hour} (column: {datetime_col})")
+            
+            # Ensure column is datetime type
+            df[datetime_col] = pd.to_datetime(df[datetime_col])
+            
+            # Target timestamp (truncated to hour)
+            target_ts = pd.to_datetime(date_hour).floor('H')
+            
+            # Filter rows where the hour matches
+            df = df[df[datetime_col].dt.floor('H') == target_ts]
+            
+            if verbose:
+                print(f"[{file_path.name}] Rows after filtering: {len(df)}")
+        else:
+            if verbose:
+                print(f"[{file_path.name}] Warning: No datetime column found for filtering.")
 
     total_rows = len(df)
     if total_rows == 0:
@@ -191,6 +223,7 @@ def main():
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--chunk-rows", type=int, default=200_000)
     parser.add_argument("--csv-null", default=r"\N")
+    parser.add_argument("--date-hour", help="Filter data by specific date hour (format: YYYY-MM-DD HH:00:00)")
     parser.add_argument("--no-verbose", action="store_true")
     args = parser.parse_args()
 
@@ -256,6 +289,7 @@ def main():
                 args.chunk_rows,
                 args.csv_null,
                 verbose,
+                args.date_hour,
             )
             for (fp, table_name, mode) in tasks
         ]

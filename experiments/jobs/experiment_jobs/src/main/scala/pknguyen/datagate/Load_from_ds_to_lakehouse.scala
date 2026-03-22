@@ -45,6 +45,13 @@ object Load_from_ds_to_lakehouse {
       .config(s"spark.sql.catalog.$CATALOG.s3.secret-access-key", S3_SECRET_KEY)
       .config(s"spark.sql.catalog.$CATALOG.s3.region", AWS_REGION)
       .config(s"spark.sql.catalog.$CATALOG.s3.ssl-enabled", "false")
+      
+      // Also set global Hadoop S3A properties as a fallback for some internal Spark/Iceberg calls
+      .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT)
+      .config("spark.hadoop.fs.s3a.access.key", S3_ACCESS_KEY)
+      .config("spark.hadoop.fs.s3a.secret.key", S3_SECRET_KEY)
+      .config("spark.hadoop.fs.s3a.path.style.access", "true")
+      .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
       .config("spark.sql.shuffle.partitions", "8")
       .config("spark.default.parallelism", "8")
