@@ -1,51 +1,26 @@
-import React from "react";
-import { Box, useTheme } from "@mui/material";
-import { Outlet } from "react-router-dom";
-import SideBar from "~/components/Sidebar/SideBar";
-import AppBar from "~/components/AppBar/AppBar";
+import { Outlet, useLocation } from 'react-router-dom';
+import { Box, Container } from '@mui/material';
+import AppBar from '~/components/AppBar/AppBar';
+import Footer from '~/components/Footer/Footer';
+import SideBar from '~/components/SideBar/SideBar';
 
 const MainLayout = () => {
-  const theme = useTheme();
+  const location = useLocation();
+  // Don't show sidebar on the root or /home routes
+  const showSidebar = location.pathname !== '/home' && location.pathname !== '/';
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        bgcolor: "background.default",
-      }}
-    >
-      {/* Navbar section */}
+    <Container disableGutters maxWidth={false} sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppBar />
-
-      {/* Main Layout Area */}
-      <Box
-        sx={{
-          display: "flex",
-          pt: theme.datagate.appBarHeight,
-          flexGrow: 1,
-          overflow: "hidden",
-        }}
-      >
-        {/* Sidebar for quick access to tables */}
-        <SideBar />
-
-        {/* Content area */}
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            p: 3,
-            overflowY: "auto",
-            bgcolor: "#F8FAFC",
-            boxShadow: "inset 1px 0 3px rgba(0,0,0,0.02)",
-          }}
-        >
+      <Box sx={{ display: 'flex', flexGrow: 1, pt: '64px', overflow: 'hidden' }}>
+        {showSidebar && <SideBar />}
+        
+        <Box component="main" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'auto'}}>
           <Outlet />
         </Box>
       </Box>
-    </Box>
+      <Footer />
+    </Container>
   );
 };
 

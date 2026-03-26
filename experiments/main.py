@@ -1,5 +1,5 @@
 def main():
-    print("Hello from datagate!")
+    print("Hello from experiments!")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,11 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers import profiling
+from app.db.database import Base, engine
+import app.models.profiling  # Ensure models are imported for SQLAlchemy to detect tables
+
+# Tự động tạo bảng database nếu chưa có
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

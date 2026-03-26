@@ -3,6 +3,7 @@ import { createTheme } from "@mui/material/styles";
 const APP_BAR_HEIGHT = "64px";
 const FOOTER_HEIGHT = "48px";
 const SIDEBAR_WIDTH = "260px";
+const MAIN_CONTENT_HEIGHT = `calc(100vh - ${APP_BAR_HEIGHT} - ${FOOTER_HEIGHT})`;
 
 const theme = createTheme({
   palette: {
@@ -42,6 +43,13 @@ const theme = createTheme({
     borderRadius: 1, // Strictly <= 1 as requested
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          transition: "background-color 0.3s ease",
+        },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {
@@ -77,6 +85,7 @@ const theme = createTheme({
     appBarHeight: APP_BAR_HEIGHT,
     footerHeight: FOOTER_HEIGHT,
     sidebarWidth: SIDEBAR_WIDTH,
+    mainContentHeight: MAIN_CONTENT_HEIGHT,
   },
 });
 

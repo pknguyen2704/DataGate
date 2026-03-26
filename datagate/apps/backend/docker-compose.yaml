@@ -22,7 +22,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./database:/var/lib/postgresql
+      - database:/var/lib/postgresql
     restart: unless-stopped 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -31,6 +31,8 @@ services:
       retries: 5
     networks:
       - datagate_net
+volumes:
+  database:
 networks:
   datagate_net:
     external: true

@@ -3,7 +3,7 @@ services:
   datagate_spark_master:
     build:
       context: .
-      dockerfile: ./docker/Dockerfile
+      dockerfile: ./Dockerfile
     hostname: datagate-spark-master
     container_name: datagate_spark_master
     env_file:
@@ -31,7 +31,7 @@ services:
   datagate_spark_worker_1:
     build:
       context: .
-      dockerfile: ./docker/Dockerfile
+      dockerfile: ./Dockerfile
     hostname: datagate-spark-worker-1
     container_name: datagate_spark_worker_1
     depends_on:
@@ -65,7 +65,7 @@ services:
   datagate_spark_worker_2:
     build:
       context: .
-      dockerfile: ./docker/Dockerfile
+      dockerfile: ./Dockerfile
     hostname: datagate-spark-worker-2
     container_name: datagate_spark_worker_2
     depends_on:
@@ -99,7 +99,7 @@ services:
   datagate_spark_client:
     build:
       context: .
-      dockerfile: ./docker/Dockerfile
+      dockerfile: ./Dockerfile
     hostname: datagate-spark-client
     container_name: datagate_spark_client
     depends_on:
