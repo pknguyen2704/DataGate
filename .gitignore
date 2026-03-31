@@ -49,12 +49,8 @@ docker-compose.override.yml
 *.csv
 *.json
 *.avro
-postgres_data/
-minio_data/
 logs/
 dags/logs/
-experiments/data/
-experiments/data_source/postgres_data/
 
 # Application Specific
 profiles.yml
