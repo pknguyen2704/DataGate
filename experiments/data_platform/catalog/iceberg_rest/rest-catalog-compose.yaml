@@ -12,11 +12,14 @@ services:
     networks:
       - datagate_net
     environment:
-      # Injecting direct Iceberg properties via JVM System Properties
       - JAVA_OPTS=-Diceberg.s3.path-style-access=true -Diceberg.s3.endpoint=http://minio:9000
     restart: unless-stopped
+    user: root
     volumes:
-      - ./catalog_data:/var/lib/iceberg
+      - catalog_data:/var/lib/iceberg
+
+volumes:
+  catalog_data:
 
 networks:
   datagate_net:

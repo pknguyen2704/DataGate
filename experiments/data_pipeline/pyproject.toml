@@ -1,0 +1,15 @@
+[project]
+name = "data-pipeline"
+version = "0.1.0"
+description = "Taxicab Data Pipeline (EL)"
+dependencies = [
+    "psycopg2-binary",
+    "pyarrow",
+    "pyiceberg[s3fs]",
+    "boto3",
+    "schedule",
+    "python-dotenv",
+]
+
+[tool.uv]
+managed = true
