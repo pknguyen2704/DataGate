@@ -1,10 +1,9 @@
-name: datagate_experiments
 services:
-  data_source_postgres:
+  postgres:
     image: postgres:18
-    container_name: data_source_postgres
+    container_name: postgres
     env_file:
-      - ./.env
+      - .env
     ports:
       - "5433:5432"
     volumes:
@@ -16,9 +15,10 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - datagate_net
+      - datagate-net
 volumes:
   postgres_data:
+
 networks:
-  datagate_net:
+  datagate-net:
     external: true

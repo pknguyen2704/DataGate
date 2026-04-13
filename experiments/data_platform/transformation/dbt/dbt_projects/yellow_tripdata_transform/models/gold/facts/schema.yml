@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: gold_dim_payment_type
+    description: "Dimensional lookup for payment types (CC, Cash, etc.)"
+    columns:
+      - name: payment_type_id
+        tests:
+          - unique
+          - not_null
+      - name: payment_type_name
+        tests:
+          - not_null
+
+  - name: gold_dim_rate_code
+    description: "Dimensional lookup for rate codes (Standard, JFK, etc.)"
+    columns:
+      - name: rate_code_id
+        tests:
+          - unique
+          - not_null
+      - name: rate_code_name
+        tests:
+          - not_null
+
+  - name: gold_fct_trips
+    description: "Core fact table for all taxi trips."
+    columns:
+      - name: trip_id
+        tests:
+          - unique
+          - not_null
+      - name: pickup_datetime
+        tests:
+          - not_null
+      - name: trip_distance_miles
+        tests:
+          - dbt_utils_positive_value:
+              column_name: trip_distance_miles
+      - name: total_amount
+        tests:
+          - dbt_utils_positive_value:
+              column_name: total_amount

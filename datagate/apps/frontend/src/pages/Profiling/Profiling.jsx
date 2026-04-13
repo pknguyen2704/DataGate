@@ -12,7 +12,8 @@ import {
   StarBorder as StarIcon
 } from '@mui/icons-material';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { profilingApi } from '../../apis/profiling';
+import { servicesApi } from '../../apis/services';
+import { rulesApi } from '../../apis/rules';
 
 import ProfilingDashboard from './ProfilingDashboard/ProfilingDashboard';
 import TablePreview from './SampleData/SampleData';
@@ -24,6 +25,8 @@ const Profiling = () => {
   const [histogramData, setHistogramData] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [trendMetric, setTrendMetric] = useState('completeness');
+  
+  const [activeRulesCount, setActiveRulesCount] = useState(0);
   
   const [loading, setLoading] = useState(false);
   const [runLoading, setRunLoading] = useState(false);
@@ -51,13 +54,32 @@ const Profiling = () => {
 
   useEffect(() => { fetchRuns(); }, []);
 
+  // Sync with Sidebar selection via URL query param
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tableParam = params.get('table');
+    if (tableParam && runs.length > 0) {
+      // Find the latest run for this table
+      const tableRun = runs.find(r => r.table_name === tableParam);
+      if (tableRun) {
+        handleSelectRun(tableRun.id);
+      }
+    }
+  }, [location.search, runs]);
+
   const handleSelectRun = async (runId) => {
     setRunLoading(true);
     try {
       const response = await profilingApi.getRunDetail(runId);
-      setSelectedRun(response.data);
-      if (response.data.columns.length > 0) {
-        handleSelectColumn(response.data.columns[0], response.data.table_name);
+      const tableData = response.data;
+      setSelectedRun(tableData);
+      
+      // Fetch active rules for this table
+      const rulesRes = await rulesApi.getRules(tableData.table_name);
+      setActiveRulesCount(rulesRes.data.filter(r => r.is_active).length);
+
+      if (tableData.columns.length > 0) {
+        handleSelectColumn(tableData.columns[0], tableData.table_name);
       }
     } catch (err) { console.error(err); } finally { setRunLoading(false); }
   };
@@ -123,11 +145,20 @@ const Profiling = () => {
               
               <Box sx={{ flexGrow: 1 }} />
               
-              {/* Fake Badges for Atlan Look */}
+              {/* Metadata Badges from active_rules */}
               <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                <Chip icon={<WarningIcon />} label="Contract Failed" color="error" variant="outlined" sx={{ bgcolor: '#FEF2F2', fontWeight: 600, borderRadius: 1.5 }} />
-                <Chip icon={<ThumbUpOutlined fontSize="small" />} label="23" variant="outlined" sx={{ borderRadius: 1.5, '& .MuiChip-icon': { ml: 1 } }} />
-                <Chip icon={<ThumbDownOutlined fontSize="small" />} label="7" variant="outlined" sx={{ borderRadius: 1.5, '& .MuiChip-icon': { ml: 1 } }} />
+                <Chip 
+                  icon={<WarningIcon />} 
+                  label={`${activeRulesCount} Active Rules`} 
+                  color={activeRulesCount > 0 ? "primary" : "default"} 
+                  variant="outlined" 
+                  sx={{ bgcolor: activeRulesCount > 0 ? '#F0F9FF' : 'transparent', fontWeight: 600, borderRadius: 1.5 }} 
+                />
+                <Tooltip title="View Rules">
+                  <IconButton size="small" onClick={() => navigate(`/rules?table=${selectedRun.table_name}`)}>
+                    <LayersIcon fontSize="small" color="primary" />
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Box>
 

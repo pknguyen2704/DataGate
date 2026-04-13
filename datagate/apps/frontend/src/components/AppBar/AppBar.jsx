@@ -154,7 +154,10 @@ const AppBar = () => {
             </IconButton>
           </Tooltip>
           <Tooltip title="Settings">
-            <IconButton sx={{ color: "rgba(255, 255, 255, 0.8)", "&:hover": { color: "#fff" } }}>
+            <IconButton 
+              onClick={() => navigate('/settings/services')}
+              sx={{ color: "rgba(255, 255, 255, 0.8)", "&:hover": { color: "#fff" } }}
+            >
               <SettingsOutlinedIcon />
             </IconButton>
           </Tooltip>

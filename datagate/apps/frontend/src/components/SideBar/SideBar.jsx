@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -10,35 +10,70 @@ import {
   InputAdornment,
   Divider,
   IconButton,
-  Tooltip
+  Tooltip,
+  Collapse,
+  Avatar
 } from "@mui/material";
-import TableChartIcon from "@mui/icons-material/TableChart";
-import SearchIcon from "@mui/icons-material/Search";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import {
+  TableChart as TableChartIcon,
+  Search as SearchIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  ExpandMore,
+  ExpandLess,
+  Storage as StorageIcon,
+  CloudQueue as CloudIcon,
+  Layers as LayersIcon
+} from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
-
-const mockTables = [
-  "users",
-  "transactions",
-  "products",
-  "inventory_logs",
-  "customer_profiles",
-  "orders_2024",
-  "payment_methods",
-  "shipping_address",
-  "marketing_campaigns",
-  "audit_logs",
-];
+import { useNavigate, useLocation } from "react-router-dom";
+import { servicesApi } from "~/apis/services";
+import TrinoIcon from "~/assets/images/Trino.svg";
 
 const SideBar = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  const [services, setServices] = useState([]);
+  const [expandedItems, setExpandedItems] = useState(["databases"]); // "databases" is open by default
+  const [loading, setLoading] = useState(false);
 
-  const filteredTables = mockTables.filter((table) =>
-    table.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchServices = async () => {
+      setLoading(true);
+      try {
+        const res = await servicesApi.getServices();
+        setServices(res.data);
+      } catch (err) {
+        console.error("Failed to fetch services", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  const toggleExpand = (id) => {
+    setExpandedItems(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const getServiceIcon = (type) => {
+    if (type === 'trino') return <Avatar src={TrinoIcon} sx={{ width: 18, height: 18, borderRadius: 0, '& img': { objectFit: 'contain' } }} />;
+    if (type === 'postgres') return <LayersIcon sx={{ fontSize: 18, color: '#336791' }} />;
+    return <StorageIcon sx={{ fontSize: 18, color: '#64748B' }} />;
+  };
+
+  const handleTableClick = (table, serviceId) => {
+    navigate(`${location.pathname}?table=${table}&service=${serviceId}`);
+  };
+
+  const selectedTable = new URLSearchParams(location.search).get('table');
 
   return (
     <Box
@@ -46,126 +81,119 @@ const SideBar = () => {
         width: isCollapsed ? "60px" : theme.datagate.sidebarWidth,
         height: '100%',
         borderRight: `1px solid ${theme.palette.divider}`,
-        bgcolor: "background.paper",
+        bgcolor: "#FFFFFF",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
         transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
-      {/* Header & Toggle Button */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: isCollapsed ? 'center' : 'space-between', 
-        p: 1.5,
-      }}>
+      {/* Header */}
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {!isCollapsed && (
-          <Typography
-            variant="overline"
-            sx={{ fontWeight: 700, color: "text.secondary", letterSpacing: 1.2, fontSize: "0.7rem", ml: 0.5 }}
-          >
-            DATAGATE TABLES
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#1E293B" }}>
+            Data Assets
           </Typography>
         )}
-        <Tooltip title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right">
-          <IconButton size="small" onClick={() => setIsCollapsed(!isCollapsed)}>
-            {isCollapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
-          </IconButton>
-        </Tooltip>
+        <IconButton size="small" onClick={() => setIsCollapsed(!isCollapsed)}>
+          {isCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        </IconButton>
       </Box>
 
-      {!isCollapsed ? (
+      {!isCollapsed && (
         <>
           <Box sx={{ px: 2, pb: 2 }}>
             <TextField
               fullWidth
               size="small"
-              placeholder="Search tables..."
+              placeholder="Filter assets..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  bgcolor: "#F8FAFC",
-                  borderRadius: 1,
-                  fontSize: "0.875rem",
-                  "& fieldset": { borderColor: "divider" },
-                  "&:hover fieldset": { borderColor: "primary.main" },
-                  "&.Mui-focused fieldset": { borderWidth: 1 },
-                },
-              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+                    <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
                   </InputAdornment>
                 ),
               }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#F1F5F9", border: 'none' } }}
             />
           </Box>
 
-          <Divider />
+          <List sx={{ flexGrow: 1, overflowY: "auto", px: 1 }}>
+            {/* Root Node: Databases */}
+            <ListItemButton 
+              onClick={() => toggleExpand("databases")}
+              sx={{ py: 0.5, borderRadius: 1 }}
+            >
+              <ListItemIcon sx={{ minWidth: 28 }}>
+                {expandedItems.includes("databases") ? <ExpandMore fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+              </ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <StorageIcon fontSize="small" sx={{ color: '#64748B' }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Databases" 
+                primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }} 
+              />
+            </ListItemButton>
 
-          <List
-            sx={{
-              flexGrow: 1,
-              overflowY: "auto",
-              px: 1,
-              py: 2,
-              "&::-webkit-scrollbar": { width: 6 },
-              "&::-webkit-scrollbar-thumb": {
-                bgcolor: "divider",
-                borderRadius: 3,
-              },
-            }}
-          >
-            {filteredTables.map((table) => (
-              <ListItemButton
-                key={table}
-                sx={{
-                  borderRadius: 1,
-                  mb: 0.5,
-                  "&:hover": {
-                    bgcolor: "rgba(30, 64, 175, 0.04)",
-                    "& .MuiListItemIcon-root": { color: "primary.main" },
-                    "& .MuiListItemText-primary": { color: "primary.main" },
-                  },
-                  transition: "all 0.2s ease",
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 36, color: "text.secondary" }}>
-                  <TableChartIcon sx={{ fontSize: 20 }} />
-                </ListItemIcon>
-                <ListItemText
-                  primary={table}
-                  primaryTypographyProps={{
-                    variant: "body2",
-                    fontWeight: 500,
-                    noWrap: true,
-                  }}
-                />
-              </ListItemButton>
-            ))}
+            <Collapse in={expandedItems.includes("databases")} timeout="auto">
+              <List component="div" disablePadding sx={{ pl: 2 }}>
+                {services.map((service) => (
+                  <React.Fragment key={service.id}>
+                    <ListItemButton 
+                      onClick={() => toggleExpand(`service-${service.id}`)}
+                      sx={{ py: 0.5, borderRadius: 1 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 28 }}>
+                        {expandedItems.includes(`service-${service.id}`) ? <ExpandMore fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+                      </ListItemIcon>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        {getServiceIcon(service.service_type)}
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={service.name} 
+                        primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 600, color: '#1E293B' }} 
+                      />
+                    </ListItemButton>
+
+                    <Collapse in={expandedItems.includes(`service-${service.id}`)} timeout="auto">
+                      <List component="div" disablePadding sx={{ pl: 4 }}>
+                        {service.integrated_tables?.map((table) => (
+                          <ListItemButton
+                            key={`${service.id}-${table}`}
+                            onClick={() => handleTableClick(table, service.id)}
+                            sx={{
+                              py: 0.5,
+                              borderRadius: 1,
+                              bgcolor: selectedTable === table ? "#E0F2FE" : "transparent",
+                              color: selectedTable === table ? "#0284C7" : "#64748B",
+                              "&:hover": { bgcolor: "#F1F5F9" }
+                            }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 28 }}>
+                              <TableChartIcon sx={{ fontSize: 16, color: selectedTable === table ? "#0284C7" : "inherit" }} />
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary={table} 
+                              primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 500, noWrap: true }} 
+                            />
+                          </ListItemButton>
+                        ))}
+                        {(!service.integrated_tables || service.integrated_tables.length === 0) && (
+                          <Typography variant="caption" sx={{ pl: 4, color: 'text.disabled', fontStyle: 'italic' }}>
+                            No tables integrated
+                          </Typography>
+                        )}
+                      </List>
+                    </Collapse>
+                  </React.Fragment>
+                ))}
+              </List>
+            </Collapse>
           </List>
-
-          <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}`, bgcolor: "rgba(0,0,0,0.02)" }}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-              {filteredTables.length} tables managed
-            </Typography>
-          </Box>
         </>
-      ) : (
-        /* Collapsed Mode Icons */
-        <List sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 1, pb: 2, flexGrow: 1 }}>
-          <Divider sx={{ width: '100%', mb: 2 }} />
-          {[1, 2, 3].map((item) => (
-            <Tooltip key={item} title="Table Item" placement="right">
-              <IconButton sx={{ mb: 1, color: "text.secondary", "&:hover": { color: "primary.main", bgcolor: "rgba(30, 64, 175, 0.04)" } }}>
-                <TableChartIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          ))}
-        </List>
       )}
     </Box>
   );

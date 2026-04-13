@@ -47,7 +47,7 @@ docker-compose.override.yml
 # Project Specific - Data
 *.parquet
 *.csv
-*.json
+
 *.avro
 logs/
 dags/logs/

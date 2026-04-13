@@ -6,8 +6,9 @@ import SideBar from '~/components/SideBar/SideBar';
 
 const MainLayout = () => {
   const location = useLocation();
-  // Don't show sidebar on the root or /home routes
-  const showSidebar = location.pathname !== '/home' && location.pathname !== '/';
+  // Sidebar should only appear for Data Profiling, Rules, and Anomaly Detection
+  const dataPages = ['/profiling', '/rules', '/anomaly'];
+  const showSidebar = dataPages.some(page => location.pathname.startsWith(page));
 
   return (
     <Container disableGutters maxWidth={false} sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>

@@ -35,22 +35,11 @@ echo -e "${YELLOW}Enter target Iceberg table name [default: $TABLE_NAME]: ${NC}"
 read -p "> " table_target
 TABLE_TARGET="${table_target:-$TABLE_NAME}"
 
-# Optional: filter by date_hour
-echo ""
-echo -e "${YELLOW}Enter date_hour filter (format: YYYY-MM-DD HH:00:00) or leave blank to load all:${NC}"
-read -p "> " date_hour_input
-DATE_HOUR="${date_hour_input:-}"
-
 # Display selected configuration
 echo ""
 echo -e "${GREEN}Selected Configuration:${NC}"
 echo "  Source Table:      $TABLE_NAME"
 echo "  Target Table:      $TABLE_TARGET"
-if [ -z "$DATE_HOUR" ]; then
-  echo "  Date Hour Filter:  (none - loading all data)"
-else
-  echo "  Date Hour Filter:  $DATE_HOUR"
-fi
 echo ""
 
 read -p "Proceed with submission? (y/n) [default: y]: " proceed
@@ -65,27 +54,32 @@ fi
 echo ""
 echo -e "${BLUE}Submitting Spark Job: Load_from_ds_to_lakehouse...${NC}"
 
-if [ -z "$DATE_HOUR" ]; then
-  docker exec data_platform_spark_client /opt/spark/bin/spark-submit \
-    --class pknguyen.datagate.Load_from_ds_to_lakehouse \
-    --master spark://data-platform-spark-master:7077 \
-    --deploy-mode cluster \
-    --driver-memory 2G \
-    --executor-memory 4G \
-    --executor-cores 2 \
-    /opt/spark/jobs/experiment_jobs-1.0.jar \
-    "$TABLE_NAME" "$TABLE_TARGET"
-else
-  docker exec data_platform_spark_client /opt/spark/bin/spark-submit \
-    --class pknguyen.datagate.Load_from_ds_to_lakehouse \
-    --master spark://data-platform-spark-master:7077 \
-    --deploy-mode cluster \
-    --driver-memory 2G \
-    --executor-memory 4G \
-    --executor-cores 2 \
-    /opt/spark/work-dir/jobs/experiment_jobs-1.0.jar \
-    "$TABLE_NAME" "$TABLE_TARGET" "$DATE_HOUR"
-fi
+docker exec spark-client /opt/spark/bin/spark-submit \
+  --class datagate.experiment.batch.batch_ingestion_from_ps_to_bronze_layer \
+  --master spark://spark-master:7077 \
+  --deploy-mode cluster \
+  --driver-memory 2G \
+  --executor-memory 4G \
+  --executor-cores 2 \
+  --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  --conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.rest.catalog-impl=org.apache.iceberg.rest.RESTCatalog \
+  --conf spark.sql.catalog.rest.uri=http://iceberg-rest:8181 \
+  --conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.iceberg.catalog-impl=org.apache.iceberg.rest.RESTCatalog \
+  --conf spark.sql.catalog.iceberg.uri=http://iceberg-rest:8181 \
+  /opt/spark/work-dir/experiments/ingest_data-1.0.jar \
+  http://iceberg-rest:8181 \
+  http://minio:9000 \
+  admin \
+  miniopassword \
+  us-east-1 \
+  jdbc:postgresql://postgres:5432/postgres \
+  admin \
+  postgrespassword \
+  "public.$TABLE_NAME" \
+  "bronze.$TABLE_TARGET" \
+  append
 
 echo ""
 echo -e "${GREEN}Job submission complete.${NC}"

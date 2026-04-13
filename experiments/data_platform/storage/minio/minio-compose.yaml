@@ -1,23 +1,20 @@
-name: datagate_experiments
-
 services:
   minio:
     image: minio/minio:latest
-    container_name: data_platform_minio
-    hostname: minio
+    container_name: minio
     command: server /data --console-address ":9001"
     env_file:
-      - ./.env
+      - .env
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - minio_data:/data
     networks:
-      - datagate_net
+      - datagate-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/ready"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -25,7 +22,9 @@ services:
 
   create_buckets:
     image: minio/mc
-    container_name: data_platform_create_buckets
+    container_name: minio_create_buckets
+    env_file:
+      - .env
     depends_on:
       minio:
         condition: service_healthy
@@ -33,19 +32,15 @@ services:
       /bin/sh -c "
       /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
       /usr/bin/mc mb -p myminio/lakehouse;
-      /usr/bin/mc pipe myminio/lakehouse/bronze/.keep;
-      /usr/bin/mc pipe myminio/lakehouse/silver/.keep;
-      /usr/bin/mc pipe myminio/lakehouse/gold/.keep;
       exit 0;
       "
-    env_file:
-      - ./.env
+
     networks:
-      - datagate_net
+      - datagate-net
 
 volumes:
   minio_data:
 
 networks:
-  datagate_net:
+  datagate-net:
     external: true

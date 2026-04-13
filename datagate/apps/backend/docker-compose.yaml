@@ -1,4 +1,3 @@
-name: datagate
 services:
   datagate_backend:
     build: .
@@ -12,7 +11,7 @@ services:
     volumes:
       - ./app:/app/app
     networks:
-      - datagate_net
+      - datagate-net
 
   datagate_database:
     image: postgres:18
@@ -30,9 +29,9 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - datagate_net
+      - datagate-net
 volumes:
   database:
 networks:
-  datagate_net:
+  datagate-net:
     external: true

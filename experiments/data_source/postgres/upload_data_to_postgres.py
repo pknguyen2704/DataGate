@@ -27,7 +27,7 @@ def ds_connect() -> str:
     password = os.getenv("POSTGRES_PASSWORD", "postgrespassword")
     db = os.getenv("POSTGRES_DB", "postgres")
     host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "54321")
+    port = os.getenv("POSTGRES_PORT", "5433")
     
     return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
@@ -79,12 +79,19 @@ def upload_file(db_url, file_path: Path, table_name: str, if_exists: str) -> int
     total_rows = parquet_file.metadata.num_rows
 
     inserted = 0
+    engine = create_engine(db_url)
+    is_first_batch = True
 
     with tqdm(total=total_rows, desc=f"Uploading {file_path.name}") as pbar:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=100000)):
-            df = batch.to_pandas()
+            df = batch.to_pandas(types_mapper=pd.ArrowDtype)
             if df.empty:
                 continue
+            
+            if is_first_batch:
+                df.head(0).to_sql(name=table_name, con=engine, if_exists=if_exists, index=False)
+                is_first_batch = False
+
             copy_to_postgres(df, db_url, table_name)
 
             inserted += len(df)
