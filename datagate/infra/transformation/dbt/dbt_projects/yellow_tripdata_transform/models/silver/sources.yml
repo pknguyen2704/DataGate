@@ -1,0 +1,44 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: "Raw ingested data in the Bronze layer – unmodified from source systems."
+    database: iceberg
+    schema: bronze
+    tables:
+      - name: yellow_tripdata
+        identifier: yellow_tripdata
+        description: "Raw NYC Yellow Taxi trip records ingested from PostgreSQL via Spark."
+        columns:
+          - name: vendorid
+            description: "LPEP provider that provided the record (1=Creative Mobile, 2=VeriFone)."
+          - name: tpep_pickup_datetime
+            description: "Date and time when the meter was engaged."
+            tests:
+              - not_null
+          - name: tpep_dropoff_datetime
+            description: "Date and time when the meter was disengaged."
+            tests:
+              - not_null
+          - name: passenger_count
+            description: "Number of passengers in the vehicle (driver-entered value)."
+          - name: trip_distance
+            description: "Elapsed trip distance in miles."
+          - name: ratecodeid
+            description: "Final rate code in effect at end of trip."
+          - name: store_and_fwd_flag
+            description: "Whether the trip record was stored before sending to vendor (Y/N)."
+          - name: pulocationid
+            description: "TLC Taxi Zone where the taximeter was engaged."
+          - name: dolocationid
+            description: "TLC Taxi Zone where the taximeter was disengaged."
+          - name: payment_type
+            description: "How the passenger paid for the trip."
+          - name: fare_amount
+            description: "Time-and-distance fare calculated by the meter."
+          - name: total_amount
+            description: "Total amount charged to passengers, excluding cash tips."
+          - name: date_hour
+            description: "Partition column – truncated pickup datetime to the hour."
+            tests:
+              - not_null

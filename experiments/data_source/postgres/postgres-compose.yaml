@@ -1,13 +1,13 @@
 services:
-  postgres:
+  datasource_postgres:
     image: postgres:18
-    container_name: postgres
+    container_name: datasource_postgres
     env_file:
       - .env
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - data_source_postgres_data:/var/lib/postgresql
     restart: unless-stopped 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -17,7 +17,7 @@ services:
     networks:
       - datagate-net
 volumes:
-  postgres_data:
+  data_source_postgres_data:
 
 networks:
   datagate-net:

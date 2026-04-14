@@ -1,0 +1,19 @@
+==========================================================
+🚀 DATA GATE: Syncing Rules & Running DBT Transformation
+==========================================================
+Step 1: Generating dbt schema from DataGate Rules (Internal)...
+Defaulting to user installation because normal site-packages is not writeable
+Collecting psycopg2-binary
+  Downloading psycopg2_binary-2.9.11-cp39-cp39-macosx_11_0_arm64.whl (3.9 MB)
+Collecting PyYAML
+  Downloading pyyaml-6.0.3-cp39-cp39-macosx_11_0_arm64.whl (174 kB)
+Installing collected packages: PyYAML, psycopg2-binary
+Successfully installed PyYAML-6.0.3 psycopg2-binary-2.9.11
+WARNING: You are using pip version 21.2.4; however, version 26.0.1 is available.
+You should consider upgrading via the '/Library/Developer/CommandLineTools/usr/bin/python3 -m pip install --upgrade pip' command.
+📦 Installing missing dependencies (psycopg2-binary, PyYAML)...
+Traceback (most recent call last):
+  File "/Users/andrew/Dev/Projects/DataGate/experiments/data_platform/transformation/dbt/dbt_projects/yellow_tripdata_transform/generate_rules.py", line 15, in <module>
+    import psycopg2
+ModuleNotFoundError: No module named 'psycopg2'
+❌ Error generating schema. Aborting.
