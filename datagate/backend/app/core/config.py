@@ -5,21 +5,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "DataGate"
-    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str
+    API_V1_STR: str
     
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "7b68832a8a815a51357635c91178659139268383dfa32e825000")
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+    SECRET_KEY: str
+    ALGORITHM: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
     
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://admin:datagatepassword@localhost:5432/datagate")
+    DATABASE_URL: str
 
     # Airflow
-    AIRFLOW_URL: str = os.getenv("AIRFLOW_URL", "http://localhost:8089")
-    AIRFLOW_USER: str = os.getenv("AIRFLOW_USER", "airflow")
-    AIRFLOW_PASS: str = os.getenv("AIRFLOW_PASS", "airflow")
+    AIRFLOW_URL: str
+    AIRFLOW_USER: str
+    AIRFLOW_PASS: str
 
     class Config:
         case_sensitive = True

@@ -19,11 +19,13 @@ import {
   Logout as LogoutIcon,
   PersonOutline as PersonIcon,
   HelpOutline as HelpIcon,
+  Menu as MenuIcon,
+  MenuOpen as MenuOpenIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-const AppBar = () => {
+const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -38,30 +40,20 @@ const AppBar = () => {
 
   return (
     <MuiAppBar position="static" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'transparent' }}>
-      <Toolbar sx={{ justifyContent: "space-between", minHeight: '64px' }}>
-        {/* Search Bar */}
-        <Box 
-          sx={{ 
-            display: "flex", 
-            alignItems: "center", 
-            bgcolor: "#F1F5F9", 
-            borderRadius: "8px", 
-            px: 2, 
-            py: 0.5,
-            width: { xs: '200px', md: '400px' },
-            transition: 'all 0.2s',
-            '&:focus-within': {
-              bgcolor: 'white',
-              boxShadow: '0 0 0 2px #2563EB33',
-              border: '1px solid #2563EB'
-            }
-          }}
-        >
-          <SearchIcon sx={{ color: "text.secondary", fontSize: 20, mr: 1 }} />
-          <InputBase
-            placeholder="Search datasets, rules, or alerts..."
-            sx={{ flex: 1, fontSize: '0.875rem' }}
-          />
+      <Toolbar sx={{ justifyContent: "space-between", minHeight: '64px', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton 
+            onClick={onToggleSidebar}
+            edge="start"
+            sx={{ 
+              color: 'text.primary',
+              bgcolor: 'transparent',
+              '&:hover': { bgcolor: 'action.hover' }
+            }}
+          >
+            {isSidebarCollapsed ? <MenuIcon /> : <MenuOpenIcon />}
+          </IconButton>
+
         </Box>
 
         {/* Right side Actions */}

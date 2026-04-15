@@ -12,7 +12,7 @@ import MainLayout from "~/components/Layout/MainLayout";
 import Settings from "~/pages/Settings/Settings";
 import MetricMonitoring from "~/pages/Metrics/MetricMonitoring";
 import DataLineage from "~/pages/Lineage/DataLineage";
-import DatasetExplorer from "~/pages/Explorer/DatasetExplorer";
+import Explore from "~/pages/Explore/Explore";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 import "react-toastify/dist/ReactToastify.css";
@@ -37,7 +37,7 @@ function App() {
             <Route path="/metrics" element={<MetricMonitoring />} />
             <Route path="/anomaly" element={<AnomalyDetection />} />
             <Route path="/lineage" element={<DataLineage />} />
-            <Route path="/explorer" element={<DatasetExplorer />} />
+            <Route path="/explore" element={<Explore />} />
             <Route path="/settings/*" element={<Settings />} />
           </Route>
         </Route>

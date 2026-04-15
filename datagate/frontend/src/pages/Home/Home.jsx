@@ -122,15 +122,12 @@ const Home = () => {
   const theme = useTheme();
 
   return (
-    <Box>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>System Overview</Typography>
-          <Typography variant="body1" color="text.secondary">
-            Health monitoring and data quality metrics for the last 24 hours.
-          </Typography>
-        </Box>
-        <Button variant="contained" endIcon={<ChevronRight />}>View Data Lineage</Button>
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5 }}>System Overview</Typography>
+        <Typography variant="body1" color="text.secondary">
+          Health monitoring and data quality metrics for the last 24 hours.
+        </Typography>
       </Box>
 
       {/* KPI Section */}
@@ -204,8 +201,8 @@ const Home = () => {
                 <Chip label="7d" size="small" variant="outlined" />
               </Box>
             </Box>
-            <Box sx={{ height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <Box sx={{ height: 300, minHeight: 300 }}>
+              <ResponsiveContainer width="99%" height="100%">
                 <AreaChart data={mockVolumeData}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">

@@ -1,22 +1,27 @@
-import { Outlet, useLocation } from 'react-router-dom';
-import { Box, Container } from '@mui/material';
+import React from 'react';
+import { Outlet } from 'react-router-dom';
+import { Box } from '@mui/material';
 import AppBar from '~/components/AppBar/AppBar';
-import Footer from '~/components/Footer/Footer';
 import SideBar from '~/components/SideBar/SideBar';
 
 const MainLayout = () => {
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  const toggleSidebar = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: 'background.default' }}>
-      <SideBar />
+      <SideBar isCollapsed={isCollapsed} onToggle={toggleSidebar} />
       
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <AppBar />
+        <AppBar onToggleSidebar={toggleSidebar} isSidebarCollapsed={isCollapsed} />
         
         <Box 
           component="main" 
           sx={{ 
             flexGrow: 1, 
-            p: 3, 
             overflow: 'auto',
             display: 'flex',
             flexDirection: 'column'
@@ -24,7 +29,6 @@ const MainLayout = () => {
         >
           <Outlet />
         </Box>
-        <Footer />
       </Box>
     </Box>
   );

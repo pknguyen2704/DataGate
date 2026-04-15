@@ -55,3 +55,4 @@ dags/logs/
 # Application Specific
 profiles.yml
 airflow.env
+.jar

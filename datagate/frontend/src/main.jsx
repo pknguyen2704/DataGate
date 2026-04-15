@@ -7,7 +7,6 @@ import { ToastContainer } from 'react-toastify'
 import theme from '~/theme'
 import App from '~/App.jsx'
 import { AuthProvider } from './contexts/AuthContext'
-import './index.css'
 
 import { Provider } from 'react-redux'
 import { store } from './store'

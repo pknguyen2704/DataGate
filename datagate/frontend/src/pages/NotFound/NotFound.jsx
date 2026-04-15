@@ -26,11 +26,11 @@ const NotFound = () => {
         </Typography>
         
         <Typography variant="h4" color="text.primary" fontWeight={600}>
-          Trang không tồn tại
+          Page not found
         </Typography>
         
         <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 500, mb: 2 }}>
-          Oops! Có vẻ như trang bạn đang tìm kiếm đã bị di dời, đổi tên hoặc không bao giờ tồn tại trong hệ thống DataGate.
+          Oops! The page you are looking for might have been moved, renamed, or never existed in the DataGate system.
         </Typography>
 
         <Button
@@ -40,7 +40,7 @@ const NotFound = () => {
           onClick={() => navigate('/')}
           sx={{ borderRadius: 2, px: 4, py: 1.5, textTransform: 'none', fontWeight: 'bold' }}
         >
-          Quay lại Trang chủ
+          Back to Home
         </Button>
       </Box>
     </Container>

@@ -19,7 +19,7 @@ import {
   Edit as EditIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { servicesApi } from '../../../apis/services';
+import { servicesApi } from '~/apis/services';
 
 const ServiceList = () => {
   const [services, setServices] = useState([]);
