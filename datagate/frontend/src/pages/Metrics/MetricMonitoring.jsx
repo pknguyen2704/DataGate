@@ -1,143 +1,423 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
-  Typography,
-  Grid,
-  Paper,
   Chip,
+  CircularProgress,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Slider,
   Stack,
-  useTheme,
+  Typography,
 } from "@mui/material";
 import {
   AssessmentOutlined as MetricsIcon,
-  Timeline as TimelineIcon,
-  CompareArrows as CompareIcon,
+  InsightsOutlined as InsightsIcon,
+  QueryStatsOutlined as StatsIcon,
+  TuneOutlined as TuneIcon,
 } from "@mui/icons-material";
 import {
-  ComposedChart,
-  Line,
   Area,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
+import { servicesApi } from "~/apis/services";
+import { profilingApi } from "~/apis/profiling";
 
-const mockMetricData = [
-  { time: "09:00", actual: 42, min: 38, max: 46 },
-  { time: "10:00", actual: 45, min: 40, max: 50 },
-  { time: "11:00", actual: 62, min: 42, max: 52 }, // Anomaly
-  { time: "12:00", actual: 48, min: 43, max: 53 },
-  { time: "13:00", actual: 50, min: 44, max: 54 },
-  { time: "14:00", actual: 52, min: 45, max: 55 },
-  { time: "15:00", actual: 51, min: 45, max: 55 },
+const CONFIDENCE_MARKS = [
+  { value: 80, label: "80%" },
+  { value: 95, label: "95%" },
+  { value: 99, label: "99%" },
 ];
 
-const MetricCard = ({ title, value, unit, status }) => (
-  <Paper sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-    <Box>
-      <Typography variant="caption" color="text.secondary" fontWeight={700}>{title}</Typography>
-      <Typography variant="h5" fontWeight={800}>{value} <Typography variant="caption" sx={{ fontWeight: 500 }}>{unit}</Typography></Typography>
-    </Box>
-    <Chip 
-      label={status} 
-      size="small" 
-      color={status === 'Healthy' ? 'success' : 'error'} 
-      sx={{ fontWeight: 800, height: 20, fontSize: '0.65rem' }} 
-    />
-  </Paper>
-);
+const formatMetricValue = (metric, value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "--";
+  if (metric === "null_rate") return `${(value * 100).toFixed(2)}%`;
+  return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+};
 
-const MetricMonitoring = () => {
-  const theme = useTheme();
+function MetricMonitoring() {
+  const [assets, setAssets] = useState([]);
+  const [selectedTable, setSelectedTable] = useState("");
+  const [recommendations, setRecommendations] = useState([]);
+  const [selectedColumn, setSelectedColumn] = useState("");
+  const [selectedMetric, setSelectedMetric] = useState("null_rate");
+  const [confidence, setConfidence] = useState(95);
+  const [series, setSeries] = useState([]);
+  const [loadingAssets, setLoadingAssets] = useState(true);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [loadingSeries, setLoadingSeries] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchAssets = async () => {
+      try {
+        setLoadingAssets(true);
+        const response = await servicesApi.getAssets();
+        const nextAssets = response.data || [];
+        setAssets(nextAssets);
+        setSelectedTable(nextAssets[0]?.table_name || "");
+      } catch (fetchError) {
+        console.error(fetchError);
+        setError("Could not load data assets for metric monitoring.");
+      } finally {
+        setLoadingAssets(false);
+      }
+    };
+
+    fetchAssets();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedTable) return;
+
+    const fetchRecommendations = async () => {
+      try {
+        setLoadingRecommendations(true);
+        const response = await profilingApi.getMonitoringRecommendations(selectedTable);
+        const nextRecommendations = response.data?.recommended_columns || [];
+        setRecommendations(nextRecommendations);
+        const fallbackColumn = nextRecommendations[0]?.column_name || "";
+        const fallbackMetric = nextRecommendations[0]?.metrics?.[0]?.metric || "null_rate";
+        setSelectedColumn(fallbackColumn);
+        setSelectedMetric(fallbackMetric);
+        setError("");
+      } catch (fetchError) {
+        console.error(fetchError);
+        setRecommendations([]);
+        setError("No profiling recommendations are available for this asset yet.");
+      } finally {
+        setLoadingRecommendations(false);
+      }
+    };
+
+    fetchRecommendations();
+  }, [selectedTable]);
+
+  useEffect(() => {
+    if (!selectedTable || !selectedColumn || !selectedMetric) return;
+
+    const fetchSeries = async () => {
+      try {
+        setLoadingSeries(true);
+        const response = await profilingApi.getMonitoringSeries(selectedTable, selectedColumn, selectedMetric, confidence);
+        const points = response.data?.points || [];
+        setSeries(
+          points.map((point) => ({
+            ...point,
+            date: new Date(point.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          }))
+        );
+        setError("");
+      } catch (fetchError) {
+        console.error(fetchError);
+        setSeries([]);
+        setError("Could not load metric history for the selected column.");
+      } finally {
+        setLoadingSeries(false);
+      }
+    };
+
+    fetchSeries();
+  }, [confidence, selectedColumn, selectedMetric, selectedTable]);
+
+  const selectedColumnConfig = useMemo(
+    () => recommendations.find((item) => item.column_name === selectedColumn) || null,
+    [recommendations, selectedColumn]
+  );
+
+  const totalAnomalies = series.filter((point) => point.is_anomaly).length;
 
   return (
-    <Box>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Metric Monitoring</Typography>
-        <Typography variant="body1" color="text.secondary">Deep-dive into statistical distributions and time-series profiling.</Typography>
-      </Box>
+    <Box sx={{ p: 4, height: "100%", overflow: "auto", background: "#F6F8FC" }}>
+      <Paper
+        sx={{
+          mb: 3,
+          p: 4,
+          borderRadius: 4,
+          background: "linear-gradient(135deg, #0F1F4D 0%, #17397A 48%, #2E6BFF 100%)",
+          color: "#FFFFFF",
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={3} justifyContent="space-between">
+          <Box sx={{ maxWidth: 760 }}>
+            <Typography variant="overline" sx={{ letterSpacing: "0.18em", opacity: 0.8 }}>
+              Pillar 3
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 800, mb: 1.5, letterSpacing: "-0.03em" }}>
+              Metric Monitoring
+            </Typography>
+            <Typography sx={{ fontSize: "1.05rem", opacity: 0.9, maxWidth: 720 }}>
+              Monitor aggregate statistics such as null rate, mean, minimum, maximum, and standard deviation to detect slow-moving distribution drift. Confidence bands adapt to the selected sensitivity and the backend uses seasonal historical baselines for cleaner alerts.
+            </Typography>
+          </Box>
 
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={4}><MetricCard title="Null Rate" value="0.12" unit="%" status="Healthy" /></Grid>
-        <Grid item xs={12} md={4}><MetricCard title="Mean Value" value="482.4" unit="USD" status="Healthy" /></Grid>
-        <Grid item xs={12} md={4}><MetricCard title="Std Deviation" value="12.5" unit="" status="Healthy" /></Grid>
-      </Grid>
-
-      <Paper sx={{ p: 3, mb: 4 }}>
-         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Box>
-               <Typography variant="h6">Metric Trend with Confidence Intervals</Typography>
-               <Typography variant="caption" color="text.secondary">Actual values vs 95% confidence band (history-based)</Typography>
-            </Box>
-            <Stack direction="row" spacing={1}>
-               <Chip label="Actual" icon={<Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />} size="small" variant="outlined" />
-               <Chip label="Confidence Interval" icon={<Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', opacity: 0.2, borderRadius: '50%' }} />} size="small" variant="outlined" />
-            </Stack>
-         </Box>
-         
-         <Box sx={{ height: 400 }}>
-            <ResponsiveContainer width="100%" height="100%">
-               <ComposedChart data={mockMetricData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="time" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  {/* Confidence Interval Band */}
-                  <Area 
-                    type="monotone" 
-                    dataKey="max" 
-                    stroke="none" 
-                    fill={theme.palette.primary.main} 
-                    fillOpacity={0.1} 
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="min" 
-                    stroke="none" 
-                    fill="#FFFFFF" 
-                    fillOpacity={1} 
-                  />
-                  {/* Actual Line */}
-                  <Line 
-                    type="monotone" 
-                    dataKey="actual" 
-                    stroke={theme.palette.primary.main} 
-                    strokeWidth={3} 
-                    dot={(props) => {
-                      const { cx, cy, payload } = props;
-                      if (payload.actual > payload.max || payload.actual < payload.min) {
-                        return <circle cx={cx} cy={cy} r={6} fill={theme.palette.error.main} stroke="none" />;
-                      }
-                      return <circle cx={cx} cy={cy} r={4} fill={theme.palette.primary.main} stroke="none" />;
-                    }}
-                  />
-               </ComposedChart>
-            </ResponsiveContainer>
-         </Box>
+          <Stack spacing={1.5} sx={{ minWidth: { lg: 280 } }}>
+            <Chip sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.22)" }} variant="outlined" label="Confidence bands on every chart" />
+            <Chip sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.22)" }} variant="outlined" label="Sensitivity tuning: 80% / 95% / 99%" />
+            <Chip sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.22)" }} variant="outlined" label="Recommended metrics from profiling history" />
+          </Stack>
+        </Stack>
       </Paper>
 
-      <Typography variant="h6" gutterBottom>Statistical Breakdown</Typography>
-      <Grid container spacing={2}>
-         {['Completeness', 'Uniqueness', 'Validity', 'Consistency'].map(stat => (
-            <Grid item xs={12} sm={6} md={3} key={stat}>
-               <Paper sx={{ p: 2, border: '1px solid #E2E8F0', boxShadow: 'none' }}>
-                  <Typography variant="caption" fontWeight={700}>{stat}</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
-                     <Typography variant="h5" fontWeight={800}>99.9%</Typography>
-                     <Box sx={{ flex: 1, height: 4, bgcolor: '#F1F5F9', borderRadius: 2 }}>
-                        <Box sx={{ width: '99.9%', height: '100%', bgcolor: 'success.main', borderRadius: 2 }} />
-                     </Box>
-                  </Box>
-               </Paper>
-            </Grid>
-         ))}
+      {error ? (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      ) : null}
+
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={4}>
+          <MetricCard
+            icon={<MetricsIcon />}
+            label="Monitored assets"
+            value={loadingAssets ? "--" : assets.length.toLocaleString()}
+            helper="Assets accessible from your RBAC scope"
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <MetricCard
+            icon={<InsightsIcon />}
+            label="Suggested columns"
+            value={loadingRecommendations ? "--" : recommendations.length.toLocaleString()}
+            helper="Auto-selected important columns from the latest profiling run"
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <MetricCard
+            icon={<StatsIcon />}
+            label="Detected anomalies"
+            value={loadingSeries ? "--" : totalAnomalies.toLocaleString()}
+            helper={`At ${confidence}% confidence for the selected metric`}
+          />
+        </Grid>
+      </Grid>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} lg={4}>
+          <Paper sx={{ p: 3, borderRadius: 4, height: "100%" }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2.5 }}>
+              Monitoring Controls
+            </Typography>
+
+            {loadingAssets ? (
+              <CircularProgress size={24} />
+            ) : (
+              <Stack spacing={2.5}>
+                <FormControl fullWidth>
+                  <InputLabel>Asset</InputLabel>
+                  <Select label="Asset" value={selectedTable} onChange={(event) => setSelectedTable(event.target.value)}>
+                    {assets.map((asset) => (
+                      <MenuItem key={`${asset.service_id}-${asset.table_name}`} value={asset.table_name}>
+                        {asset.table_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth disabled={loadingRecommendations || recommendations.length === 0}>
+                  <InputLabel>Column</InputLabel>
+                  <Select label="Column" value={selectedColumn} onChange={(event) => setSelectedColumn(event.target.value)}>
+                    {recommendations.map((column) => (
+                      <MenuItem key={column.column_name} value={column.column_name}>
+                        {column.column_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth disabled={!selectedColumnConfig}>
+                  <InputLabel>Metric</InputLabel>
+                  <Select label="Metric" value={selectedMetric} onChange={(event) => setSelectedMetric(event.target.value)}>
+                    {(selectedColumnConfig?.metrics || []).map((metric) => (
+                      <MenuItem key={metric.metric} value={metric.metric}>
+                        {metric.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <Box sx={{ px: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <TuneIcon fontSize="small" color="primary" />
+                    <Typography sx={{ fontWeight: 700 }}>Sensitivity tuning</Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Lower confidence produces tighter bands and more alerts. Higher confidence reduces noise.
+                  </Typography>
+                  <Slider
+                    value={confidence}
+                    onChange={(_, nextValue) => setConfidence(nextValue)}
+                    step={null}
+                    marks={CONFIDENCE_MARKS}
+                    min={80}
+                    max={99}
+                  />
+                </Box>
+
+                <Box sx={{ p: 2.5, borderRadius: 3, bgcolor: "#F8FAFC", border: "1px solid #E5EAF2" }}>
+                  <Typography sx={{ fontWeight: 700, mb: 1 }}>Backend behavior</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Daily metric results are persisted in PostgreSQL. Confidence bands are generated from historical profiling data with a seasonality-aware baseline by weekday before alerting on drift.
+                  </Typography>
+                </Box>
+              </Stack>
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} lg={8}>
+          <Paper sx={{ p: 3, borderRadius: 4, mb: 3 }}>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "center" }}
+              sx={{ mb: 3 }}
+            >
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Metric Chart with Confidence Interval
+                </Typography>
+                <Typography color="text.secondary">
+                  {selectedColumn ? `${selectedColumn} · ${selectedMetric}` : "Select an asset, column, and metric"}
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1}>
+                <Chip label={`Confidence ${confidence}%`} color="primary" variant="outlined" />
+                <Chip label={`${series.length} points`} variant="outlined" />
+              </Stack>
+            </Stack>
+
+            <Box sx={{ height: 420 }}>
+              {loadingSeries ? (
+                <Stack alignItems="center" justifyContent="center" sx={{ height: "100%" }}>
+                  <CircularProgress />
+                </Stack>
+              ) : series.length === 0 ? (
+                <Stack alignItems="center" justifyContent="center" sx={{ height: "100%" }}>
+                  <Typography color="text.secondary">No metric history is available for this selection.</Typography>
+                </Stack>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={series}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF5" vertical={false} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} />
+                    <YAxis axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="upper_bound"
+                      stroke="none"
+                      fill="#2E6BFF"
+                      fillOpacity={0.12}
+                      name="Upper bound"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="lower_bound"
+                      stroke="none"
+                      fill="#FFFFFF"
+                      fillOpacity={1}
+                      name="Lower bound"
+                    />
+                    <Line type="monotone" dataKey="expected" stroke="#94A3B8" strokeDasharray="6 4" dot={false} name="Expected" />
+                    <Line type="monotone" dataKey="value" stroke="#1D4ED8" strokeWidth={3} name="Actual" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+            </Box>
+          </Paper>
+
+          <Paper sx={{ p: 3, borderRadius: 4 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2.5 }}>
+              Auto-suggested Metrics
+            </Typography>
+
+            {loadingRecommendations ? (
+              <CircularProgress size={24} />
+            ) : recommendations.length === 0 ? (
+              <Typography color="text.secondary">
+                Profiling history is required before suggested metrics can be generated.
+              </Typography>
+            ) : (
+              <Grid container spacing={2}>
+                {recommendations.map((column) => (
+                  <Grid item xs={12} md={6} key={column.column_name}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        borderColor: column.column_name === selectedColumn ? "#2E6BFF" : "#E5EAF2",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        setSelectedColumn(column.column_name);
+                        setSelectedMetric(column.metrics[0]?.metric || "null_rate");
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                        <Typography sx={{ fontWeight: 700 }}>{column.column_name}</Typography>
+                        <Chip size="small" label={column.data_type || "--"} variant="outlined" />
+                      </Stack>
+                      <Stack spacing={1}>
+                        {column.metrics.map((metric) => (
+                          <Stack key={`${column.column_name}-${metric.metric}`} direction="row" justifyContent="space-between">
+                            <Typography color="text.secondary">{metric.label}</Typography>
+                            <Typography sx={{ fontWeight: 700 }}>{formatMetricValue(metric.metric, metric.value)}</Typography>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Paper>
+        </Grid>
       </Grid>
     </Box>
   );
-};
+}
+
+function MetricCard({ icon, label, value, helper }) {
+  return (
+    <Paper sx={{ p: 3, borderRadius: 4, height: "100%" }}>
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            borderRadius: 2.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "#E8F0FF",
+            color: "#1D4ED8",
+          }}
+        >
+          {icon}
+        </Box>
+        <Typography color="text.secondary">{label}</Typography>
+      </Stack>
+      <Typography sx={{ fontSize: "2.1rem", fontWeight: 800, letterSpacing: "-0.03em", mb: 0.5 }}>{value}</Typography>
+      <Typography color="text.secondary">{helper}</Typography>
+    </Paper>
+  );
+}
 
 export default MetricMonitoring;

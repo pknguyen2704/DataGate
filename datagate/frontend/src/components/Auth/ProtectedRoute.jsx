@@ -1,10 +1,9 @@
-import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSelector } from 'react-redux';
 import { Box, CircularProgress } from '@mui/material';
 
 const ProtectedRoute = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading } = useSelector((state) => state.auth);
   const location = useLocation();
 
   if (loading) {

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
 from app.db.base_class import Base
@@ -21,6 +21,7 @@ class QualityCheckResult(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     run_id = Column(Integer, ForeignKey("quality_check_runs.id"))
+    rule_id = Column(Integer, ForeignKey("active_rules.id"), nullable=True)
     column_name = Column(String)
     rule_type = Column(String)
     constraint_status = Column(String) # Success, Failure
@@ -38,6 +39,7 @@ class MLAnomalyRun(Base):
     partition_key = Column(String)
     anomaly_score = Column(Float) # AUC score from binary classifier
     status = Column(String) # PASS, ALERT (if score > threshold)
+    raw_json = Column(JSON, nullable=True)
     
     features = relationship("MLFeatureImportance", back_populates="run", cascade="all, delete-orphan")
 

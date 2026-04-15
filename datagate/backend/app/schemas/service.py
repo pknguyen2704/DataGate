@@ -2,6 +2,16 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
+
+class ServiceOwner(BaseModel):
+    id: int
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class ServiceBase(BaseModel):
     name: str
     service_type: str
@@ -22,6 +32,7 @@ class ServiceUpdate(BaseModel):
 class Service(ServiceBase):
     id: int
     status: str
+    owner: Optional[ServiceOwner] = None
     created_at: datetime
     updated_at: datetime
 

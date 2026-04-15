@@ -38,9 +38,9 @@ const AnomalyDetection = () => {
   if (loading && !selectedRun) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
 
   return (
-    <Box>
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>ML Anomaly Detection</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>ML Anomaly Detection</Typography>
         <Typography variant="body1" color="text.secondary">Deep learning based distribution shift and outlier detection.</Typography>
       </Box>
 

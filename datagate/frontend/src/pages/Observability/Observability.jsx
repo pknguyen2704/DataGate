@@ -86,9 +86,9 @@ const Observability = () => {
   }, [services]);
 
   const renderListView = () => (
-    <Box>
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom>Data Observability</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5 }}>Data Observability</Typography>
         <Typography variant="body1" color="text.secondary">
           Monitor freshness, volume, and schema health across all your Bronze layer assets.
         </Typography>
@@ -148,7 +148,7 @@ const Observability = () => {
   const renderDetailView = () => {
     const latestSnapshot = snapshots[0] || null;
     return (
-      <Box>
+      <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Breadcrumbs sx={{ mb: 0.5 }}>

@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from collections import defaultdict
 
 # 1. Ensure dependencies are present in the dbt container
 def install_deps():
@@ -25,6 +26,7 @@ DB_PORT = os.getenv("DATAGATE_DB_PORT", "5432")
 
 DB_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 TARGET_SCHEMA_PATH = "./models/silver/schema.yml"
+TARGET_TABLE = os.getenv("DATAGATE_TARGET_TABLE")
 
 def translate_to_sql(expression, column_name):
     """Translates common profiling descriptors to valid SQL expressions."""
@@ -113,8 +115,10 @@ def translate_to_sql(expression, column_name):
 
 def generate_dbt_test(rule_type, expression, column_name):
     """Maps rule types to standard or custom dbt tests with arguments."""
-    if rule_type == 'not_null': return 'not_null'
-    if rule_type == 'unique': return 'unique'
+    if rule_type in {'not_null', 'completeness'}: return 'not_null'
+    if rule_type == 'uniqueness': return 'unique'
+    if rule_type == 'range':
+        return {"dbt_utils.expression_is_true": {"expression": translate_to_sql(expression, column_name)}}
     
     # Translate the expression to SQL
     sql_expression = translate_to_sql(expression, column_name)
@@ -129,7 +133,25 @@ def main():
     try:
         conn = psycopg2.connect(DB_URL)
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT table_name, column_name, rule_type, rule_expression FROM active_rules WHERE is_active = true")
+            if TARGET_TABLE:
+                cur.execute(
+                    """
+                    SELECT table_name, column_name, rule_type, rule_expression, priority, category
+                    FROM active_rules
+                    WHERE is_active = true AND is_applied = true AND table_name = %s
+                    ORDER BY priority ASC, column_name ASC
+                    """,
+                    (TARGET_TABLE,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT table_name, column_name, rule_type, rule_expression, priority, category
+                    FROM active_rules
+                    WHERE is_active = true AND is_applied = true
+                    ORDER BY priority ASC, column_name ASC
+                    """
+                )
             rules = cur.fetchall()
         
         if not rules:
@@ -137,13 +159,12 @@ def main():
             return
 
         # Build YAML structure with deduplication
-        models_data = {}
+        models_data = defaultdict(dict)
         for rule in rules:
             table = rule['table_name'].split('.')[-1]
             col = rule['column_name']
             test = generate_dbt_test(rule['rule_type'], rule['rule_expression'], col)
             
-            if table not in models_data: models_data[table] = {}
             if col not in models_data[table]: models_data[table][col] = []
             
             # Use a hashable representation to check for duplicates

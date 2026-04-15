@@ -66,23 +66,28 @@ const ServiceList = () => {
 
   const handleOpenEdit = (service) => {
     setEditingServiceId(service.id);
-    setFormData({
+    const data = {
       name: service.name,
       service_type: service.service_type,
-      connection_url: service.connection_url
-    });
+      connection_url: service.connection_url,
+    };
+    setFormData(data);
     setIntegratedTables(service.integrated_tables || []);
     setOpen(true);
-    // Auto test to load schemas
-    handleTest();
+    setTestResult(null);
+    setDiscoveredSchemas([]);
   };
 
-  const handleTest = async () => {
+  const handleTest = async (explicitPayload = null) => {
     setTesting(true);
     setTestResult(null);
     setDiscoveredSchemas([]);
     try {
-      const res = await servicesApi.testConnection(editingServiceId ? { ...formData, id: editingServiceId } : formData);
+      // Ignore click events; only send actual form payloads.
+      const payload = explicitPayload && typeof explicitPayload === 'object' && !('target' in explicitPayload)
+        ? explicitPayload
+        : (editingServiceId ? { ...formData, id: editingServiceId } : formData);
+      const res = await servicesApi.testConnection(payload);
       setTestResult(res.data);
       if (res.data.status === 'success') {
         toast.success("Connection successful!");
@@ -261,7 +266,7 @@ const ServiceList = () => {
                 </Select>
              </Box>
              <TextField label="Connection URL" fullWidth size="small" value={formData.connection_url} onChange={(e) => setFormData({...formData, connection_url: e.target.value})} />
-             <Button variant="outlined" size="small" onClick={handleTest} disabled={testing}>{testing ? <CircularProgress size={20} /> : "Test Connection"}</Button>
+             <Button variant="outlined" size="small" onClick={() => handleTest()} disabled={testing}>{testing ? <CircularProgress size={20} /> : "Test Connection"}</Button>
              
              {discoveredSchemas.length > 0 && (
                <Box sx={{ display: 'flex', gap: 1, height: 300 }}>

@@ -22,19 +22,27 @@ dag = DAG(
     tags=['datagate', 'ml', 'anomaly'],
 )
 
-# This task will run spark-submit inside the spark-client container
-# It receives parameters from the external trigger (dag_run.conf)
-# Required conf keys: catalog, schema, table
+# This task runs spark-submit directly on the spark-master container.
+# Spark standalone does not support cluster deploy mode for Python applications,
+# so this stays in client mode.
+# It receives parameters from the external trigger (dag_run.conf).
 ml_scan_task = BashOperator(
     task_id='run_ml_anomaly_scan',
     bash_command="""
-        docker exec spark-client /opt/spark/bin/spark-submit \
+        docker exec spark-master /opt/spark/bin/spark-submit \
             --master spark://spark-master:7077 \
             --deploy-mode client \
+            --name ml-anomaly-{{ dag_run.run_id | replace(':', '-') | replace('+', '-') }} \
+            --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
             --conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
-            --conf spark.sql.catalog.iceberg.type=hadoop \
-            --conf spark.sql.catalog.iceberg.warehouse=s3a://iceberg/warehouse \
-            --conf spark.sql.catalog.iceberg.io-impl=org.apache.iceberg.aws.s3.S3FileIO \
+            --conf spark.sql.catalog.iceberg.catalog-impl=org.apache.iceberg.rest.RESTCatalog \
+            --conf spark.sql.catalog.iceberg.uri=http://iceberg-rest:8181 \
+            --conf spark.sql.catalog.iceberg.s3.endpoint=http://minio:9000 \
+            --conf spark.sql.catalog.iceberg.s3.access-key-id=admin \
+            --conf spark.sql.catalog.iceberg.s3.secret-access-key=miniopassword \
+            --conf spark.sql.catalog.iceberg.s3.path-style-access=true \
+            --conf spark.sql.catalog.iceberg.s3.region=us-east-1 \
+            --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
             --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
             --conf spark.hadoop.fs.s3a.access.key=admin \
             --conf spark.hadoop.fs.s3a.secret.key=miniopassword \
@@ -43,7 +51,10 @@ ml_scan_task = BashOperator(
             --catalog {{ dag_run.conf.get('catalog', 'iceberg') }} \
             --schema {{ dag_run.conf.get('schema', 'public') }} \
             --table {{ dag_run.conf.get('table', 'unknown') }} \
-            --backend_url http://backend:8000 \
+            --effective_date {{ dag_run.conf.get('effective_date', '') }} \
+            --sample_size {{ dag_run.conf.get('sample_size', 10000) }} \
+            --sensitivity {{ dag_run.conf.get('sensitivity', 'medium') }} \
+            --backend_url http://host.docker.internal:8000 \
             --token internal_ops_token
     """,
     dag=dag,

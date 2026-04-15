@@ -12,12 +12,30 @@ def init_db(db: Session) -> None:
     # Create tables
     Base.metadata.create_all(bind=engine)
 
+    admin_role = db.query(models.Role).filter(models.Role.name == "ADMIN").first()
+    if not admin_role:
+        admin_role = models.Role(name="ADMIN", description="Platform Administrator")
+        db.add(admin_role)
+
+    owner_role = db.query(models.Role).filter(models.Role.name == "DATA_OWNER").first()
+    if not owner_role:
+        owner_role = models.Role(name="DATA_OWNER", description="Data Asset Owner")
+        db.add(owner_role)
+
+    viewer_role = db.query(models.Role).filter(models.Role.name == "VIEWER").first()
+    if not viewer_role:
+        viewer_role = models.Role(name="VIEWER", description="Data Consumer / Viewer")
+        db.add(viewer_role)
+
+    db.commit()
+
     # Check if superuser already exists
     user = db.query(models.User).filter(models.User.email == "admin@datagate.ai").first()
     if not user:
         # Create Superuser
         user_in = models.User(
             email="admin@datagate.ai",
+            username="admin",
             hashed_password=security.get_password_hash("admin123"),
             full_name="System Administrator",
             is_active=True,
@@ -25,15 +43,7 @@ def init_db(db: Session) -> None:
         )
         db.add(user_in)
         
-        # Create default roles
-        admin_role = models.Role(name="ADMIN", description="Platform Administrator")
-        owner_role = models.Role(name="DATA_OWNER", description="Data Asset Owner")
-        viewer_role = models.Role(name="VIEWER", description="Data Consumer / Viewer")
-        
-        db.add(admin_role)
-        db.add(owner_role)
-        db.add(viewer_role)
-        
+        db.add(user_in)
         db.commit()
         db.refresh(user_in)
         
@@ -44,6 +54,49 @@ def init_db(db: Session) -> None:
         logger.info("Database initialized with superuser: admin@datagate.ai / admin123")
     else:
         logger.info("Database already initialized.")
+
+    sample_users = [
+        {
+            "email": "owner.a@datagate.ai",
+            "username": "owner_a",
+            "password": "owner123",
+            "full_name": "Owner A",
+            "is_superuser": False,
+            "role": owner_role,
+        },
+        {
+            "email": "viewer.b@datagate.ai",
+            "username": "viewer_b",
+            "password": "viewer123",
+            "full_name": "Viewer B",
+            "is_superuser": False,
+            "role": viewer_role,
+        },
+    ]
+
+    for sample_user in sample_users:
+        existing_user = db.query(models.User).filter(models.User.email == sample_user["email"]).first()
+        if existing_user:
+            if sample_user["role"] not in existing_user.roles:
+                existing_user.roles.append(sample_user["role"])
+                db.add(existing_user)
+                db.commit()
+            continue
+
+        created_user = models.User(
+            email=sample_user["email"],
+            username=sample_user["username"],
+            hashed_password=security.get_password_hash(sample_user["password"]),
+            full_name=sample_user["full_name"],
+            is_active=True,
+            is_superuser=sample_user["is_superuser"],
+        )
+        db.add(created_user)
+        db.commit()
+        db.refresh(created_user)
+        created_user.roles.append(sample_user["role"])
+        db.add(created_user)
+        db.commit()
 
 def main() -> None:
     db = SessionLocal()

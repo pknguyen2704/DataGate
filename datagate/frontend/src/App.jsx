@@ -11,13 +11,20 @@ import NotFound from "~/pages/NotFound/NotFound";
 import MainLayout from "~/components/Layout/MainLayout";
 import Settings from "~/pages/Settings/Settings";
 import MetricMonitoring from "~/pages/Metrics/MetricMonitoring";
-import DataLineage from "~/pages/Lineage/DataLineage";
 import Explore from "~/pages/Explore/Explore";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 import "react-toastify/dist/ReactToastify.css";
+import { useDispatch } from "react-redux";
+import { initializeAuth } from "./store/slices/authSlice";
 
 function App() {
+  const dispatch = useDispatch();
+
+  React.useEffect(() => {
+    dispatch(initializeAuth());
+  }, [dispatch]);
+
   return (
     <>
       <Routes>
@@ -36,7 +43,6 @@ function App() {
             <Route path="/rules" element={<Rules />} />
             <Route path="/metrics" element={<MetricMonitoring />} />
             <Route path="/anomaly" element={<AnomalyDetection />} />
-            <Route path="/lineage" element={<DataLineage />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/settings/*" element={<Settings />} />
           </Route>
@@ -50,7 +56,6 @@ function App() {
 }
 
 export default App;
-
 
 
 

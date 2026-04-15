@@ -1,234 +1,577 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
-  TextField,
-  InputAdornment,
-  Collapse,
-  Divider,
-  IconButton,
-  CircularProgress,
   Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  IconButton,
+  InputAdornment,
+  List,
+  ListItemButton,
+  ListItemText,
+  Paper,
+  Divider,
+  Stack,
+  TextField,
+  Typography,
 } from "@mui/material";
 import {
-  Search as SearchIcon,
-  TableChart as TableIcon,
-  KeyboardArrowDown as ExpandIcon,
-  KeyboardArrowUp as CollapseIcon,
-  FilterList as FilterIcon,
+  AccountCircleOutlined as OwnerIcon,
+  ChevronRight as ChevronRightIcon,
+  ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
-  Dns as DbIcon,
+  Search as SearchIcon,
+  StorageOutlined as ServiceIcon,
+  SchemaOutlined as SchemaIcon,
+  TableChartOutlined as TableIcon,
 } from "@mui/icons-material";
+import { useLocation, useNavigate } from "react-router-dom";
+import { observabilityApi } from "~/apis/observability";
 import { servicesApi } from "~/apis/services";
-import TrinoIcon from "~/assets/images/Trino.svg";
+import TableView from "./Table/Table";
+
+const normalizeTable = (table) => {
+  if (typeof table === "string") {
+    const [schemaName, ...rest] = table.split(".");
+    const assetName = rest.join(".") || table;
+    return {
+      full_name: table,
+      table_name: assetName,
+      schema_name: rest.length ? schemaName : "",
+    };
+  }
+
+  return {
+    full_name: table.full_name || table.table_name || "",
+    table_name: table.table_name || "",
+    schema_name: table.schema_name || "",
+  };
+};
+
+const getOwnerLabel = (owner) => owner?.full_name || owner?.username || owner?.email || "Unknown owner";
 
 const Explore = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [expandedDb, setExpandedDb] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const tableParam = searchParams.get("table");
+  const serviceParam = searchParams.get("service");
+
+  const [selectedServiceId, setSelectedServiceId] = useState(null);
+  const [selectedSchemaByService, setSelectedSchemaByService] = useState({});
   const [services, setServices] = useState([]);
+  const [schemasMap, setSchemasMap] = useState({});
   const [tablesMap, setTablesMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [, setLoadingSchemas] = useState({});
   const [loadingTables, setLoadingTables] = useState({});
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isDatabasesExpanded, setIsDatabasesExpanded] = useState(true);
+  const [expandedServiceTypes, setExpandedServiceTypes] = useState({});
+  const [expandedServices, setExpandedServices] = useState({});
 
-  useEffect(() => {
-    fetchServices();
-  }, []);
+  const [sampleLimit, setSampleLimit] = useState(50);
+  const [assetDetail, setAssetDetail] = useState(null);
+  const [assetDetailLoading, setAssetDetailLoading] = useState(false);
+  const [assetDetailError, setAssetDetailError] = useState(null);
+  const [assetObservability, setAssetObservability] = useState({
+    columnStats: [],
+    incidents: [],
+    schema: [],
+    snapshots: [],
+    volume: [],
+  });
 
-  const fetchServices = async () => {
+  const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
       const response = await servicesApi.getServices();
-      setServices(response.data || []);
+      const nextServices = response.data || [];
+      setServices(nextServices);
+      setSelectedServiceId((prev) =>
+        prev && nextServices.some((service) => service.id === prev) ? prev : nextServices[0]?.id ?? null
+      );
       setError(null);
     } catch (err) {
       console.error("Failed to fetch services:", err);
-      setError("Could not load databases. Please check connection.");
+      setError("Could not load data platform services. Please check connection.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchTables = async (serviceId) => {
-    if (tablesMap[serviceId]) return; 
-    
+  const fetchSchemas = useCallback(async (serviceId) => {
+    if (!serviceId || schemasMap[serviceId]) return;
+
     try {
-      setLoadingTables(prev => ({ ...prev, [serviceId]: true }));
+      setLoadingSchemas((prev) => ({ ...prev, [serviceId]: true }));
+      const response = await servicesApi.getServiceSchemas(serviceId);
+      const schemas = response.data || [];
+      setSchemasMap((prev) => ({ ...prev, [serviceId]: schemas }));
+      setSelectedSchemaByService((prev) => ({
+        ...prev,
+        [serviceId]: prev[serviceId] || schemas[0] || "all",
+      }));
+    } catch (err) {
+      console.error(`Failed to fetch schemas for ${serviceId}:`, err);
+    } finally {
+      setLoadingSchemas((prev) => ({ ...prev, [serviceId]: false }));
+    }
+  }, [schemasMap]);
+
+  const fetchTables = useCallback(async (serviceId) => {
+    if (!serviceId || tablesMap[serviceId]) return;
+
+    try {
+      setLoadingTables((prev) => ({ ...prev, [serviceId]: true }));
       const response = await servicesApi.getServiceTables(serviceId);
-      setTablesMap(prev => ({ ...prev, [serviceId]: response.data || [] }));
+      setTablesMap((prev) => ({
+        ...prev,
+        [serviceId]: (response.data || []).map(normalizeTable),
+      }));
     } catch (err) {
       console.error(`Failed to fetch tables for ${serviceId}:`, err);
     } finally {
-      setLoadingTables(prev => ({ ...prev, [serviceId]: false }));
+      setLoadingTables((prev) => ({ ...prev, [serviceId]: false }));
     }
+  }, [tablesMap]);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  useEffect(() => {
+    if (!selectedServiceId || tableParam) return;
+    fetchSchemas(selectedServiceId);
+    fetchTables(selectedServiceId);
+  }, [fetchSchemas, fetchTables, selectedServiceId, tableParam]);
+
+  useEffect(() => {
+    if (!selectedServiceId) return;
+
+    const nextService = services.find((service) => service.id === selectedServiceId);
+    if (!nextService) return;
+
+    const nextServiceType = (nextService.service_type || "Other").toLowerCase();
+    setExpandedServiceTypes((prev) => ({ ...prev, [nextServiceType]: true }));
+    setExpandedServices((prev) => ({ ...prev, [selectedServiceId]: true }));
+  }, [selectedServiceId, services]);
+
+  useEffect(() => {
+    if (!tableParam || !serviceParam) {
+      setAssetDetail(null);
+      setAssetDetailError(null);
+      return;
+    }
+
+    const fetchAssetDetail = async () => {
+      try {
+        setAssetDetailLoading(true);
+        setAssetDetailError(null);
+        const [detailRes, snapshotsRes, schemaRes, columnStatsRes, incidentsRes, volumeRes] = await Promise.all([
+          servicesApi.getAssetDetail(tableParam, Number(serviceParam), sampleLimit),
+          observabilityApi.getSnapshots(tableParam),
+          observabilityApi.getSchema(tableParam),
+          observabilityApi.getColumnStats(tableParam),
+          observabilityApi.getIncidents(tableParam),
+          observabilityApi.getVolumeTS(tableParam),
+        ]);
+
+        setAssetDetail(detailRes.data);
+        setAssetObservability({
+          columnStats: columnStatsRes.data || [],
+          incidents: incidentsRes.data || [],
+          schema: schemaRes.data || [],
+          snapshots: snapshotsRes.data || [],
+          volume: volumeRes.data || [],
+        });
+      } catch (err) {
+        console.error("Failed to fetch asset detail:", err);
+        setAssetDetailError("Could not load asset details.");
+      } finally {
+        setAssetDetailLoading(false);
+      }
+    };
+
+    fetchAssetDetail();
+  }, [tableParam, serviceParam, sampleLimit]);
+
+  const openAssetDetail = (serviceId, tableName) => {
+    navigate(`/explore?service=${serviceId}&table=${encodeURIComponent(tableName)}`);
   };
 
-  const handleToggleDb = (serviceId) => {
-    const isExpanding = expandedDb !== serviceId;
-    setExpandedDb(isExpanding ? serviceId : null);
-    if (isExpanding) {
-      fetchTables(serviceId);
-    }
+  const closeAssetDetail = () => {
+    navigate("/explore");
   };
 
-  const getServiceIcon = (type) => {
-    if (type?.toLowerCase() === 'trino') {
-      return <Box component="img" src={TrinoIcon} sx={{ width: 22, height: 22, objectFit: 'contain' }} />;
+  const selectedService = services.find((service) => service.id === selectedServiceId) || null;
+  const selectedSchema = selectedServiceId ? selectedSchemaByService[selectedServiceId] || "all" : "all";
+  const selectedServiceTables = selectedServiceId ? tablesMap[selectedServiceId] || [] : [];
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const groupedServices = services.reduce((accumulator, service) => {
+    const key = (service.service_type || "Other").toLowerCase();
+    if (!accumulator[key]) {
+      accumulator[key] = {
+        label: service.service_type || "Other",
+        services: [],
+      };
     }
-    return <DbIcon fontSize="small" />;
-  };
+    accumulator[key].services.push(service);
+    return accumulator;
+  }, {});
 
-  const filteredServices = services.filter(service => {
-    const serviceMatches = service.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          service.service_type?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const tables = tablesMap[service.id] || [];
-    const tableMatches = tables.some(t => t.table_name?.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    return serviceMatches || tableMatches;
+  const visibleTables = selectedServiceTables.filter((table) => {
+    const matchesSchema = selectedSchema === "all" || table.schema_name === selectedSchema;
+    if (!matchesSchema) return false;
+    if (!normalizedSearchQuery) return true;
+
+    const haystack = [table.table_name, table.schema_name, table.full_name]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalizedSearchQuery);
   });
 
-  if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-      <CircularProgress size={32} />
-    </Box>
-  );
+  const assetCards = visibleTables.map((table, index) => ({
+    ...table,
+    summary: `${selectedService?.name || "data_asset"} / ${table.schema_name || "default"} / ${table.table_name}`,
+    description: table.full_name || table.table_name,
+    ownerLabel: getOwnerLabel(selectedService?.owner),
+    accent: index === 0 ? "#F7FAFF" : "#FFFFFF",
+    border: index === 0 ? "#7BA7FF" : "#EEF2F7",
+  }));
+
+  if (loading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  if (tableParam && serviceParam) {
+    if (assetDetailLoading) {
+      return (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+          <CircularProgress size={28} />
+        </Box>
+      );
+    }
+
+    if (assetDetailError) {
+      return <Alert severity="error">{assetDetailError}</Alert>;
+    }
+
+    if (!assetDetail) return null;
+
+    return (
+      <TableView
+        assetDetail={assetDetail}
+        assetObservability={assetObservability}
+        onBack={closeAssetDetail}
+        onChangeSampleLimit={setSampleLimit}
+        sampleLimit={sampleLimit}
+      />
+    );
+  }
 
   return (
-    <Box sx={{ display: 'flex', gap: 0, height: '100%' }}>
-      {/* Internal Navigation Sidebar - Wider */}
-      <Box sx={{ 
-        width: 320, 
-        flexShrink: 0, 
-        bgcolor: 'white', 
-        p: 3,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2,
-        boxShadow: 'none'
-      }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Databases</Typography>
-        
-        <TextField
-            fullWidth
-            size="small"
-            placeholder="Filter databases..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" color="action" />
-                </InputAdornment>
-              ),
-              sx: { bgcolor: '#F8FAFC', border: 'none' }
-            }}
-          />
-
-        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-          {services.map(s => (
-            <Box 
-              key={s.id}
-              onClick={() => handleToggleDb(s.id)}
-              sx={{ 
-                p: 1.5, 
-                borderRadius: '4px', 
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                mb: 0.5,
-                bgcolor: expandedDb === s.id ? 'primary.50' : 'transparent',
-                color: expandedDb === s.id ? 'primary.main' : 'inherit',
-                '&:hover': { bgcolor: expandedDb === s.id ? 'primary.50' : '#F8FAFC' }
-              }}
-            >
-              {getServiceIcon(s.service_type)}
-              <Typography variant="body2" fontWeight={expandedDb === s.id ? 700 : 500} noWrap>
-                {s.name}
+    <Box sx={{ p: 2.5, height: "100%", overflow: "auto", bgcolor: "#F7F9FC" }}>
+      <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5} alignItems="stretch">
+        <Paper
+          sx={{
+            width: { xs: "100%", lg: 300 },
+            minWidth: { lg: 300 },
+            p: 1.75,
+            borderRadius: 3,
+            border: "1px solid #EEF2F7",
+            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
+          }}
+        >
+          <Stack spacing={1.5} sx={{ height: "100%" }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Typography sx={{ fontSize: 18, fontWeight: 800 }}>
+                Data Assets
               </Typography>
+              <Avatar sx={{ width: 28, height: 28, bgcolor: "#EEF4FF", color: "primary.main" }}>
+                <TableIcon sx={{ fontSize: 16 }} />
+              </Avatar>
+            </Stack>
+
+            <TextField
+              size="small"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search table..."
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+                sx: {
+                  fontSize: 14,
+                  borderRadius: 2,
+                },
+              }}
+            />
+            <Box sx={{ overflow: "auto", pr: 0.5 }}>
+              <List disablePadding>
+                <ListItemButton
+                  onClick={() => setIsDatabasesExpanded((prev) => !prev)}
+                  sx={{ px: 0.25, py: 0.5, borderRadius: 2, mb: 0.25, minHeight: 32 }}
+                >
+                  {isDatabasesExpanded ? <ExpandMoreIcon sx={{ fontSize: 18 }} /> : <ChevronRightIcon sx={{ fontSize: 18 }} />}
+                  <ServiceIcon sx={{ ml: 0.75, mr: 1, color: "text.secondary", fontSize: 18 }} />
+                  <ListItemText
+                    primary="Databases"
+                    primaryTypographyProps={{ fontWeight: 700, fontSize: 14 }}
+                  />
+                </ListItemButton>
+
+                {isDatabasesExpanded
+                  ? Object.entries(groupedServices).map(([serviceTypeKey, group]) => {
+                      const isTypeExpanded = expandedServiceTypes[serviceTypeKey] ?? true;
+                      const matchedServices = group.services.filter((service) => {
+                        if (!normalizedSearchQuery) return true;
+
+                        const haystack = [service.name, service.service_type]
+                          .filter(Boolean)
+                          .join(" ")
+                          .toLowerCase();
+
+                        return haystack.includes(normalizedSearchQuery);
+                      });
+
+                      if (matchedServices.length === 0 && normalizedSearchQuery) {
+                        return null;
+                      }
+
+                      return (
+                        <Box key={serviceTypeKey} sx={{ ml: 1.5 }}>
+                          <ListItemButton
+                            onClick={() =>
+                              setExpandedServiceTypes((prev) => ({
+                                ...prev,
+                                [serviceTypeKey]: !isTypeExpanded,
+                              }))
+                            }
+                            sx={{ borderRadius: 2, py: 0.4, minHeight: 30 }}
+                          >
+                            {isTypeExpanded ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />}
+                            <ListItemText
+                              primary={group.label}
+                              primaryTypographyProps={{ fontWeight: 600, textTransform: "lowercase", fontSize: 13 }}
+                              sx={{ ml: 1 }}
+                            />
+                          </ListItemButton>
+
+                          {isTypeExpanded
+                            ? matchedServices.map((service) => {
+                                const isSelected = service.id === selectedServiceId;
+                                const isServiceExpanded = expandedServices[service.id] ?? isSelected;
+                                const serviceSchemas = schemasMap[service.id] || [];
+                                const visibleSchemas = serviceSchemas.filter((schema) => {
+                                  if (!normalizedSearchQuery) return true;
+                                  return schema.toLowerCase().includes(normalizedSearchQuery);
+                                });
+
+                                return (
+                                  <Box key={service.id} sx={{ ml: 1.5 }}>
+                                    <ListItemButton
+                                      selected={isSelected}
+                                      onClick={() => {
+                                        setSelectedServiceId(service.id);
+                                        fetchSchemas(service.id);
+                                        fetchTables(service.id);
+                                      }}
+                                      sx={{
+                                        borderRadius: 2,
+                                        py: 0.45,
+                                        mb: 0.25,
+                                        minHeight: 34,
+                                        bgcolor: isSelected ? "#EEF4FF" : "transparent",
+                                        "&.Mui-selected": {
+                                          bgcolor: "#EEF4FF",
+                                        },
+                                      }}
+                                    >
+                                      <IconButton
+                                        size="small"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setExpandedServices((prev) => ({
+                                            ...prev,
+                                            [service.id]: !isServiceExpanded,
+                                          }));
+                                        }}
+                                        sx={{ mr: 0.5, p: 0.25 }}
+                                      >
+                                        {isServiceExpanded ? (
+                                          <ExpandMoreIcon sx={{ fontSize: 16 }} />
+                                        ) : (
+                                          <ChevronRightIcon sx={{ fontSize: 16 }} />
+                                        )}
+                                      </IconButton>
+                                      <ListItemText
+                                        primary={service.name}
+                                        secondary={service.service_type}
+                                        primaryTypographyProps={{ fontWeight: isSelected ? 700 : 500, fontSize: 13 }}
+                                        secondaryTypographyProps={{ fontSize: 11 }}
+                                      />
+                                    </ListItemButton>
+
+                                    {isServiceExpanded && isSelected
+                                      ? visibleSchemas.map((schema) => {
+                                          const schemaTableCount = selectedServiceTables.filter(
+                                            (table) => table.schema_name === schema
+                                          ).length;
+
+                                          return (
+                                            <ListItemButton
+                                              key={schema}
+                                              selected={selectedSchema === schema}
+                                              onClick={() =>
+                                                setSelectedSchemaByService((prev) => ({
+                                                  ...prev,
+                                                  [service.id]: schema,
+                                                }))
+                                              }
+                                              sx={{ ml: 3, borderRadius: 2, py: 0.25, minHeight: 28 }}
+                                            >
+                                              <SchemaIcon sx={{ mr: 1, color: "text.secondary", fontSize: 15 }} />
+                                              <ListItemText
+                                                primary={schema}
+                                                secondary={`${schemaTableCount} tables`}
+                                                primaryTypographyProps={{ fontSize: 12.5 }}
+                                                secondaryTypographyProps={{ fontSize: 10.5 }}
+                                              />
+                                            </ListItemButton>
+                                          );
+                                        })
+                                      : null}
+                                  </Box>
+                                );
+                              })
+                            : null}
+                        </Box>
+                      );
+                    })
+                  : null}
+              </List>
             </Box>
-          ))}
+          </Stack>
+        </Paper>
+
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {error ? <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert> : null}
+
+          <Paper
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              border: "1px solid #EEF2F7",
+              boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
+            }}
+          >
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+              <Box>
+                <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
+                  {selectedService?.name || "Data Assets"}
+                </Typography>
+                <Typography sx={{ fontSize: 12.5 }} color="text.secondary">
+                  {selectedSchema === "all"
+                    ? `${visibleTables.length} assets available`
+                    : `${visibleTables.length} assets in schema ${selectedSchema}`}
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={fetchServices} sx={{ textTransform: "none", fontSize: 12, borderColor: "#E6EBF2" }}>
+                  Refresh
+                </Button>
+              </Stack>
+            </Stack>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {loadingTables[selectedServiceId] ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : assetCards.length === 0 ? (
+              <Box sx={{ py: 10, textAlign: "center" }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  Không có asset phù hợp
+                </Typography>
+                <Typography color="text.secondary">
+                  Thử chọn service khác hoặc đổi từ khóa tìm kiếm.
+                </Typography>
+              </Box>
+            ) : (
+              <Stack spacing={2.5}>
+                {assetCards.map((table) => (
+                  <Paper
+                    key={table.full_name}
+                    onClick={() => openAssetDetail(selectedServiceId, table.full_name)}
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      border: `1px solid ${table.border}`,
+                      borderLeft: `3px solid ${table.border}`,
+                      bgcolor: table.accent,
+                      cursor: "pointer",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                      "&:hover": {
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 8px 18px rgba(15, 23, 42, 0.06)",
+                      },
+                    }}
+                  >
+                    <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ md: "flex-start" }}>
+                      <Avatar sx={{ bgcolor: "#EEF4FF", color: "primary.main", width: 38, height: 38 }}>
+                        <TableIcon sx={{ fontSize: 18 }} />
+                      </Avatar>
+
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          color="text.secondary"
+                          sx={{ mb: 0.5, wordBreak: "break-word", fontSize: 12.5 }}
+                        >
+                          {table.summary}
+                        </Typography>
+
+                        <Typography
+                          sx={{ color: "#2F6FED", fontWeight: 700, mb: 0.75, textTransform: "lowercase", fontSize: 24 }}
+                        >
+                          {table.table_name}
+                        </Typography>
+
+                        <Typography color="text.secondary" sx={{ mb: 1.5, fontSize: 13.5 }}>
+                          {table.description}
+                        </Typography>
+
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                          <Chip
+                            icon={<OwnerIcon />}
+                            label={table.ownerLabel}
+                            size="small"
+                            variant="outlined"
+                            sx={{ height: 24, fontSize: 11.5, borderColor: "#E6EBF2" }}
+                          />
+                        </Stack>
+                      </Box>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </Paper>
         </Box>
-      </Box>
-
-      {/* Main Content Area - White background */}
-      <Box sx={{ flexGrow: 1, bgcolor: 'white', p: 4, overflow: 'auto' }}>
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
-            <Typography variant="h5" fontWeight="800" sx={{ mb: 0.5 }}>
-              {expandedDb ? services.find(s => s.id === expandedDb)?.name : "All Assets"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {expandedDb ? `Exploring tables in ${services.find(s => s.id === expandedDb)?.service_type}` : "Select a database to browse its tables."}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton onClick={fetchServices} size="small">
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small">
-              <FilterIcon fontSize="small" />
-            </IconButton>
-          </Box>
-        </Box>
-
-        {/* Tables Grid */}
-        <Grid container spacing={2}>
-          {expandedDb ? (
-            (tablesMap[expandedDb] || [])
-                .filter(t => (t.table_name || "").toLowerCase().includes(searchTerm.toLowerCase()))
-              .map(table => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={table.table_name || Math.random()}>
-                    <Paper 
-                      elevation={0}
-                      sx={{ 
-                        p: 2, 
-                        borderRadius: '4px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 2,
-                        bgcolor: '#F8FAFC',
-                        '&:hover': { bgcolor: '#F1F5F9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' },
-                        cursor: 'pointer'
-                      }}
-                    >
-                  <TableIcon fontSize="small" color="primary" sx={{ opacity: 0.7 }} />
-                  <Box sx={{ overflow: 'hidden' }}>
-                    <Typography variant="body2" fontWeight={700} noWrap>
-                      {table.table_name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                      {table.schema_name}
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-            ))
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', py: 10, color: 'text.secondary' }}>
-              <DbIcon sx={{ fontSize: 48, mb: 2, opacity: 0.2 }} />
-              <Typography>Please select a database from the sidebar to explore tables.</Typography>
-            </Box>
-          )}
-          
-          {expandedDb && !loadingTables[expandedDb] && (tablesMap[expandedDb] || []).length === 0 && (
-            <Box sx={{ width: '100%', p: 4, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">No tables found.</Typography>
-            </Box>
-          )}
-          
-          {expandedDb && loadingTables[expandedDb] && (
-            <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress size={24} />
-            </Box>
-          )}
-        </Grid>
-      </Box>
+      </Stack>
     </Box>
   );
 };

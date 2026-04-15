@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Any, List, Optional
 from datetime import datetime
 
 class MLFeatureImportanceBase(BaseModel):
@@ -18,6 +18,7 @@ class MLAnomalyRunBase(BaseModel):
     partition_key: str
     anomaly_score: float
     status: str
+    raw_json: Optional[dict[str, Any]] = None
 
 class MLAnomalyRun(MLAnomalyRunBase):
     id: int
@@ -28,3 +29,16 @@ class MLAnomalyRunDetail(MLAnomalyRun):
     features: List[MLFeatureImportance]
     class Config:
         from_attributes = True
+
+class MLFeatureImportanceCreate(BaseModel):
+    column_name: str
+    importance_score: float
+
+class MLAnomalyRunCreate(BaseModel):
+    table_name: str
+    batch_time: Optional[datetime] = None
+    partition_key: str
+    anomaly_score: float
+    status: str
+    raw_json: Optional[dict[str, Any]] = None
+    features: List[MLFeatureImportanceCreate] = []

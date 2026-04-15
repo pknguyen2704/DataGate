@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 
 class QualityCheckResultBase(BaseModel):
+    rule_id: Optional[int] = None
     column_name: str
     rule_type: str
     constraint_status: str
@@ -35,3 +36,22 @@ class QualityCheckRunDetail(QualityCheckRun):
 
     class Config:
         from_attributes = True
+
+
+class QualityCheckResultCreate(BaseModel):
+    rule_id: Optional[int] = None
+    column_name: str
+    rule_type: str
+    constraint_status: str
+    constraint_message: str
+    severity: str
+
+
+class QualityCheckRunCreate(BaseModel):
+    table_name: str
+    batch_time: Optional[datetime] = None
+    partition_key: str
+    total_checks: int
+    failed_checks: int
+    status: str
+    results: List[QualityCheckResultCreate] = []

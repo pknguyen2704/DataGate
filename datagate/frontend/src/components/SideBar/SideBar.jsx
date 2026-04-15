@@ -12,6 +12,7 @@ import {
 import {
   DashboardOutlined as DashboardIcon,
   SearchOutlined as ExplorerIcon,
+  QueryStatsOutlined as MetricsIcon,
   SettingsOutlined as SettingsIcon,
   KeyboardDoubleArrowLeft as CollapseIcon,
   KeyboardDoubleArrowRight as ExpandIcon,
@@ -23,11 +24,12 @@ import DataGateLogo from "~/assets/images/datagate.svg";
 
 const navItems = [
   { text: "Overview", icon: <DashboardIcon />, path: "/home" },
+  { text: "Metrics Monitoring", icon: <MetricsIcon />, path: "/metrics" },
   { text: "Data Assets", icon: <ExplorerIcon />, path: "/explore" },
   { text: "Settings", icon: <SettingsIcon />, path: "/settings" },
 ];
 
-const SideBar = ({ isCollapsed, onToggle }) => {
+const SideBar = ({ isCollapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -42,11 +44,13 @@ const SideBar = ({ isCollapsed, onToggle }) => {
     <Box
       sx={{
         width: isCollapsed ? "80px" : theme.datagate.sidebarWidth,
+        minWidth: isCollapsed ? "80px" : theme.datagate.sidebarWidth,
+        flexShrink: 0,
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "background.default", // Match app gray background
-        transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        bgcolor: "background.default",
+        transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         overflowX: "hidden",
         zIndex: 1200,
         boxShadow: 'none',

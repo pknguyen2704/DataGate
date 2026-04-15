@@ -4,32 +4,31 @@ import {
   Typography,
   TextField,
   Button,
-  Checkbox,
   FormControlLabel,
+  Checkbox,
   Link,
   IconButton,
   InputAdornment,
-  Divider,
+  CircularProgress,
 } from "@mui/material";
-import { Visibility, VisibilityOff, GitHub, Google } from "@mui/icons-material";
+import { Visibility, VisibilityOff, LockOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useDispatch, useSelector } from "react-redux";
+import { login } from "~/store/slices/authSlice";
 import { toast } from "react-toastify";
-import LogoImage from "../../../assets/images/datagate.svg";
+import LogoImage from "~/assets/images/datagate.svg";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    email: "",
+    username: "",
     password: "",
     rememberMe: false,
   });
 
-  const { login } = useAuth();
+  const dispatch = useDispatch();
+  const { loading } = useSelector((state) => state.auth);
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-
-  const handleClickShowPassword = () => setShowPassword((show) => !show);
 
   const handleChange = (e) => {
     const { name, value, checked, type } = e.target;
@@ -41,16 +40,14 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     try {
-      await login(formData.email, formData.password);
+      await dispatch(
+        login({ username: formData.username, password: formData.password })
+      ).unwrap();
       toast.success("Welcome back to DataGate!");
       navigate("/");
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || "Invalid credentials. Please try again.";
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
+      toast.error(err || "Invalid credentials. Please try again.");
     }
   };
 
@@ -58,94 +55,82 @@ const Login = () => {
     <Box
       sx={{
         width: "100%",
-        p: 4,
-        borderRadius: 1, // Strictly 1 as per theme.js
-        bgcolor: "rgba(255, 255, 255, 0.8)",
-        backdropFilter: "blur(20px)",
-        boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.2)",
-        border: "1px solid rgba(255, 255, 255, 0.18)",
+        maxWidth: 420,
+        p: { xs: 3, sm: 4.5 },
+        borderRadius: "16px",
+        bgcolor: "rgba(255,255,255,0.92)",
+        backdropFilter: "blur(24px)",
+        boxShadow: "0 8px 40px 0 rgba(31,38,135,0.18)",
+        border: "1px solid rgba(255,255,255,0.6)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        animation: "slideUp 0.6s ease-out",
+        animation: "slideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
         "@keyframes slideUp": {
-          from: { opacity: 0, transform: "translateY(30px)" },
+          from: { opacity: 0, transform: "translateY(24px)" },
           to: { opacity: 1, transform: "translateY(0)" },
         },
       }}
     >
-      {/* Logo and Header */}
-      <Box
-        sx={{
-          mb: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
+      {/* ── Logo ── */}
+      <Box sx={{ mb: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
         <Box
           component="img"
           src={LogoImage}
           alt="DataGate Logo"
-          sx={{ height: 48, mb: 1.5 }}
+          sx={{ height: 48 }}
         />
         <Typography
-          variant="h4"
-          sx={{
-            fontWeight: 700,
-            color: "primary.main",
-            mb: 0.5,
-          }}
+          variant="h5"
+          sx={{ fontWeight: 700, color: "primary.main", letterSpacing: "-0.5px" }}
         >
-          Welcome Back
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Manage your data with confidence
+          Sign in to DataGate
         </Typography>
       </Box>
 
-      {/* Login Form */}
+      {/* ── Form ── */}
       <Box
         component="form"
         onSubmit={handleSubmit}
-        sx={{ width: "100%", mb: 3 }}
+        sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 2 }}
       >
         <TextField
           fullWidth
-          label="Email Address"
-          name="email"
-          type="email"
+          label="Username"
+          name="username"
+          type="text"
           variant="outlined"
-          margin="normal"
           required
-          value={formData.email}
+          autoComplete="username"
+          autoFocus
+          value={formData.username}
           onChange={handleChange}
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 1,
-            },
+          InputProps={{
+            sx: { borderRadius: "10px" },
           }}
         />
+
         <TextField
           fullWidth
           label="Password"
           name="password"
           type={showPassword ? "text" : "password"}
           variant="outlined"
-          margin="normal"
           required
+          autoComplete="current-password"
           value={formData.password}
           onChange={handleChange}
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 1,
-            },
-          }}
           InputProps={{
+            sx: { borderRadius: "10px" },
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton onClick={handleClickShowPassword} edge="end">
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                <IconButton
+                  onClick={() => setShowPassword((s) => !s)}
+                  edge="end"
+                  size="small"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                 </IconButton>
               </InputAdornment>
             ),
@@ -157,35 +142,27 @@ const Login = () => {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            mt: 1,
-            mb: 2,
           }}
         >
           <FormControlLabel
             control={
               <Checkbox
                 name="rememberMe"
+                size="small"
                 color="primary"
                 checked={formData.rememberMe}
                 onChange={handleChange}
-                size="small"
               />
             }
             label={
-              <Typography variant="body2" sx={{ fontSize: "0.875rem" }}>
-                Remember me
-              </Typography>
+              <Typography variant="body2">Remember me</Typography>
             }
           />
           <Link
             href="#"
             variant="body2"
-            sx={{
-              fontWeight: 600,
-              textDecoration: "none",
-              color: "primary.main",
-              "&:hover": { textDecoration: "underline" },
-            }}
+            underline="hover"
+            sx={{ fontWeight: 600, color: "primary.main" }}
           >
             Forgot password?
           </Link>
@@ -196,79 +173,41 @@ const Login = () => {
           type="submit"
           variant="contained"
           disabled={loading}
+          size="large"
           sx={{
-            py: 1.5,
-            fontSize: "1rem",
+            mt: 0.5,
+            py: 1.4,
+            borderRadius: "10px",
             fontWeight: 700,
-            bgcolor: "secondary.main", // Accent green as per theme.js/design-system
+            fontSize: "0.95rem",
+            textTransform: "none",
+            bgcolor: "primary.main",
+            boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
             "&:hover": {
-              bgcolor: "secondary.dark",
+              bgcolor: "primary.dark",
+              boxShadow: "0 6px 20px rgba(37,99,235,0.45)",
             },
-            borderRadius: 1,
-            textTransform: "none"
+            transition: "all 0.2s ease",
           }}
+          startIcon={
+            loading ? (
+              <CircularProgress size={18} color="inherit" />
+            ) : (
+              <LockOutlined fontSize="small" />
+            )
+          }
         >
-          {loading ? "Authenticating..." : "Sign In"}
+          {loading ? "Authenticating…" : "Sign In"}
         </Button>
       </Box>
 
-      <Divider sx={{ width: "100%", mb: 3 }}>
-        <Typography variant="body2" color="text.secondary">
-          OR CONTINUE WITH
-        </Typography>
-      </Divider>
-
-      {/* Social Login */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%", mb: 4 }}>
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<Google />}
-          sx={{
-            borderRadius: 1,
-            color: "text.primary",
-            borderColor: "divider",
-            py: 1,
-            "&:hover": {
-              borderColor: "primary.main",
-              bgcolor: "transparent",
-            },
-          }}
-        >
-          Google
-        </Button>
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<GitHub />}
-          sx={{
-            borderRadius: 1,
-            color: "text.primary",
-            borderColor: "divider",
-            py: 1,
-            "&:hover": {
-              borderColor: "primary.main",
-              bgcolor: "transparent",
-            },
-          }}
-        >
-          GitHub
-        </Button>
-      </Box>
-
-      <Typography variant="body2" color="text.secondary">
-        Don't have an account?{" "}
-        <Link
-          href="#"
-          sx={{
-            fontWeight: 700,
-            textDecoration: "none",
-            color: "primary.main",
-            "&:hover": { textDecoration: "underline" },
-          }}
-        >
-          Create an account
-        </Link>
+      {/* ── Footer note ── */}
+      <Typography
+        variant="caption"
+        color="text.disabled"
+        sx={{ mt: 3, textAlign: "center" }}
+      >
+        Access is restricted to authorized personnel only.
       </Typography>
     </Box>
   );

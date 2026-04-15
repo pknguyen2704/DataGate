@@ -13,6 +13,12 @@ export const profilingApi = {
   // Lấy xu hướng biến thiên
   getTrend: (table, column, metric = 'completeness') => 
     apiClient.get(`/profiling/trend`, { params: { table, column, metric } }),
+
+  getMonitoringRecommendations: (table) =>
+    apiClient.get(`/profiling/monitoring/recommendations`, { params: { table } }),
+
+  getMonitoringSeries: (table, column, metric = "null_rate", confidence = 95) =>
+    apiClient.get(`/profiling/monitoring/series`, { params: { table, column, metric, confidence } }),
 };
 
 export default apiClient;

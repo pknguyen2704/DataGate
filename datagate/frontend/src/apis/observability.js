@@ -3,6 +3,9 @@ import apiClient from './index';
 export const observabilityApi = {
   getJobs: () => apiClient.get('/observability/jobs'),
   createJob: (data) => apiClient.post('/observability/jobs', data),
+  updateJob: (jobId, data) => apiClient.put(`/observability/jobs/${jobId}`, data),
+  deleteJob: (jobId) => apiClient.delete(`/observability/jobs/${jobId}`),
+  getJobRuns: (jobId) => apiClient.get(`/observability/jobs/${jobId}/runs`),
   triggerJob: (jobId) => apiClient.post(`/observability/jobs/${jobId}/trigger`),
   triggerScan: (data) => apiClient.post('/observability/trigger-scan', data),
   getSnapshots: (tableName) => apiClient.get('/observability/snapshots', { params: { table_name: tableName } }),

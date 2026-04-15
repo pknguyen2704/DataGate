@@ -10,11 +10,32 @@ class DQJobConfig(Base):
     catalog = Column(Text)
     schema_name = Column(Text)
     table_name = Column(Text)
-    hour = Column(Integer)
-    minute = Column(Integer)
-    job_type = Column(Text) # observability
+    hour = Column(Integer, nullable=True)
+    minute = Column(Integer, nullable=True)
+    schedule_type = Column(Text, default="daily")
+    interval_minutes = Column(Integer, nullable=True)
+    dag_id = Column(Text, default="dq_metadata_collector")
+    job_type = Column(Text, default="metadata_profile")
     is_active = Column(Boolean, default=True)
+    last_run_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=now())
+
+class DQJobRunHistory(Base):
+    __tablename__ = "dq_job_run_history"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("dq_job_config.id"), nullable=False)
+    dag_id = Column(Text)
+    dag_run_id = Column(Text)
+    trigger_type = Column(Text, default="scheduled")
+    status = Column(Text, default="queued")
+    scheduled_for = Column(DateTime, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=now())
+
+    job = relationship("DQJobConfig")
 
 class DQTableSnapshot(Base):
     __tablename__ = "dq_table_snapshot"

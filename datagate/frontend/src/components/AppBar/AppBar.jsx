@@ -22,11 +22,13 @@ import {
   Menu as MenuIcon,
   MenuOpen as MenuOpenIcon,
 } from "@mui/icons-material";
-import { useAuth } from "../../contexts/AuthContext";
+import { useDispatch, useSelector } from "react-redux";
+import { logout as logoutAction } from "../../store/slices/authSlice";
 import { useNavigate } from "react-router-dom";
 
 const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
-  const { user, logout } = useAuth();
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = React.useState(null);
 
@@ -34,12 +36,16 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
   const handleClose = () => setAnchorEl(null);
   const handleLogout = () => {
     handleClose();
-    logout();
+    dispatch(logoutAction());
     navigate("/auth/login");
   };
 
   return (
-    <MuiAppBar position="static" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'transparent' }}>
+    <MuiAppBar position="static" elevation={0} sx={{ 
+      borderBottom: '1px solid', 
+      borderColor: 'divider', 
+      bgcolor: 'transparent' 
+    }}>
       <Toolbar sx={{ justifyContent: "space-between", minHeight: '64px', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton 
@@ -87,12 +93,14 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
             onClick={handleProfileClick}
           >
             <Box sx={{ textAlign: 'right', display: { xs: 'none', md: 'block' } }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1 }}>
-                {user?.full_name || 'Admin User'}
+              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+                {user?.full_name || user?.username || 'User'}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user?.role || 'Data Engineer'}
-              </Typography>
+              {user?.username && (
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
+                  @{user.username}
+                </Typography>
+              )}
             </Box>
             <Avatar 
               sx={{ 
@@ -103,7 +111,7 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
                 fontWeight: 700
               }}
             >
-              {user?.email?.charAt(0).toUpperCase() || 'A'}
+              {(user?.full_name || user?.username || 'A').charAt(0).toUpperCase()}
             </Avatar>
           </Box>
         </Box>

@@ -98,11 +98,11 @@ const SettingsDashboard = () => {
 
   return (
     <Box>
-      <Box sx={{ mb: 6 }}>
-        <Typography variant="h4" fontWeight="700" sx={{ mb: 1.5, letterSpacing: '-0.02em' }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5 }}>
           Settings
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600 }}>
+        <Typography variant="body1" color="text.secondary">
           Configure the DataGate platform to suit your data governance and observability requirements.
         </Typography>
       </Box>
@@ -124,7 +124,7 @@ const Settings = () => {
   const isBasePage = location.pathname === '/settings' || location.pathname === '/settings/';
 
   return (
-    <Box sx={{ flexGrow: 1, bgcolor: 'white', p: 4, height: '100%', overflow: 'auto' }}>
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
       {!isBasePage && (
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton 

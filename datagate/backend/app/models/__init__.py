@@ -3,4 +3,4 @@ from .service import Service
 from .rule import ActiveRule
 from .profiling import ProfilingRun, ColumnProfile
 from .quality import QualityCheckRun, QualityCheckResult, MLAnomalyRun, MLFeatureImportance
-from .observability import DQJobConfig, DQTableSnapshot, DQTableVolumeTS, DQTableSchema, DQColumnStats, DQIncident
+from .observability import DQJobConfig, DQJobRunHistory, DQTableSnapshot, DQTableVolumeTS, DQTableSchema, DQColumnStats, DQIncident

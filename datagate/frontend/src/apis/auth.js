@@ -1,9 +1,9 @@
 import apiClient from './index';
 
 export const authApi = {
-  login: async (email, password) => {
+  login: async (username, password) => {
     const formData = new FormData();
-    formData.append('username', email);
+    formData.append('username', username);
     formData.append('password', password);
     
     return apiClient.post(`/auth/login/access-token`, formData, {

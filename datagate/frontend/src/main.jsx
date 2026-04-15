@@ -6,7 +6,6 @@ import { CssBaseline } from '@mui/material'
 import { ToastContainer } from 'react-toastify'
 import theme from '~/theme'
 import App from '~/App.jsx'
-import { AuthProvider } from './contexts/AuthContext'
 
 import { Provider } from 'react-redux'
 import { store } from './store'
@@ -29,9 +28,7 @@ createRoot(document.getElementById('root')).render(
         },
       }}>
         <CssBaseline />
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <App />
         <ToastContainer position="bottom-right" theme="colored"/>
       </ConfirmProvider>
     </ThemeProvider>
