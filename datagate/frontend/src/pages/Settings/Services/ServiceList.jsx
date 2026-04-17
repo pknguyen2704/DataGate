@@ -20,12 +20,21 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { servicesApi } from '~/apis/services';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  createService,
+  deleteService,
+  fetchServices,
+  refreshServiceTables,
+  updateService,
+} from '~/stores/slices/servicesSlice';
 
 const ServiceList = () => {
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const dispatch = useDispatch();
+  const services = useSelector((state) => state.services.services);
+  const servicesStatus = useSelector((state) => state.services.servicesStatus);
+  const refreshingServices = useSelector((state) => state.services.refreshingByService);
   const [open, setOpen] = useState(false);
-  const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
   
   const [discoveredSchemas, setDiscoveredSchemas] = useState([]);
@@ -42,19 +51,11 @@ const ServiceList = () => {
     connection_url: '',
   });
 
-  const fetchServices = async () => {
-    setLoading(true);
-    try {
-      const res = await servicesApi.getServices();
-      setServices(res.data);
-    } catch (err) {
-      toast.error("Failed to fetch services");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (servicesStatus === "idle") {
+      dispatch(fetchServices());
     }
-  };
-
-  useEffect(() => { fetchServices(); }, []);
+  }, [dispatch, servicesStatus]);
 
   const handleOpenAdd = () => {
     setEditingServiceId(null);
@@ -74,13 +75,11 @@ const ServiceList = () => {
     setFormData(data);
     setIntegratedTables(service.integrated_tables || []);
     setOpen(true);
-    setTestResult(null);
     setDiscoveredSchemas([]);
   };
 
   const handleTest = async (explicitPayload = null) => {
     setTesting(true);
-    setTestResult(null);
     setDiscoveredSchemas([]);
     try {
       // Ignore click events; only send actual form payloads.
@@ -88,7 +87,6 @@ const ServiceList = () => {
         ? explicitPayload
         : (editingServiceId ? { ...formData, id: editingServiceId } : formData);
       const res = await servicesApi.testConnection(payload);
-      setTestResult(res.data);
       if (res.data.status === 'success') {
         toast.success("Connection successful!");
         if (res.data.schemas) setDiscoveredSchemas(res.data.schemas);
@@ -108,7 +106,7 @@ const ServiceList = () => {
     try {
       const res = await servicesApi.getSchemaTablesRaw(formData.service_type, formData.connection_url, schema);
       setSchemaTables(res.data);
-    } catch (err) {
+    } catch {
       toast.error("Failed to fetch tables");
     } finally {
       setTablesLoading(false);
@@ -126,16 +124,16 @@ const ServiceList = () => {
     try {
       const data = { ...formData, integrated_tables: integratedTables };
       if (editingServiceId) {
-        await servicesApi.updateService(editingServiceId, data);
+        await dispatch(updateService({ serviceId: editingServiceId, data })).unwrap();
         toast.success("Catalog updated successfully!");
       } else {
-        await servicesApi.createService(data);
+        await dispatch(createService(data)).unwrap();
         toast.success("Catalog integrated successfully!");
       }
       setOpen(false);
-      fetchServices();
+      dispatch(fetchServices());
     } catch (err) {
-      toast.error("Failed to save: " + err.message);
+      toast.error("Failed to save: " + (err.message || err));
     }
   };
 
@@ -143,18 +141,13 @@ const ServiceList = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState(null);
 
-  const [refreshingServices, setRefreshingServices] = useState({});
-
   const handleRefresh = async (serviceId) => {
-    setRefreshingServices(prev => ({ ...prev, [serviceId]: true }));
     try {
-      await servicesApi.refreshTables(serviceId);
+      await dispatch(refreshServiceTables(serviceId)).unwrap();
       toast.success("Tables synchronized and orphans removed!");
-      fetchServices();
+      dispatch(fetchServices());
     } catch (err) {
-      toast.error("Sync failed: " + (err.response?.data?.detail || err.message));
-    } finally {
-      setRefreshingServices(prev => ({ ...prev, [serviceId]: false }));
+      toast.error("Sync failed: " + (err.message || err));
     }
   };
 
@@ -166,10 +159,10 @@ const ServiceList = () => {
   const handleDelete = async () => {
     if (!serviceToDelete) return;
     try {
-      await servicesApi.deleteService(serviceToDelete.id);
+      await dispatch(deleteService(serviceToDelete.id)).unwrap();
       toast.success(`Catalog "${serviceToDelete.name}" deleted`);
-      fetchServices();
-    } catch (err) {
+      dispatch(fetchServices());
+    } catch {
       toast.error("Failed to delete catalog");
     } finally {
       setDeleteConfirmOpen(false);
@@ -211,7 +204,7 @@ const ServiceList = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {servicesStatus === "loading" ? (
               <TableRow><TableCell colSpan={5} align="center" sx={{ py: 10 }}><CircularProgress /></TableCell></TableRow>
             ) : services.map((service) => (
               <TableRow key={service.id} hover>
@@ -274,7 +267,7 @@ const ServiceList = () => {
                     <List dense>
                       {discoveredSchemas.map(s => (
                         <ListItemButton key={s} selected={currentSchema === s} onClick={() => handleFetchTables(s)}>
-                          <ListItemText primary={s} primaryTypographyProps={{ fontSize: '0.8rem' }} />
+                          <ListItemText primary={s} slotProps={{ primary: { fontSize: "0.8rem" } }} />
                         </ListItemButton>
                       ))}
                     </List>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Breadcrumbs,
@@ -18,16 +18,39 @@ import {
 import TableDescription from "./TableDescription/TableDescription";
 import DataSample from "./DataSample/DataSample";
 import DataObservability from "./DataObservability/DataObservability";
+import { pageShellSx } from "~/theme";
 
 const getOwnerLabel = (owner) =>
   owner?.full_name || owner?.username || owner?.email || "Unassigned owner";
 
-function TableView({ assetDetail, assetObservability, onBack, onChangeSampleLimit, sampleLimit }) {
-  const [activeTab, setActiveTab] = useState(0);
+const SECTION_TO_TAB = {
+  description: 0,
+  sample: 1,
+  observability: 2,
+};
+
+function TableView({
+  assetDetail,
+  assetObservability,
+  onBack,
+  onChangeSampleLimit,
+  onChangeSection,
+  sampleLimit,
+  section = "description",
+  observabilityTab = "profile",
+}) {
   const ownerLabel = useMemo(() => getOwnerLabel(assetDetail?.owner), [assetDetail?.owner]);
+  const activeTab = SECTION_TO_TAB[section] ?? 0;
+
+  const handleTabChange = (_, nextTab) => {
+    if (onChangeSection) {
+      const nextSection = Object.keys(SECTION_TO_TAB).find((key) => SECTION_TO_TAB[key] === nextTab) || "description";
+      onChangeSection(nextSection);
+    }
+  };
 
   return (
-    <Box sx={{ p: 4, height: "100%", overflow: "auto" }}>
+    <Box sx={pageShellSx}>
       <Box sx={{ mb: 3 }}>
         <Breadcrumbs sx={{ mb: 1 }}>
           <Link underline="hover" color="inherit" onClick={onBack} sx={{ cursor: "pointer" }}>
@@ -65,7 +88,7 @@ function TableView({ assetDetail, assetObservability, onBack, onChangeSampleLimi
       </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={(_, nextTab) => setActiveTab(nextTab)}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
           <Tab icon={<DescriptionIcon fontSize="small" />} iconPosition="start" label="Description" />
           <Tab icon={<SampleIcon fontSize="small" />} iconPosition="start" label="Data Sample" />
           <Tab icon={<ObservabilityIcon fontSize="small" />} iconPosition="start" label="Observability" />
@@ -77,7 +100,12 @@ function TableView({ assetDetail, assetObservability, onBack, onChangeSampleLimi
         <DataSample assetDetail={assetDetail} onChangeSampleLimit={onChangeSampleLimit} sampleLimit={sampleLimit} />
       ) : null}
       {activeTab === 2 ? (
-        <DataObservability assetDetail={assetDetail} assetObservability={assetObservability} />
+        <DataObservability
+          assetDetail={assetDetail}
+          assetObservability={assetObservability}
+          initialTab={observabilityTab}
+          onTabChange={(nextTab) => onChangeSection?.("observability", nextTab)}
+        />
       ) : null}
     </Box>
   );

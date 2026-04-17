@@ -12,6 +12,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { datagateColors, panelSx } from "~/theme";
 
 function DataSample({ assetDetail, onChangeSampleLimit, sampleLimit }) {
   const sampleData = assetDetail?.sample_data || {};
@@ -39,10 +40,10 @@ function DataSample({ assetDetail, onChangeSampleLimit, sampleLimit }) {
         </Stack>
       </Paper>
 
-      <Paper sx={{ overflow: "hidden" }}>
+      <Paper sx={{ ...panelSx, overflow: "hidden" }}>
         <TableContainer>
           <Table size="small">
-            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+            <TableHead sx={{ bgcolor: datagateColors.tableHeadBackground }}>
               <TableRow>
                 {columns.map((column) => (
                   <TableCell key={column} sx={{ fontWeight: 700 }}>

@@ -28,8 +28,21 @@ import {
   TableChartOutlined as TableIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
-import { observabilityApi } from "~/apis/observability";
-import { servicesApi } from "~/apis/services";
+import { useDispatch, useSelector } from "react-redux";
+import { datagateColors, pageShellSx, panelSx } from "~/theme";
+import {
+  fetchColumnStats,
+  fetchIncidents,
+  fetchSchema,
+  fetchSnapshots,
+  fetchVolumeTS,
+} from "~/stores/slices/observabilitySlice";
+import {
+  fetchAssetDetail,
+  fetchServices,
+  fetchServiceSchemas,
+  fetchServiceTables,
+} from "~/stores/slices/servicesSlice";
 import TableView from "./Table/Table";
 
 const normalizeTable = (table) => {
@@ -53,163 +66,111 @@ const normalizeTable = (table) => {
 const getOwnerLabel = (owner) => owner?.full_name || owner?.username || owner?.email || "Unknown owner";
 
 const Explore = () => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const tableParam = searchParams.get("table");
   const serviceParam = searchParams.get("service");
+  const sectionParam = searchParams.get("section") || "description";
+  const observabilityTabParam = searchParams.get("obsTab") || "profile";
+  const services = useSelector((state) => state.services.services);
+  const servicesStatus = useSelector((state) => state.services.servicesStatus);
+  const servicesError = useSelector((state) => state.services.servicesError);
+  const schemasMap = useSelector((state) => state.services.schemasByService);
+  const tablesMap = useSelector((state) => state.services.tablesByService);
+  const loadingTablesByService = useSelector((state) => state.services.tablesStatusByService);
+  const assetDetailsByKey = useSelector((state) => state.services.assetDetailsByKey);
+  const assetDetailStatusByKey = useSelector((state) => state.services.assetDetailStatusByKey);
+  const assetDetailErrorByKey = useSelector((state) => state.services.assetDetailErrorByKey);
+  const {
+    columnStatsByTable,
+    incidentsByTable,
+    schemasByTable,
+    snapshotsByTable,
+    volumeTSByTable,
+  } = useSelector((state) => state.observability);
 
   const [selectedServiceId, setSelectedServiceId] = useState(null);
   const [selectedSchemaByService, setSelectedSchemaByService] = useState({});
-  const [services, setServices] = useState([]);
-  const [schemasMap, setSchemasMap] = useState({});
-  const [tablesMap, setTablesMap] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [, setLoadingSchemas] = useState({});
-  const [loadingTables, setLoadingTables] = useState({});
-  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDatabasesExpanded, setIsDatabasesExpanded] = useState(true);
   const [expandedServiceTypes, setExpandedServiceTypes] = useState({});
   const [expandedServices, setExpandedServices] = useState({});
 
   const [sampleLimit, setSampleLimit] = useState(50);
-  const [assetDetail, setAssetDetail] = useState(null);
-  const [assetDetailLoading, setAssetDetailLoading] = useState(false);
-  const [assetDetailError, setAssetDetailError] = useState(null);
-  const [assetObservability, setAssetObservability] = useState({
-    columnStats: [],
-    incidents: [],
-    schema: [],
-    snapshots: [],
-    volume: [],
-  });
-
-  const fetchServices = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await servicesApi.getServices();
-      const nextServices = response.data || [];
-      setServices(nextServices);
-      setSelectedServiceId((prev) =>
-        prev && nextServices.some((service) => service.id === prev) ? prev : nextServices[0]?.id ?? null
-      );
-      setError(null);
-    } catch (err) {
-      console.error("Failed to fetch services:", err);
-      setError("Could not load data platform services. Please check connection.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchSchemas = useCallback(async (serviceId) => {
-    if (!serviceId || schemasMap[serviceId]) return;
-
-    try {
-      setLoadingSchemas((prev) => ({ ...prev, [serviceId]: true }));
-      const response = await servicesApi.getServiceSchemas(serviceId);
-      const schemas = response.data || [];
-      setSchemasMap((prev) => ({ ...prev, [serviceId]: schemas }));
-      setSelectedSchemaByService((prev) => ({
-        ...prev,
-        [serviceId]: prev[serviceId] || schemas[0] || "all",
-      }));
-    } catch (err) {
-      console.error(`Failed to fetch schemas for ${serviceId}:`, err);
-    } finally {
-      setLoadingSchemas((prev) => ({ ...prev, [serviceId]: false }));
-    }
-  }, [schemasMap]);
-
-  const fetchTables = useCallback(async (serviceId) => {
-    if (!serviceId || tablesMap[serviceId]) return;
-
-    try {
-      setLoadingTables((prev) => ({ ...prev, [serviceId]: true }));
-      const response = await servicesApi.getServiceTables(serviceId);
-      setTablesMap((prev) => ({
-        ...prev,
-        [serviceId]: (response.data || []).map(normalizeTable),
-      }));
-    } catch (err) {
-      console.error(`Failed to fetch tables for ${serviceId}:`, err);
-    } finally {
-      setLoadingTables((prev) => ({ ...prev, [serviceId]: false }));
-    }
-  }, [tablesMap]);
 
   useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    if (servicesStatus === "idle") {
+      dispatch(fetchServices());
+    }
+  }, [dispatch, servicesStatus]);
 
   useEffect(() => {
-    if (!selectedServiceId || tableParam) return;
-    fetchSchemas(selectedServiceId);
-    fetchTables(selectedServiceId);
-  }, [fetchSchemas, fetchTables, selectedServiceId, tableParam]);
-
-  useEffect(() => {
-    if (!selectedServiceId) return;
-
-    const nextService = services.find((service) => service.id === selectedServiceId);
-    if (!nextService) return;
-
-    const nextServiceType = (nextService.service_type || "Other").toLowerCase();
-    setExpandedServiceTypes((prev) => ({ ...prev, [nextServiceType]: true }));
-    setExpandedServices((prev) => ({ ...prev, [selectedServiceId]: true }));
-  }, [selectedServiceId, services]);
+    const nextServiceId =
+      selectedServiceId && services.some((service) => service.id === selectedServiceId)
+        ? selectedServiceId
+        : services[0]?.id ?? null;
+    if (!nextServiceId || tableParam) return;
+    if (!schemasMap[nextServiceId]) {
+      dispatch(fetchServiceSchemas(nextServiceId));
+    }
+    if (!tablesMap[nextServiceId]) {
+      dispatch(fetchServiceTables(nextServiceId));
+    }
+  }, [dispatch, schemasMap, selectedServiceId, services, tableParam, tablesMap]);
 
   useEffect(() => {
     if (!tableParam || !serviceParam) {
-      setAssetDetail(null);
-      setAssetDetailError(null);
       return;
     }
+    dispatch(fetchAssetDetail({ tableName: tableParam, serviceId: Number(serviceParam), sampleLimit }));
+    dispatch(fetchSnapshots(tableParam));
+    dispatch(fetchSchema(tableParam));
+    dispatch(fetchColumnStats(tableParam));
+    dispatch(fetchIncidents(tableParam));
+    dispatch(fetchVolumeTS(tableParam));
+  }, [dispatch, sampleLimit, serviceParam, tableParam]);
 
-    const fetchAssetDetail = async () => {
-      try {
-        setAssetDetailLoading(true);
-        setAssetDetailError(null);
-        const [detailRes, snapshotsRes, schemaRes, columnStatsRes, incidentsRes, volumeRes] = await Promise.all([
-          servicesApi.getAssetDetail(tableParam, Number(serviceParam), sampleLimit),
-          observabilityApi.getSnapshots(tableParam),
-          observabilityApi.getSchema(tableParam),
-          observabilityApi.getColumnStats(tableParam),
-          observabilityApi.getIncidents(tableParam),
-          observabilityApi.getVolumeTS(tableParam),
-        ]);
-
-        setAssetDetail(detailRes.data);
-        setAssetObservability({
-          columnStats: columnStatsRes.data || [],
-          incidents: incidentsRes.data || [],
-          schema: schemaRes.data || [],
-          snapshots: snapshotsRes.data || [],
-          volume: volumeRes.data || [],
-        });
-      } catch (err) {
-        console.error("Failed to fetch asset detail:", err);
-        setAssetDetailError("Could not load asset details.");
-      } finally {
-        setAssetDetailLoading(false);
-      }
-    };
-
-    fetchAssetDetail();
-  }, [tableParam, serviceParam, sampleLimit]);
+  const updateExploreQuery = useCallback(
+    ({ serviceId = serviceParam, tableName = tableParam, section = sectionParam, obsTab = observabilityTabParam } = {}) => {
+      const params = new URLSearchParams();
+      if (serviceId) params.set("service", serviceId);
+      if (tableName) params.set("table", tableName);
+      if (section && section !== "description") params.set("section", section);
+      if (obsTab && obsTab !== "profile") params.set("obsTab", obsTab);
+      navigate(`/explore${params.toString() ? `?${params.toString()}` : ""}`);
+    },
+    [navigate, observabilityTabParam, sectionParam, serviceParam, tableParam]
+  );
 
   const openAssetDetail = (serviceId, tableName) => {
-    navigate(`/explore?service=${serviceId}&table=${encodeURIComponent(tableName)}`);
+    updateExploreQuery({ serviceId, tableName, section: "description", obsTab: "profile" });
   };
 
   const closeAssetDetail = () => {
     navigate("/explore");
   };
 
-  const selectedService = services.find((service) => service.id === selectedServiceId) || null;
-  const selectedSchema = selectedServiceId ? selectedSchemaByService[selectedServiceId] || "all" : "all";
-  const selectedServiceTables = selectedServiceId ? tablesMap[selectedServiceId] || [] : [];
+  const loading = servicesStatus === "loading";
+  const error =
+    servicesStatus === "failed"
+      ? servicesError || "Could not load data platform services. Please check connection."
+      : null;
+  const resolvedSelectedServiceId =
+    selectedServiceId && services.some((service) => service.id === selectedServiceId)
+      ? selectedServiceId
+      : services[0]?.id ?? null;
+  const selectedService =
+    services.find((service) => service.id === resolvedSelectedServiceId) || null;
+  const selectedSchema = resolvedSelectedServiceId
+    ? selectedSchemaByService[resolvedSelectedServiceId] ||
+      schemasMap[resolvedSelectedServiceId]?.[0] ||
+      "all"
+    : "all";
+  const selectedServiceTables = resolvedSelectedServiceId
+    ? (tablesMap[resolvedSelectedServiceId] || []).map(normalizeTable)
+    : [];
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const groupedServices = services.reduce((accumulator, service) => {
     const key = (service.service_type || "Other").toLowerCase();
@@ -244,6 +205,20 @@ const Explore = () => {
     accent: index === 0 ? "#F7FAFF" : "#FFFFFF",
     border: index === 0 ? "#7BA7FF" : "#EEF2F7",
   }));
+  const assetDetailKey =
+    tableParam && serviceParam ? `${Number(serviceParam)}:${tableParam}:${sampleLimit}` : "";
+  const assetDetail = assetDetailKey ? assetDetailsByKey[assetDetailKey] || null : null;
+  const assetDetailLoading = assetDetailKey
+    ? assetDetailStatusByKey[assetDetailKey] === "loading"
+    : false;
+  const assetDetailError = assetDetailKey ? assetDetailErrorByKey[assetDetailKey] || null : null;
+  const assetObservability = {
+    columnStats: columnStatsByTable[tableParam] || [],
+    incidents: incidentsByTable[tableParam] || [],
+    schema: schemasByTable[tableParam] || [],
+    snapshots: snapshotsByTable[tableParam] || [],
+    volume: volumeTSByTable[tableParam] || [],
+  };
 
   if (loading) {
     return (
@@ -273,23 +248,31 @@ const Explore = () => {
         assetDetail={assetDetail}
         assetObservability={assetObservability}
         onBack={closeAssetDetail}
+        onChangeSection={(nextSection, nextObsTab = observabilityTabParam) =>
+          updateExploreQuery({
+            serviceId: serviceParam,
+            tableName: tableParam,
+            section: nextSection,
+            obsTab: nextObsTab,
+          })
+        }
         onChangeSampleLimit={setSampleLimit}
+        observabilityTab={observabilityTabParam}
         sampleLimit={sampleLimit}
+        section={sectionParam}
       />
     );
   }
 
   return (
-    <Box sx={{ p: 2.5, height: "100%", overflow: "auto", bgcolor: "#F7F9FC" }}>
+    <Box sx={pageShellSx}>
       <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5} alignItems="stretch">
         <Paper
           sx={{
             width: { xs: "100%", lg: 300 },
             minWidth: { lg: 300 },
             p: 1.75,
-            borderRadius: 3,
-            border: "1px solid #EEF2F7",
-            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
+            ...panelSx,
           }}
         >
           <Stack spacing={1.5} sx={{ height: "100%" }}>
@@ -329,13 +312,17 @@ const Explore = () => {
                   <ServiceIcon sx={{ ml: 0.75, mr: 1, color: "text.secondary", fontSize: 18 }} />
                   <ListItemText
                     primary="Databases"
-                    primaryTypographyProps={{ fontWeight: 700, fontSize: 14 }}
+                    slotProps={{ primary: { fontWeight: 700, fontSize: 14 } }}
                   />
                 </ListItemButton>
 
                 {isDatabasesExpanded
                   ? Object.entries(groupedServices).map(([serviceTypeKey, group]) => {
-                      const isTypeExpanded = expandedServiceTypes[serviceTypeKey] ?? true;
+                      const defaultTypeExpanded = group.services.some(
+                        (service) => service.id === resolvedSelectedServiceId
+                      );
+                      const isTypeExpanded =
+                        expandedServiceTypes[serviceTypeKey] ?? defaultTypeExpanded;
                       const matchedServices = group.services.filter((service) => {
                         if (!normalizedSearchQuery) return true;
 
@@ -365,14 +352,16 @@ const Explore = () => {
                             {isTypeExpanded ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />}
                             <ListItemText
                               primary={group.label}
-                              primaryTypographyProps={{ fontWeight: 600, textTransform: "lowercase", fontSize: 13 }}
+                              slotProps={{
+                                primary: { fontWeight: 600, textTransform: "lowercase", fontSize: 13 },
+                              }}
                               sx={{ ml: 1 }}
                             />
                           </ListItemButton>
 
                           {isTypeExpanded
                             ? matchedServices.map((service) => {
-                                const isSelected = service.id === selectedServiceId;
+                                const isSelected = service.id === resolvedSelectedServiceId;
                                 const isServiceExpanded = expandedServices[service.id] ?? isSelected;
                                 const serviceSchemas = schemasMap[service.id] || [];
                                 const visibleSchemas = serviceSchemas.filter((schema) => {
@@ -386,17 +375,21 @@ const Explore = () => {
                                       selected={isSelected}
                                       onClick={() => {
                                         setSelectedServiceId(service.id);
-                                        fetchSchemas(service.id);
-                                        fetchTables(service.id);
+                                        if (!schemasMap[service.id]) {
+                                          dispatch(fetchServiceSchemas(service.id));
+                                        }
+                                        if (!tablesMap[service.id]) {
+                                          dispatch(fetchServiceTables(service.id));
+                                        }
                                       }}
                                       sx={{
                                         borderRadius: 2,
                                         py: 0.45,
                                         mb: 0.25,
                                         minHeight: 34,
-                                        bgcolor: isSelected ? "#EEF4FF" : "transparent",
+                                        bgcolor: isSelected ? datagateColors.selectedBackground : "transparent",
                                         "&.Mui-selected": {
-                                          bgcolor: "#EEF4FF",
+                                          bgcolor: datagateColors.selectedBackground,
                                         },
                                       }}
                                     >
@@ -420,8 +413,10 @@ const Explore = () => {
                                       <ListItemText
                                         primary={service.name}
                                         secondary={service.service_type}
-                                        primaryTypographyProps={{ fontWeight: isSelected ? 700 : 500, fontSize: 13 }}
-                                        secondaryTypographyProps={{ fontSize: 11 }}
+                                        slotProps={{
+                                          primary: { fontWeight: isSelected ? 700 : 500, fontSize: 13 },
+                                          secondary: { fontSize: 11 },
+                                        }}
                                       />
                                     </ListItemButton>
 
@@ -447,8 +442,10 @@ const Explore = () => {
                                               <ListItemText
                                                 primary={schema}
                                                 secondary={`${schemaTableCount} tables`}
-                                                primaryTypographyProps={{ fontSize: 12.5 }}
-                                                secondaryTypographyProps={{ fontSize: 10.5 }}
+                                                slotProps={{
+                                                  primary: { fontSize: 12.5 },
+                                                  secondary: { fontSize: 10.5 },
+                                                }}
                                               />
                                             </ListItemButton>
                                           );
@@ -473,9 +470,7 @@ const Explore = () => {
           <Paper
             sx={{
               p: 2,
-              borderRadius: 3,
-              border: "1px solid #EEF2F7",
-              boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
+              ...panelSx,
             }}
           >
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
@@ -490,7 +485,7 @@ const Explore = () => {
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1}>
-                <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={fetchServices} sx={{ textTransform: "none", fontSize: 12, borderColor: "#E6EBF2" }}>
+                <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={() => dispatch(fetchServices())} sx={{ textTransform: "none", fontSize: 12, borderColor: "#E6EBF2" }}>
                   Refresh
                 </Button>
               </Stack>
@@ -498,7 +493,7 @@ const Explore = () => {
 
             <Divider sx={{ mb: 2 }} />
 
-            {loadingTables[selectedServiceId] ? (
+            {loadingTablesByService[resolvedSelectedServiceId] === "loading" ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
                 <CircularProgress size={28} />
               </Box>
@@ -516,7 +511,7 @@ const Explore = () => {
                 {assetCards.map((table) => (
                   <Paper
                     key={table.full_name}
-                    onClick={() => openAssetDetail(selectedServiceId, table.full_name)}
+                    onClick={() => openAssetDetail(resolvedSelectedServiceId, table.full_name)}
                     sx={{
                       p: 2,
                       borderRadius: 3,

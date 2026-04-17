@@ -1,34 +1,37 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { authApi } from '../../apis/auth';
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { authApi } from "~/apis/auth";
 
-// Login then fetch full user profile
+const TOKEN_KEY = "token";
+
+const getStoredToken = () => localStorage.getItem(TOKEN_KEY);
+const saveToken = (token) => localStorage.setItem(TOKEN_KEY, token);
+const clearStoredToken = () => localStorage.removeItem(TOKEN_KEY);
+
 export const login = createAsyncThunk(
-  'auth/login',
+  "auth/login",
   async ({ username, password }, { rejectWithValue }) => {
     try {
       const res = await authApi.login(username, password);
       const accessToken = res.data.access_token;
-      localStorage.setItem('token', accessToken);
+      saveToken(accessToken);
 
-      // Fetch real user profile from /auth/me
       const meRes = await authApi.getMe();
       return {
         user: meRes.data,
         token: accessToken,
       };
     } catch (err) {
-      localStorage.removeItem('token');
-      return rejectWithValue(err.response?.data?.detail || 'Login failed');
+      clearStoredToken();
+      return rejectWithValue(err.response?.data?.detail || "Login failed");
     }
   }
 );
 
-// On page reload — restore session by calling /auth/me with saved token
 export const initializeAuth = createAsyncThunk(
-  'auth/initialize',
+  "auth/initialize",
   async (_, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
-    if (!token) return rejectWithValue('No token');
+    const token = getStoredToken();
+    if (!token) return rejectWithValue("No token");
 
     try {
       const meRes = await authApi.getMe();
@@ -37,30 +40,32 @@ export const initializeAuth = createAsyncThunk(
         token,
       };
     } catch (err) {
-      localStorage.removeItem('token');
-      return rejectWithValue('Auth initialization failed');
+      clearStoredToken();
+      return rejectWithValue("Auth initialization failed");
     }
   }
 );
 
 const initialState = {
   user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  token: getStoredToken(),
+  isAuthenticated: Boolean(getStoredToken()),
   loading: true,
+  status: "idle",
   error: null,
 };
 
 const authSlice = createSlice({
-  name: 'auth',
+  name: "auth",
   initialState,
   reducers: {
     logout: (state) => {
-      localStorage.removeItem('token');
+      clearStoredToken();
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
       state.loading = false;
+      state.status = "idle";
       state.error = null;
     },
     clearError: (state) => {
@@ -72,30 +77,37 @@ const authSlice = createSlice({
       // Login
       .addCase(login.pending, (state) => {
         state.loading = true;
+        state.status = "loading";
         state.error = null;
       })
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
+        state.status = "authenticated";
         state.isAuthenticated = true;
         state.user = action.payload.user;
         state.token = action.payload.token;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
+        state.status = "error";
+        state.isAuthenticated = false;
         state.error = action.payload;
       })
       // Initialize Auth
       .addCase(initializeAuth.pending, (state) => {
         state.loading = true;
+        state.status = "loading";
       })
       .addCase(initializeAuth.fulfilled, (state, action) => {
         state.loading = false;
+        state.status = "authenticated";
         state.isAuthenticated = true;
         state.user = action.payload.user;
         state.token = action.payload.token;
       })
       .addCase(initializeAuth.rejected, (state) => {
         state.loading = false;
+        state.status = "anonymous";
         state.isAuthenticated = false;
         state.user = null;
         state.token = null;

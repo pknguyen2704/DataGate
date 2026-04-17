@@ -16,52 +16,43 @@ import {
   Inventory2Outlined as AssetsIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { servicesApi } from "~/apis/services";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchAssets } from "~/stores/slices/servicesSlice";
 
 const rangeOptions = [
   { label: "Latest", value: "latest" },
-  { label: "Last 7 days", value: "7d" },
+  { label: "Yesterday", value: "1d" },
 ];
 
 const formatName = (user) => user?.full_name || user?.username || user?.email || "there";
 
 function Home() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  const assets = useSelector((state) => state.services.assets);
+  const assetsStatus = useSelector((state) => state.services.assetsStatus);
   const [range, setRange] = useState("latest");
-  const [assets, setAssets] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAssets = async () => {
-      try {
-        setLoading(true);
-        const response = await servicesApi.getAssets();
-        setAssets(response.data || []);
-      } catch (error) {
-        console.error("Failed to load home assets", error);
-        setAssets([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAssets();
-  }, []);
+    if (assetsStatus === "idle") {
+      dispatch(fetchAssets());
+    }
+  }, [assetsStatus, dispatch]);
 
   const ownedAssets = assets.slice(0, 8);
   const totalAssets = assets.length;
   const selectedDay = useMemo(() => new Date().getDate(), []);
+  const loading = assetsStatus === "loading";
 
   return (
-    <Box sx={{ p: 4, height: "100%", overflow: "auto", background: "#F6F8FC" }}>
+    <Box sx={{ p: 2, height: "100%", overflow: "auto"}}>
       <Paper
         sx={{
           mb: 4,
           px: { xs: 3, md: 5 },
           py: { xs: 4, md: 6 },
-          borderRadius: 4,
+          // borderRadius: ,
           color: "#FFFFFF",
           background: "linear-gradient(135deg, #2E6BFF 0%, #2347D9 55%, #1938CF 100%)",
           boxShadow: "0 30px 60px rgba(28, 70, 217, 0.22)",

@@ -4,11 +4,10 @@ import { ThemeProvider } from '@mui/material/styles'
 import { ConfirmProvider } from 'material-ui-confirm'
 import { CssBaseline } from '@mui/material'
 import { ToastContainer } from 'react-toastify'
-import theme from '~/theme'
-import App from '~/App.jsx'
-
 import { Provider } from 'react-redux'
-import { store } from './store'
+import theme from '~/theme'
+import { store } from '~/stores'
+import App from '~/App.jsx'
 
 createRoot(document.getElementById('root')).render(
   <Provider store={store}>
@@ -29,7 +28,18 @@ createRoot(document.getElementById('root')).render(
       }}>
         <CssBaseline />
         <App />
-        <ToastContainer position="bottom-right" theme="colored"/>
+        <ToastContainer
+          position="bottom-right"
+          autoClose={4000}
+          hideProgressBar
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="colored"
+        />
       </ConfirmProvider>
     </ThemeProvider>
   </BrowserRouter>

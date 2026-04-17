@@ -24,6 +24,7 @@ import {
   StorageOutlined as VolumeIcon,
   ViewColumnOutlined as ColumnIcon,
 } from "@mui/icons-material";
+import { datagateColors, panelSx, subtlePanelSx } from "~/theme";
 
 const formatValue = (value) => {
   if (value === null || value === undefined || value === "") return "--";
@@ -141,7 +142,7 @@ function Profile({ assetDetail, assetObservability }) {
       <Grid container spacing={2}>
         {profileCards.map((card) => (
           <Grid item xs={12} sm={6} md={3} key={card.label}>
-            <Paper sx={{ p: 2.5, height: "100%" }}>
+            <Paper sx={{ ...panelSx, p: 2.5, height: "100%" }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 {card.icon}
                 <Typography variant="caption" color="text.secondary" fontWeight={700}>
@@ -158,7 +159,7 @@ function Profile({ assetDetail, assetObservability }) {
 
       <Grid container spacing={3}>
         <Grid item xs={12} lg={7}>
-          <Paper sx={{ p: 3, height: "100%" }}>
+          <Paper sx={{ ...panelSx, p: 3, height: "100%" }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Table-Level Metadata
             </Typography>
@@ -176,7 +177,7 @@ function Profile({ assetDetail, assetObservability }) {
         </Grid>
 
         <Grid item xs={12} lg={5}>
-          <Paper sx={{ p: 3, height: "100%" }}>
+          <Paper sx={{ ...panelSx, p: 3, height: "100%" }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Observability Checks
             </Typography>
@@ -184,12 +185,7 @@ function Profile({ assetDetail, assetObservability }) {
               {tableChecks.map((item) => (
                 <Box
                   key={item.title}
-                  sx={{
-                    p: 2,
-                    border: "1px solid #E5EAF2",
-                    borderRadius: 2,
-                    backgroundColor: "#FCFDFE",
-                  }}
+                  sx={{ ...subtlePanelSx, p: 2 }}
                 >
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
                     <Typography sx={{ fontWeight: 700 }}>{item.title}</Typography>
@@ -209,7 +205,7 @@ function Profile({ assetDetail, assetObservability }) {
         </Grid>
       </Grid>
 
-      <Paper sx={{ overflow: "hidden" }}>
+      <Paper sx={{ ...panelSx, overflow: "hidden" }}>
         <Box sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ mb: 0.5 }}>
             Column-Level Metadata
@@ -222,7 +218,7 @@ function Profile({ assetDetail, assetObservability }) {
         <Divider />
         <TableContainer>
           <Table size="small">
-            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+            <TableHead sx={{ bgcolor: datagateColors.tableHeadBackground }}>
               <TableRow>
                 <TableCell>Table</TableCell>
                 <TableCell>Column</TableCell>
@@ -256,7 +252,7 @@ function Profile({ assetDetail, assetObservability }) {
 
       <Grid container spacing={3}>
         <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 3, height: "100%" }}>
+          <Paper sx={{ ...panelSx, p: 3, height: "100%" }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Predictive Alerts
             </Typography>
@@ -284,7 +280,7 @@ function Profile({ assetDetail, assetObservability }) {
         </Grid>
 
         <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 3, height: "100%" }}>
+          <Paper sx={{ ...panelSx, p: 3, height: "100%" }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Lineage & Job Monitoring
             </Typography>

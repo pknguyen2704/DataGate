@@ -14,7 +14,7 @@ import {
 import { Visibility, VisibilityOff, LockOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { login } from "~/store/slices/authSlice";
+import { login } from "~/stores/slices/authSlice";
 import { toast } from "react-toastify";
 import LogoImage from "~/assets/images/datagate.svg";
 
@@ -41,9 +41,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(
-        login({ username: formData.username, password: formData.password })
-      ).unwrap();
+      await dispatch(login({ username: formData.username, password: formData.password })).unwrap();
       toast.success("Welcome back to DataGate!");
       navigate("/");
     } catch (err) {
@@ -72,14 +70,8 @@ const Login = () => {
         },
       }}
     >
-      {/* ── Logo ── */}
       <Box sx={{ mb: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-        <Box
-          component="img"
-          src={LogoImage}
-          alt="DataGate Logo"
-          sx={{ height: 48 }}
-        />
+        <Box component="img" src={LogoImage} alt="DataGate Logo" sx={{ height: 48 }} />
         <Typography
           variant="h5"
           sx={{ fontWeight: 700, color: "primary.main", letterSpacing: "-0.5px" }}
@@ -88,7 +80,6 @@ const Login = () => {
         </Typography>
       </Box>
 
-      {/* ── Form ── */}
       <Box
         component="form"
         onSubmit={handleSubmit}
@@ -154,9 +145,7 @@ const Login = () => {
                 onChange={handleChange}
               />
             }
-            label={
-              <Typography variant="body2">Remember me</Typography>
-            }
+            label={<Typography variant="body2">Remember me</Typography>}
           />
           <Link
             href="#"
@@ -201,7 +190,6 @@ const Login = () => {
         </Button>
       </Box>
 
-      {/* ── Footer note ── */}
       <Typography
         variant="caption"
         color="text.disabled"

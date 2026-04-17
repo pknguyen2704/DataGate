@@ -16,6 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import { mlQualityApi } from "~/apis/mlQuality";
+import { datagateColors, panelSx, subtlePanelSx } from "~/theme";
 
 const formatDateTime = (value) => {
   if (!value) return "--";
@@ -110,7 +111,7 @@ function AnomalyDetection({ assetDetail }) {
 
       <Grid container spacing={3}>
         <Grid item xs={12} lg={4}>
-          <Paper sx={{ p: 3, height: "100%" }}>
+          <Paper sx={{ ...panelSx, p: 3, height: "100%" }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               ML Run History
             </Typography>
@@ -131,7 +132,7 @@ function AnomalyDetection({ assetDetail }) {
                       borderColor: run.id === selectedRunId ? "primary.main" : "divider",
                       borderRadius: 2,
                       cursor: "pointer",
-                      backgroundColor: run.id === selectedRunId ? "#F8FBFF" : "#FFFFFF",
+                      backgroundColor: run.id === selectedRunId ? datagateColors.selectedBackground : datagateColors.cardBackground,
                     }}
                   >
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
@@ -152,7 +153,7 @@ function AnomalyDetection({ assetDetail }) {
         </Grid>
 
         <Grid item xs={12} lg={8}>
-          <Paper sx={{ p: 3, mb: 3 }}>
+          <Paper sx={{ ...panelSx, p: 3, mb: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Top Anomalous Columns
             </Typography>
@@ -166,7 +167,7 @@ function AnomalyDetection({ assetDetail }) {
             ) : (
               <TableContainer>
                 <Table size="small">
-                  <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+                  <TableHead sx={{ bgcolor: datagateColors.tableHeadBackground }}>
                     <TableRow>
                       <TableCell>Column</TableCell>
                       <TableCell>Importance Score</TableCell>
@@ -185,7 +186,7 @@ function AnomalyDetection({ assetDetail }) {
             )}
           </Paper>
 
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ ...panelSx, p: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Clustered Impact Groups
             </Typography>
@@ -197,7 +198,7 @@ function AnomalyDetection({ assetDetail }) {
             ) : (
               <Stack spacing={1.5}>
                 {clusterGroups.map((group, index) => (
-                  <Box key={`${selectedRunDetail.id}-cluster-${index}`} sx={{ p: 2, border: "1px solid #E5EAF2", borderRadius: 2 }}>
+                  <Box key={`${selectedRunDetail.id}-cluster-${index}`} sx={{ ...subtlePanelSx, p: 2 }}>
                     <Typography sx={{ fontWeight: 700, mb: 1 }}>Cluster {index + 1}</Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap">
                       {group.map((column) => (
@@ -210,7 +211,7 @@ function AnomalyDetection({ assetDetail }) {
             )}
 
             {selectedRunDetail?.raw_json ? (
-              <Box sx={{ mt: 3, p: 2, borderRadius: 2, backgroundColor: "#F8FAFC" }}>
+              <Box sx={{ ...subtlePanelSx, mt: 3, p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                   Run Settings
                 </Typography>
@@ -232,7 +233,7 @@ function AnomalyDetection({ assetDetail }) {
             ) : null}
           </Paper>
 
-          <Paper sx={{ p: 3, mt: 3 }}>
+          <Paper sx={{ ...panelSx, p: 3, mt: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               SHAP Row Explanations
             </Typography>
@@ -244,7 +245,7 @@ function AnomalyDetection({ assetDetail }) {
             ) : (
               <Stack spacing={1.5}>
                 {rowExplanations.map((row) => (
-                  <Box key={`${selectedRunDetail.id}-row-${row.row_rank}`} sx={{ p: 2, border: "1px solid #E5EAF2", borderRadius: 2 }}>
+                  <Box key={`${selectedRunDetail.id}-row-${row.row_rank}`} sx={{ ...subtlePanelSx, p: 2 }}>
                     <Typography sx={{ fontWeight: 700, mb: 1 }}>
                       Row {row.row_rank} · score {row.row_score?.toFixed?.(4) ?? row.row_score}
                     </Typography>
@@ -269,7 +270,7 @@ function AnomalyDetection({ assetDetail }) {
 function MetricCard({ label, value }) {
   return (
     <Grid item xs={12} md={4}>
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={{ ...panelSx, p: 2.5 }}>
         <Typography variant="caption" color="text.secondary" fontWeight={700}>
           {label}
         </Typography>

@@ -2,7 +2,51 @@ import { createTheme } from "@mui/material/styles";
 
 const APP_BAR_HEIGHT = 64;
 const SIDEBAR_WIDTH = 260;
-const BASE_RADIUS = 12;
+const BASE_RADIUS = 10;
+
+export const datagateColors = {
+  pageBackground: "#F7F9FC",
+  cardBorder: "#E5EAF2",
+  cardBorderSoft: "#EEF2F7",
+  cardBackground: "#FFFFFF",
+  cardBackgroundMuted: "#FCFDFE",
+  selectedBackground: "#EEF4FF",
+  selectedBorder: "#7BA7FF",
+  tableHeadBackground: "#F8FAFC",
+};
+
+export const datagateLayout = {
+  pagePadding: { xs: 2, md: 3 },
+  sectionGap: 3,
+  panelRadius: 3,
+};
+
+export const pageShellSx = {
+  p: datagateLayout.pagePadding,
+  height: "100%",
+  overflow: "auto",
+  bgcolor: datagateColors.pageBackground,
+};
+
+export const panelSx = {
+  borderRadius: datagateLayout.panelRadius,
+  border: `1px solid ${datagateColors.cardBorderSoft}`,
+  boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
+  backgroundColor: datagateColors.cardBackground,
+};
+
+export const sectionHeaderSx = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 2,
+};
+
+export const subtlePanelSx = {
+  borderRadius: 3,
+  border: `1px solid ${datagateColors.cardBorder}`,
+  bgcolor: datagateColors.cardBackgroundMuted,
+};
 
 const theme = createTheme({
   spacing: 8,
@@ -29,7 +73,7 @@ const theme = createTheme({
       main: "#16A34A",
     },
     background: {
-      default: "#F6F8FC",
+      default: datagateColors.pageBackground,
       paper: "#FFFFFF",
     },
     text: {
@@ -127,7 +171,7 @@ const theme = createTheme({
           fontSize: "16px",
         },
         body: {
-          backgroundColor: "#F6F8FC",
+          backgroundColor: datagateColors.pageBackground,
           color: "#1E293B",
           fontFamily: '"Outfit", "system-ui", "-apple-system", "Segoe UI", sans-serif',
           margin: 0,
@@ -303,16 +347,6 @@ const theme = createTheme({
           fontSize: "0.9375rem",
           fontWeight: 600,
           textTransform: "none",
-        },
-      },
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          backgroundColor: "#FFFFFF",
-          color: "#1E293B",
-          boxShadow: "none",
-          borderBottom: "1px solid #E2E8F0",
         },
       },
     },

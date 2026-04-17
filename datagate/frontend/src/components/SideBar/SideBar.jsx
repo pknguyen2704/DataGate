@@ -6,7 +6,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  IconButton,
   Tooltip,
 } from "@mui/material";
 import {
@@ -14,12 +13,9 @@ import {
   SearchOutlined as ExplorerIcon,
   QueryStatsOutlined as MetricsIcon,
   SettingsOutlined as SettingsIcon,
-  KeyboardDoubleArrowLeft as CollapseIcon,
-  KeyboardDoubleArrowRight as ExpandIcon,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate, useLocation } from "react-router-dom";
-
 import DataGateLogo from "~/assets/images/datagate.svg";
 
 const navItems = [
@@ -35,9 +31,10 @@ const SideBar = ({ isCollapsed }) => {
   const theme = useTheme();
 
   const isActive = (path) => {
-    if (path === "/home" && location.pathname === "/home") return true;
-    if (path !== "/home" && location.pathname.startsWith(path)) return true;
-    return false;
+    if (path === "/home") {
+      return location.pathname === "/home";
+    }
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -57,35 +54,33 @@ const SideBar = ({ isCollapsed }) => {
         border: 'none',
       }}
     >
-      {/* Brand Logo Area */}
-      <Box sx={{ 
-        px: isCollapsed ? 0 : 2, 
-        py: 2.5, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: isCollapsed ? 'center' : 'flex-start',
-        minHeight: '80px',
-        gap: 1.5
-      }}>
-        <Box 
+      <Box
+        sx={{
+          px: isCollapsed ? 0 : 2,
+          py: 2.5,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: isCollapsed ? "center" : "flex-start",
+          minHeight: "80px",
+          gap: 1.5,
+        }}
+      >
+        <Box
           component="img"
           src={DataGateLogo}
           alt="DataGate Logo"
-          sx={{ 
-            width: 32, 
-            height: 32, 
-            objectFit: 'contain',
-            flexShrink: 0
-          }}
+          sx={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
         />
         {!isCollapsed && (
-          <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 800, color: "primary.main", letterSpacing: "-0.5px", whiteSpace: "nowrap" }}
+          >
             DataGate
           </Typography>
         )}
       </Box>
 
-      {/* Navigation List */}
       <List sx={{ flexGrow: 1, px: 0 }}>
         {navItems.map((item) => (
           <Tooltip key={item.text} title={isCollapsed ? item.text : ""} placement="right">
@@ -95,23 +90,23 @@ const SideBar = ({ isCollapsed }) => {
               sx={{
                 mx: 1,
                 mb: 0.5,
-                borderRadius: '4px',
+                borderRadius: 1,
                 justifyContent: isCollapsed ? "center" : "flex-start",
                 px: isCollapsed ? 0 : 2,
                 minHeight: 44,
-                '&.Mui-selected': {
-                  bgcolor: 'primary.50',
-                  color: 'primary.main',
-                  '&:hover': { bgcolor: 'primary.50' }
-                }
+                "&.Mui-selected": {
+                  bgcolor: "primary.50",
+                  color: "primary.main",
+                  "&:hover": { bgcolor: "primary.50" },
+                },
               }}
             >
-              <ListItemIcon 
-                sx={{ 
+              <ListItemIcon
+                sx={{
                   minWidth: isCollapsed ? 0 : 40,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  color: isActive(item.path) ? "primary.main" : "text.secondary"
+                  display: "flex",
+                  justifyContent: "center",
+                  color: isActive(item.path) ? "primary.main" : "text.secondary",
                 }}
               >
                 {item.icon}
@@ -119,10 +114,12 @@ const SideBar = ({ isCollapsed }) => {
               {!isCollapsed && (
                 <ListItemText 
                   primary={item.text} 
-                  primaryTypographyProps={{ 
-                    fontSize: '0.875rem', 
-                    fontWeight: isActive(item.path) ? 700 : 500 
-                  }} 
+                  slotProps={{
+                    primary: {
+                      fontSize: "0.875rem",
+                      fontWeight: isActive(item.path) ? 700 : 500,
+                    },
+                  }}
                 />
               )}
             </ListItemButton>

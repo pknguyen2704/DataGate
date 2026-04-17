@@ -31,8 +31,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { servicesApi } from "~/apis/services";
-import { profilingApi } from "~/apis/profiling";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchAssets } from "~/stores/slices/servicesSlice";
+import {
+  fetchMonitoringRecommendations,
+  fetchMonitoringSeries,
+} from "~/stores/slices/monitoringSlice";
 
 const CONFIDENCE_MARKS = [
   { value: 80, label: "80%" },
@@ -47,94 +51,95 @@ const formatMetricValue = (metric, value) => {
 };
 
 function MetricMonitoring() {
-  const [assets, setAssets] = useState([]);
+  const dispatch = useDispatch();
+  const assets = useSelector((state) => state.services.assets);
+  const assetsStatus = useSelector((state) => state.services.assetsStatus);
   const [selectedTable, setSelectedTable] = useState("");
-  const [recommendations, setRecommendations] = useState([]);
   const [selectedColumn, setSelectedColumn] = useState("");
   const [selectedMetric, setSelectedMetric] = useState("null_rate");
   const [confidence, setConfidence] = useState(95);
-  const [series, setSeries] = useState([]);
-  const [loadingAssets, setLoadingAssets] = useState(true);
-  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
-  const [loadingSeries, setLoadingSeries] = useState(false);
-  const [error, setError] = useState("");
+  const resolvedSelectedTable = selectedTable || assets[0]?.table_name || "";
 
-  useEffect(() => {
-    const fetchAssets = async () => {
-      try {
-        setLoadingAssets(true);
-        const response = await servicesApi.getAssets();
-        const nextAssets = response.data || [];
-        setAssets(nextAssets);
-        setSelectedTable(nextAssets[0]?.table_name || "");
-      } catch (fetchError) {
-        console.error(fetchError);
-        setError("Could not load data assets for metric monitoring.");
-      } finally {
-        setLoadingAssets(false);
-      }
-    };
-
-    fetchAssets();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedTable) return;
-
-    const fetchRecommendations = async () => {
-      try {
-        setLoadingRecommendations(true);
-        const response = await profilingApi.getMonitoringRecommendations(selectedTable);
-        const nextRecommendations = response.data?.recommended_columns || [];
-        setRecommendations(nextRecommendations);
-        const fallbackColumn = nextRecommendations[0]?.column_name || "";
-        const fallbackMetric = nextRecommendations[0]?.metrics?.[0]?.metric || "null_rate";
-        setSelectedColumn(fallbackColumn);
-        setSelectedMetric(fallbackMetric);
-        setError("");
-      } catch (fetchError) {
-        console.error(fetchError);
-        setRecommendations([]);
-        setError("No profiling recommendations are available for this asset yet.");
-      } finally {
-        setLoadingRecommendations(false);
-      }
-    };
-
-    fetchRecommendations();
-  }, [selectedTable]);
-
-  useEffect(() => {
-    if (!selectedTable || !selectedColumn || !selectedMetric) return;
-
-    const fetchSeries = async () => {
-      try {
-        setLoadingSeries(true);
-        const response = await profilingApi.getMonitoringSeries(selectedTable, selectedColumn, selectedMetric, confidence);
-        const points = response.data?.points || [];
-        setSeries(
-          points.map((point) => ({
-            ...point,
-            date: new Date(point.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          }))
-        );
-        setError("");
-      } catch (fetchError) {
-        console.error(fetchError);
-        setSeries([]);
-        setError("Could not load metric history for the selected column.");
-      } finally {
-        setLoadingSeries(false);
-      }
-    };
-
-    fetchSeries();
-  }, [confidence, selectedColumn, selectedMetric, selectedTable]);
-
-  const selectedColumnConfig = useMemo(
-    () => recommendations.find((item) => item.column_name === selectedColumn) || null,
-    [recommendations, selectedColumn]
+  const recommendations = useSelector(
+    (state) => state.monitoring.recommendationsByTable[resolvedSelectedTable] || []
   );
+  const recommendationsStatus = useSelector(
+    (state) => state.monitoring.recommendationsStatusByTable[resolvedSelectedTable] || "idle"
+  );
+  const recommendationsError = useSelector(
+    (state) => state.monitoring.recommendationsErrorByTable[resolvedSelectedTable] || ""
+  );
+  const resolvedSelectedColumn = recommendations.some((item) => item.column_name === selectedColumn)
+    ? selectedColumn
+    : recommendations[0]?.column_name || "";
+  const selectedColumnConfig = recommendations.find(
+    (item) => item.column_name === resolvedSelectedColumn
+  ) || null;
+  const resolvedSelectedMetric = selectedColumnConfig?.metrics?.some(
+    (item) => item.metric === selectedMetric
+  )
+    ? selectedMetric
+    : selectedColumnConfig?.metrics?.[0]?.metric || "null_rate";
+  const seriesKey =
+    resolvedSelectedTable && resolvedSelectedColumn && resolvedSelectedMetric
+      ? `${resolvedSelectedTable}:${resolvedSelectedColumn}:${resolvedSelectedMetric}:${confidence}`
+      : "";
+  const rawSeries = useSelector((state) =>
+    seriesKey ? state.monitoring.seriesByKey[seriesKey] || [] : []
+  );
+  const seriesStatus = useSelector((state) =>
+    seriesKey ? state.monitoring.seriesStatusByKey[seriesKey] || "idle" : "idle"
+  );
+  const seriesError = useSelector((state) =>
+    seriesKey ? state.monitoring.seriesErrorByKey[seriesKey] || "" : ""
+  );
+
+  useEffect(() => {
+    if (assetsStatus === "idle") {
+      dispatch(fetchAssets());
+    }
+  }, [assetsStatus, dispatch]);
+
+  useEffect(() => {
+    if (!resolvedSelectedTable) return;
+    if (recommendationsStatus === "idle") {
+      dispatch(fetchMonitoringRecommendations(resolvedSelectedTable));
+    }
+  }, [dispatch, recommendationsStatus, resolvedSelectedTable]);
+
+  useEffect(() => {
+    if (!resolvedSelectedTable || !resolvedSelectedColumn || !resolvedSelectedMetric) return;
+    if (seriesStatus === "idle") {
+      dispatch(
+        fetchMonitoringSeries({
+          tableName: resolvedSelectedTable,
+          columnName: resolvedSelectedColumn,
+          metric: resolvedSelectedMetric,
+          confidence,
+        })
+      );
+    }
+  }, [confidence, dispatch, resolvedSelectedColumn, resolvedSelectedMetric, resolvedSelectedTable, seriesStatus]);
+
+  const series = useMemo(
+    () =>
+      rawSeries.map((point) => ({
+        ...point,
+        date: new Date(point.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+      })),
+    [rawSeries]
+  );
+
+  const loadingAssets = assetsStatus === "loading";
+  const loadingRecommendations = recommendationsStatus === "loading";
+  const loadingSeries = seriesStatus === "loading";
+  const error =
+    assetsStatus === "failed"
+      ? "Could not load data assets for metric monitoring."
+      : seriesError || recommendationsError || "";
 
   const totalAnomalies = series.filter((point) => point.is_anomaly).length;
 
@@ -218,7 +223,7 @@ function MetricMonitoring() {
               <Stack spacing={2.5}>
                 <FormControl fullWidth>
                   <InputLabel>Asset</InputLabel>
-                  <Select label="Asset" value={selectedTable} onChange={(event) => setSelectedTable(event.target.value)}>
+                  <Select label="Asset" value={resolvedSelectedTable} onChange={(event) => setSelectedTable(event.target.value)}>
                     {assets.map((asset) => (
                       <MenuItem key={`${asset.service_id}-${asset.table_name}`} value={asset.table_name}>
                         {asset.table_name}
@@ -229,7 +234,7 @@ function MetricMonitoring() {
 
                 <FormControl fullWidth disabled={loadingRecommendations || recommendations.length === 0}>
                   <InputLabel>Column</InputLabel>
-                  <Select label="Column" value={selectedColumn} onChange={(event) => setSelectedColumn(event.target.value)}>
+                  <Select label="Column" value={resolvedSelectedColumn} onChange={(event) => setSelectedColumn(event.target.value)}>
                     {recommendations.map((column) => (
                       <MenuItem key={column.column_name} value={column.column_name}>
                         {column.column_name}
@@ -240,7 +245,7 @@ function MetricMonitoring() {
 
                 <FormControl fullWidth disabled={!selectedColumnConfig}>
                   <InputLabel>Metric</InputLabel>
-                  <Select label="Metric" value={selectedMetric} onChange={(event) => setSelectedMetric(event.target.value)}>
+                  <Select label="Metric" value={resolvedSelectedMetric} onChange={(event) => setSelectedMetric(event.target.value)}>
                     {(selectedColumnConfig?.metrics || []).map((metric) => (
                       <MenuItem key={metric.metric} value={metric.metric}>
                         {metric.label}
@@ -292,7 +297,7 @@ function MetricMonitoring() {
                   Metric Chart with Confidence Interval
                 </Typography>
                 <Typography color="text.secondary">
-                  {selectedColumn ? `${selectedColumn} · ${selectedMetric}` : "Select an asset, column, and metric"}
+                  {resolvedSelectedColumn ? `${resolvedSelectedColumn} · ${resolvedSelectedMetric}` : "Select an asset, column, and metric"}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1}>
@@ -362,7 +367,7 @@ function MetricMonitoring() {
                       sx={{
                         p: 2.5,
                         borderRadius: 3,
-                        borderColor: column.column_name === selectedColumn ? "#2E6BFF" : "#E5EAF2",
+                        borderColor: column.column_name === resolvedSelectedColumn ? "#2E6BFF" : "#E5EAF2",
                         cursor: "pointer",
                       }}
                       onClick={() => {

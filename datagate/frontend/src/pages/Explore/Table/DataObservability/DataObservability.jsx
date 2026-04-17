@@ -23,13 +23,16 @@ import {
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import { observabilityApi } from "~/apis/observability";
+import { subtlePanelSx } from "~/theme";
 import Profile from "./Profile/Profile.jsx";
 import RulesManagement from "./DataQuality/RulesManagement/RulesManagement";
 import Incidents from "./DataQuality/Incidents/Incidents";
 import AnomalyDetection from "./AnomalyDetection/AnomalyDetection";
 
-function DataObservability({ assetDetail, assetObservability }) {
-  const [activeTab, setActiveTab] = useState(0);
+const OBSERVABILITY_TABS = ["profile", "rules", "incidents", "anomaly"];
+
+function DataObservability({ assetDetail, assetObservability, initialTab = "profile", onTabChange }) {
+  const [activeTab, setActiveTab] = useState(Math.max(OBSERVABILITY_TABS.indexOf(initialTab), 0));
   const [configOpen, setConfigOpen] = useState(false);
   const [configType, setConfigType] = useState("metadata_profile");
   const [jobId, setJobId] = useState(null);
@@ -67,6 +70,11 @@ function DataObservability({ assetDetail, assetObservability }) {
     }),
     [formData.hour, formData.interval_minutes, formData.minute, formData.schedule_type, schemaName, tableName]
   );
+
+  useEffect(() => {
+    const nextIndex = OBSERVABILITY_TABS.indexOf(initialTab);
+    setActiveTab(nextIndex >= 0 ? nextIndex : 0);
+  }, [initialTab]);
 
   useEffect(() => {
     if (!tableName) return;
@@ -166,6 +174,11 @@ function DataObservability({ assetDetail, assetObservability }) {
     }
   };
 
+  const handleTabChange = (_, nextTab) => {
+    setActiveTab(nextTab);
+    onTabChange?.(OBSERVABILITY_TABS[nextTab] || "profile");
+  };
+
   return (
     <Box>
       <Stack
@@ -176,7 +189,7 @@ function DataObservability({ assetDetail, assetObservability }) {
         sx={{ mb: 3 }}
       >
         <Box sx={{ borderBottom: 1, borderColor: "divider", flex: 1 }}>
-          <Tabs value={activeTab} onChange={(_, nextTab) => setActiveTab(nextTab)} variant="scrollable">
+          <Tabs value={activeTab} onChange={handleTabChange} variant="scrollable">
             <Tab label="Profile" />
             <Tab label="Rules" />
             <Tab label="Incidents" />
@@ -224,7 +237,7 @@ function DataObservability({ assetDetail, assetObservability }) {
 
           {configType === "metadata_profile" ? (
             <Stack spacing={2.5}>
-              <Alert severity="info">
+              <Alert severity="info" sx={subtlePanelSx}>
                 Metadata profile combines table-level and column-level statistics in one scheduled job.
               </Alert>
 
@@ -277,7 +290,7 @@ function DataObservability({ assetDetail, assetObservability }) {
             </Stack>
           ) : (
             <Stack spacing={2.5}>
-              <Alert severity="info">
+              <Alert severity="info" sx={subtlePanelSx}>
                 Pillar 4 uses unsupervised ML to detect unknown distribution shifts at scale. Choose which data date
                 should be treated as "today" for the comparison run.
               </Alert>
@@ -312,7 +325,7 @@ function DataObservability({ assetDetail, assetObservability }) {
                   <MenuItem value="low">Low sensitivity</MenuItem>
                 </Select>
               </FormControl>
-              <Alert severity="warning">
+              <Alert severity="warning" sx={subtlePanelSx}>
                 The ML engine samples data randomly, removes time-only features, and explains anomalies using feature
                 importance to reduce alert fatigue.
               </Alert>

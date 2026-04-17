@@ -20,6 +20,7 @@ import {
   SchemaOutlined as SchemaIcon,
   TableChartOutlined as TableIcon,
 } from "@mui/icons-material";
+import { datagateColors, panelSx, subtlePanelSx } from "~/theme";
 
 const formatValue = (value) => {
   if (value === null || value === undefined || value === "") return "--";
@@ -65,15 +66,7 @@ function TableDescription({ assetDetail, assetObservability }) {
 
   return (
     <Stack spacing={3}>
-      <Paper
-        sx={{
-          p: 3,
-          borderRadius: 4,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "none",
-        }}
-      >
+      <Paper sx={{ ...panelSx, p: 3 }}>
         <Stack spacing={2.5}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <DescriptionIcon color="primary" />
@@ -82,16 +75,7 @@ function TableDescription({ assetDetail, assetObservability }) {
             </Typography>
           </Stack>
 
-          <Box
-            sx={{
-              p: 3,
-              minHeight: 160,
-              borderRadius: 3,
-              border: "1px solid",
-              borderColor: "#D9E1EC",
-              backgroundColor: "#FCFDFE",
-            }}
-          >
+          <Box sx={{ ...subtlePanelSx, p: 3, minHeight: 160 }}>
             <Stack spacing={2}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <SchemaIcon sx={{ color: "text.secondary" }} fontSize="small" />
@@ -111,15 +95,7 @@ function TableDescription({ assetDetail, assetObservability }) {
         </Stack>
       </Paper>
 
-      <Paper
-        sx={{
-          overflow: "hidden",
-          borderRadius: 4,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "none",
-        }}
-      >
+      <Paper sx={{ ...panelSx, overflow: "hidden" }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
@@ -154,7 +130,7 @@ function TableDescription({ assetDetail, assetObservability }) {
 
         <TableContainer>
           <Table>
-            <TableHead sx={{ backgroundColor: "#F8FAFC" }}>
+            <TableHead sx={{ backgroundColor: datagateColors.tableHeadBackground }}>
               <TableRow>
                 <TableCell sx={{ fontWeight: 800, color: "primary.main" }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Type</TableCell>
