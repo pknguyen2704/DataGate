@@ -1,5 +1,11 @@
+from pathlib import Path
+import sys
 import logging
 from sqlalchemy.orm import Session
+
+# Allow direct execution via `uv run python app/db/initial_data.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from app import models, schemas
 from app.core import security
 from app.db.session import SessionLocal, engine
