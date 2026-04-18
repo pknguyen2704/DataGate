@@ -7,7 +7,13 @@ from app.api import deps
 from app.models.service import Service
 from app.schemas.service import Service as ServiceSchema
 from app.schemas.service import ServiceCreate, ServiceUpdate
-from app.services.connection_manager import ConnectionManager
+from app.services.connection_manager import (
+    test_connection as db_test_connection,
+    get_schemas as db_get_schemas,
+    get_tables as db_get_tables,
+    get_sample_data as db_get_sample_data,
+    get_table_metadata as db_get_table_metadata,
+)
 from app.services.observability_scanner import ObservabilityScanner
 
 router = APIRouter()
@@ -114,7 +120,7 @@ def _get_latest_ml_run_for_table(db: Session, table_name: str):
 
 
 def _build_service_status(service_in: ServiceCreate) -> str:
-    test_result = ConnectionManager.test_connection(service_in)
+    test_result = db_test_connection(service_in.connection_url)
     return "healthy" if test_result["status"] == "success" else "unhealthy"
 
 
@@ -194,9 +200,9 @@ def test_connection(
     service: ServiceCreate,
     current_user: models.User = Depends(deps.get_current_active_user),
 ):
-    result = ConnectionManager.test_connection(service)
+    result = db_test_connection(service.connection_url)
     if result["status"] == "success":
-        result["schemas"] = ConnectionManager.get_schemas(service.service_type, service.connection_url)
+        result["schemas"] = db_get_schemas(service.connection_url)
     return result
 
 
@@ -207,7 +213,7 @@ def get_raw_tables(
     schema: str | None = None,
     current_user: models.User = Depends(deps.get_current_active_user),
 ):
-    return ConnectionManager.get_tables(service_type, url, schema)
+    return db_get_tables(url, schema)
 
 
 @router.post("/", response_model=ServiceSchema)
@@ -218,6 +224,7 @@ def create_service(
 ):
     db_service = Service(
         name=service.name,
+        description=service.description,
         service_type=service.service_type,
         connection_url=service.connection_url,
         integrated_tables=service.integrated_tables,
@@ -279,9 +286,9 @@ def get_asset_detail(
     if service_id is not None and service.id != service_id:
         raise HTTPException(status_code=404, detail="Service not found for this asset")
 
-    schema_tables = ConnectionManager.get_tables(service.service_type, service.connection_url)
-    sample_data = ConnectionManager.get_sample_data(service.service_type, service.connection_url, table_name, sample_limit)
-    table_metadata = ConnectionManager.get_table_metadata(service.service_type, service.connection_url, table_name)
+    schema_tables = db_get_tables(service.connection_url)
+    sample_data = db_get_sample_data(service.connection_url, table_name, sample_limit)
+    table_metadata = db_get_table_metadata(service.connection_url, table_name)
 
     latest_snapshot = (
         db.query(models.DQTableSnapshot)
@@ -351,7 +358,7 @@ def get_service_schemas(
     current_user: models.User = Depends(deps.get_current_active_user),
 ):
     service = _get_owned_service(db, service_id, current_user)
-    schemas = ConnectionManager.get_schemas(service.service_type, service.connection_url)
+    schemas = db_get_schemas(service.connection_url)
     return _filter_schemas_by_integration(schemas, _get_accessible_tables(service))
 
 
@@ -363,7 +370,7 @@ def get_service_tables(
     current_user: models.User = Depends(deps.get_current_active_user),
 ):
     service = _get_owned_service(db, service_id, current_user)
-    tables = ConnectionManager.get_tables(service.service_type, service.connection_url, schema)
+    tables = db_get_tables(service.connection_url, schema)
     return _filter_tables_by_integration(tables, _get_accessible_tables(service), schema)
 
 
@@ -416,7 +423,7 @@ def refresh_service_tables(
     service = _get_owned_service(db, service_id, current_user)
 
     try:
-        current_tables = ConnectionManager.get_tables(service.service_type, service.connection_url)
+        current_tables = db_get_tables(service.connection_url)
 
         if service.integrated_tables:
             valid_tables = [table for table in service.integrated_tables if table in current_tables]

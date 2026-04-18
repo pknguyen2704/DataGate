@@ -39,6 +39,7 @@ createRoot(document.getElementById('root')).render(
           draggable
           pauseOnHover
           theme="colored"
+          style={{ zIndex: 99999 }}
         />
       </ConfirmProvider>
     </ThemeProvider>

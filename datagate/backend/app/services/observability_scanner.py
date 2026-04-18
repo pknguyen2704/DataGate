@@ -2,7 +2,7 @@ import logging
 from sqlalchemy.orm import Session
 from app.models.service import Service
 from app.models.profiling import ProfilingRun
-from app.services.connection_manager import ConnectionManager
+from app.services.connection_manager import create_trino_connection
 from sqlalchemy import text
 from datetime import datetime
 
@@ -40,8 +40,8 @@ class ObservabilityScanner:
                 count_query = f'SELECT count(*) FROM {full_table_name}'
 
                 try:
-                    # Execute via ConnectionManager (which should return a trino connection)
-                    conn = ConnectionManager.get_connection(service.service_type, service.connection_url)
+                    # Execute via create_trino_connection
+                    conn = create_trino_connection(service.connection_url)
                     cursor = conn.cursor()
                     
                     # 1. Freshness

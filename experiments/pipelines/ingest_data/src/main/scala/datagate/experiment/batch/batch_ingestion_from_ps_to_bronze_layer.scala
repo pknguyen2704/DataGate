@@ -50,16 +50,13 @@ object batch_ingestion_from_ps_to_bronze_layer {
       .config("spark.sql.catalog.iceberg.catalog-impl", "org.apache.iceberg.rest.RESTCatalog")
       .config("spark.sql.catalog.iceberg.uri", REST_URI)
 
-      // Storage (S3/MinIO) configuration
+      // Cập nhật cấu hình cho S3 sử dụng AWS SDK v2
       .config("spark.sql.catalog.iceberg.s3.endpoint", S3_ENDPOINT)
       .config("spark.sql.catalog.iceberg.s3.path-style-access", "true")
       .config("spark.sql.catalog.iceberg.s3.access-key-id", S3_ACCESS_KEY)
       .config("spark.sql.catalog.iceberg.s3.secret-access-key", S3_SECRET_KEY)
       .config("spark.sql.catalog.iceberg.s3.region", AWS_REGION)
-      .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT)
-      .config("spark.hadoop.fs.s3a.access.key", S3_ACCESS_KEY)
-      .config("spark.hadoop.fs.s3a.secret.key", S3_SECRET_KEY)
-      .config("spark.hadoop.fs.s3a.path.style.access", "true")
+      .config("spark.sql.catalog.iceberg.s3.client.factory", "org.apache.iceberg.aws.s3.S3ClientFactory") // Chỉ định AWS SDK v2
 
       // 🔥 OPTIMIZATION: distribution and file sizing
       .config("spark.sql.catalog.iceberg.write.distribution-mode", "hash")

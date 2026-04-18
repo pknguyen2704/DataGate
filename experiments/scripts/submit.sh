@@ -95,7 +95,7 @@ docker exec spark-client /opt/spark/bin/spark-submit \
   bronze.yellow_tripdata \
   "2025-02-01 00"
 
-docker exec spark-client /opt/spark/bin/spark-submit \
+docker exec spark-master /opt/spark/bin/spark-submit \
   --class datagate.experiment.batch.batch_ingestion_from_ps_to_bronze_layer \
   --master spark://spark-master:7077 \
   --deploy-mode cluster \
@@ -112,7 +112,7 @@ docker exec spark-client /opt/spark/bin/spark-submit \
   admin \
   postgrespassword \
   public.yellow_tripdata \
-  bronze.yellow_tripdata \
+  bronze.yellow_tripdata_scala \
   NONE
 
 

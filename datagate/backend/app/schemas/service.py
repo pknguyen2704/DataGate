@@ -14,6 +14,7 @@ class ServiceOwner(BaseModel):
 
 class ServiceBase(BaseModel):
     name: str
+    description: Optional[str] = None
     service_type: str
     connection_url: str
     integrated_tables: Optional[list[str]] = []

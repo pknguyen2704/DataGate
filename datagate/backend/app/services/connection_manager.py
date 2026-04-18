@@ -1,166 +1,176 @@
 from urllib.parse import urlparse
+from typing import Optional, Tuple, List, Dict, Any
 
-from sqlalchemy import create_engine, inspect, text
 from trino.dbapi import connect
 
-from app.schemas.service import ServiceCreate
 
+# ==============================
+# CONFIG
+# ==============================
 
-DEFAULT_TRINO_USER = "admin"
-DEFAULT_TRINO_PORT = 8080
-DEFAULT_TRINO_CATALOG = "tpch"
 DEFAULT_SAMPLE_LIMIT = 50
-MAX_SAMPLE_LIMIT = 500
+MAX_SAMPLE_LIMIT = 1000
 
 
-def _parse_trino_config(url: str) -> dict[str, str | int]:
+# ==============================
+# HELPER FUNCTIONS
+# ==============================
+
+def parse_trino_url(url: str) -> dict:
+    """
+    Parse Trino URL
+
+    Format:
+    trino://user@host:port/catalog
+
+    Example:
+    trino://admin@localhost:8080/hive
+    """
+
     parsed = urlparse(url)
-    path_parts = [part for part in parsed.path.strip("/").split("/") if part]
+
+    if not parsed.hostname:
+        raise ValueError("Missing hostname in Trino URL")
+
+    # Lấy catalog từ path
+    catalog = None
+    raw_path = parsed.path.strip("/")
+
+    if raw_path:
+        parts = raw_path.split("/")
+        catalog = parts[0]
 
     return {
-        "user": parsed.username or DEFAULT_TRINO_USER,
-        "host": parsed.hostname or "localhost",
-        "port": parsed.port or DEFAULT_TRINO_PORT,
-        "catalog": path_parts[0] if path_parts else DEFAULT_TRINO_CATALOG,
+        "user": parsed.username,
+        "host": parsed.hostname,
+        "port": parsed.port or 8080,
+        "catalog": catalog,
     }
 
 
-def _split_table_name(table_name: str, default_schema: str | None = None) -> tuple[str | None, str]:
+def split_table_name(
+    table_name: str,
+    default_schema: Optional[str] = None
+) -> Tuple[Optional[str], str]:
+    """
+    Tách table_name thành schema và table
+
+    "schema.table" -> ("schema", "table")
+    "table"        -> (default_schema, "table")
+    """
+
     if "." in table_name:
-        return table_name.split(".", 1)
+        parts = table_name.split(".")
+        return parts[0], parts[1]
+
     return default_schema, table_name
 
 
-def _quote_identifier(identifier: str) -> str:
-    return identifier.replace('"', '""')
+def quote_identifier(name: str) -> str:
+    """
+    Escape + wrap identifier để tránh lỗi SQL
+
+    my_table  -> "my_table"
+    my"table  -> "my""table"
+    """
+
+    escaped = name.replace('"', '""')
+    return f'"{escaped}"'
 
 
-class ConnectionManager:
-    @staticmethod
-    def get_connection(service_type: str, url: str):
-        if service_type == "trino":
-            trino_config = _parse_trino_config(url)
-            return connect(
-                host=trino_config["host"],
-                port=trino_config["port"],
-                user=trino_config["user"],
-                catalog=trino_config["catalog"],
-            )
+# ==============================
+# CONNECTION
+# ==============================
 
-        engine = create_engine(url)
-        return engine.raw_connection()
+def create_trino_connection(url: str):
+    """
+    Tạo connection tới Trino
+    """
 
-    @staticmethod
-    def test_connection(service: ServiceCreate) -> dict[str, str]:
-        try:
-            if service.service_type == "trino":
-                return ConnectionManager._test_trino(service.connection_url)
-            return ConnectionManager._test_sqlalchemy(service.connection_url)
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)}
+    config = parse_trino_url(url)
 
-    @staticmethod
-    def _test_sqlalchemy(url: str) -> dict[str, str]:
-        engine = create_engine(url)
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-        return {"status": "success", "message": "Connection successful"}
+    return connect(
+        host=config["host"],
+        port=config["port"],
+        user=config["user"],
+        catalog=config["catalog"],
+    )
 
-    @staticmethod
-    def _test_trino(url: str) -> dict[str, str]:
-        trino_config = _parse_trino_config(url)
-        connection = connect(
-            host=trino_config["host"],
-            port=trino_config["port"],
-            user=trino_config["user"],
-            catalog=trino_config["catalog"],
-        )
-        cursor = connection.cursor()
+
+# ==============================
+# TEST CONNECTION
+# ==============================
+
+def test_connection(url: str) -> Dict[str, str]:
+    """
+    Test kết nối Trino
+    """
+
+    try:
+        conn = create_trino_connection(url)
+        cursor = conn.cursor()
+
         cursor.execute("SELECT 1")
         cursor.fetchone()
-        return {"status": "success", "message": "Trino connection successful"}
 
-    @staticmethod
-    def get_schemas(service_type: str, url: str) -> list[str]:
-        try:
-            if service_type == "trino":
-                return ConnectionManager._get_trino_schemas(url)
-            return ConnectionManager._get_sqlalchemy_schemas(url)
-        except Exception:
-            return []
+        return {
+            "status": "success",
+            "message": "Trino connection successful"
+        }
 
-    @staticmethod
-    def _get_sqlalchemy_schemas(url: str) -> list[str]:
-        engine = create_engine(url)
-        query = text(
-            """
-            SELECT schema_name
-            FROM information_schema.schemata
-            WHERE schema_name NOT IN ('information_schema', 'pg_catalog')
-            """
-        )
-        with engine.connect() as connection:
-            result = connection.execute(query)
-            return [row[0] for row in result]
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
-    @staticmethod
-    def _get_trino_schemas(url: str) -> list[str]:
-        trino_config = _parse_trino_config(url)
-        connection = connect(
-            host=trino_config["host"],
-            port=trino_config["port"],
-            user=trino_config["user"],
-            catalog=trino_config["catalog"],
-        )
-        cursor = connection.cursor()
+
+# ==============================
+# GET SCHEMAS
+# ==============================
+
+def get_schemas(url: str) -> List[str]:
+    """
+    Lấy danh sách schema trong Trino
+    """
+
+    try:
+        conn = create_trino_connection(url)
+        cursor = conn.cursor()
+
         cursor.execute("SHOW SCHEMAS")
-        return [row[0] for row in cursor.fetchall() if row[0] not in ("information_schema", "staged")]
 
-    @staticmethod
-    def get_tables(service_type: str, url: str, schema: str | None = None) -> list[str]:
-        try:
-            if service_type == "trino":
-                return ConnectionManager._get_trino_tables(url, schema)
-            return ConnectionManager._get_sqlalchemy_tables(url, schema)
-        except Exception:
-            return []
+        return [
+            row[0]
+            for row in cursor.fetchall()
+            if row[0] not in ("information_schema", "system")
+        ]
 
-    @staticmethod
-    def _get_sqlalchemy_tables(url: str, schema: str | None) -> list[str]:
-        engine = create_engine(url)
-        with engine.connect() as connection:
-            if schema:
-                result = connection.execute(
-                    text("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = :schema"),
-                    {"schema": schema},
-                )
-                return [row[0] for row in result]
+    except Exception:
+        return []
 
-            result = connection.execute(
-                text(
-                    """
-                    SELECT schemaname, tablename
-                    FROM pg_catalog.pg_tables
-                    WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
-                    """
-                )
-            )
-            return [f"{row[0]}.{row[1]}" for row in result]
 
-    @staticmethod
-    def _get_trino_tables(url: str, schema: str | None) -> list[str]:
-        trino_config = _parse_trino_config(url)
-        connection = connect(
-            host=trino_config["host"],
-            port=trino_config["port"],
-            user=trino_config["user"],
-            catalog=trino_config["catalog"],
-        )
-        cursor = connection.cursor()
+# ==============================
+# GET TABLES
+# ==============================
 
+def get_tables(url: str, schema: Optional[str] = None) -> List[str]:
+    """
+    Lấy danh sách tables
+    """
+
+    try:
+        conn = create_trino_connection(url)
+        cursor = conn.cursor()
+
+        # Nếu có schema → chỉ lấy trong schema đó
         if schema:
-            cursor.execute(f'SHOW TABLES IN "{_quote_identifier(schema)}"')
+            safe_schema = quote_identifier(schema)
+            cursor.execute(f'SHOW TABLES IN "{safe_schema}"')
             return [row[0] for row in cursor.fetchall()]
+
+        # Nếu không có schema → lấy tất cả
+        config = parse_trino_url(url)
 
         cursor.execute(
             """
@@ -168,71 +178,54 @@ class ConnectionManager:
             FROM information_schema.tables
             WHERE table_catalog = ?
             """,
-            (trino_config["catalog"],),
+            (config["catalog"],),
         )
-        return [f"{row[0]}.{row[1]}" for row in cursor.fetchall() if row[0] not in ("information_schema", "staged")]
 
-    @staticmethod
-    def get_sample_data(service_type: str, url: str, table_name: str, limit: int = DEFAULT_SAMPLE_LIMIT) -> dict:
-        safe_limit = max(1, min(limit, MAX_SAMPLE_LIMIT))
-        try:
-            if service_type == "trino":
-                return ConnectionManager._get_trino_sample_data(url, table_name, safe_limit)
-            return ConnectionManager._get_sqlalchemy_sample_data(url, table_name, safe_limit)
-        except Exception:
-            return {"columns": [], "rows": [], "row_count": 0}
+        return [
+            f"{row[0]}.{row[1]}"
+            for row in cursor.fetchall()
+            if row[0] not in ("information_schema", "staged")
+        ]
 
-    @staticmethod
-    def get_table_metadata(service_type: str, url: str, table_name: str) -> dict:
-        try:
-            if service_type == "trino":
-                return ConnectionManager._get_trino_table_metadata(url, table_name)
-            return ConnectionManager._get_sqlalchemy_table_metadata(service_type, url, table_name)
-        except Exception:
-            return {"table_description": None, "columns": []}
+    except Exception:
+        return []
 
-    @staticmethod
-    def _get_sqlalchemy_sample_data(url: str, table_name: str, limit: int) -> dict:
-        engine = create_engine(url)
-        schema_name, physical_table_name = _split_table_name(table_name)
+
+# ==============================
+# GET SAMPLE DATA
+# ==============================
+
+def get_sample_data(
+    url: str,
+    table_name: str,
+    limit: int = DEFAULT_SAMPLE_LIMIT
+) -> Dict[str, Any]:
+    """
+    Lấy dữ liệu sample từ table
+    """
+
+    # đảm bảo limit hợp lệ
+    safe_limit = max(1, min(limit, MAX_SAMPLE_LIMIT))
+
+    try:
+        conn = create_trino_connection(url)
+        cursor = conn.cursor()
+
+        schema_name, table = split_table_name(table_name)
 
         if not schema_name:
             return {"columns": [], "rows": [], "row_count": 0}
 
-        query = text(
-            f'SELECT * FROM "{_quote_identifier(schema_name)}"."{_quote_identifier(physical_table_name)}" LIMIT {limit}'
-        )
-        with engine.connect() as connection:
-            result = connection.execute(query)
-            rows = result.fetchall()
-            columns = list(result.keys())
+        query = f"""
+        SELECT *
+        FROM "{quote_identifier(schema_name)}"."{quote_identifier(table)}"
+        LIMIT {safe_limit}
+        """
 
-        return {
-            "columns": columns,
-            "rows": [list(row) for row in rows],
-            "row_count": len(rows),
-        }
+        cursor.execute(query)
 
-    @staticmethod
-    def _get_trino_sample_data(url: str, table_name: str, limit: int) -> dict:
-        trino_config = _parse_trino_config(url)
-        schema_name, physical_table_name = _split_table_name(table_name)
-
-        if not schema_name:
-            return {"columns": [], "rows": [], "row_count": 0}
-
-        connection = connect(
-            host=trino_config["host"],
-            port=trino_config["port"],
-            user=trino_config["user"],
-            catalog=trino_config["catalog"],
-        )
-        cursor = connection.cursor()
-        cursor.execute(
-            f'SELECT * FROM "{_quote_identifier(schema_name)}"."{_quote_identifier(physical_table_name)}" LIMIT {limit}'
-        )
         rows = cursor.fetchall()
-        columns = [column[0] for column in cursor.description] if cursor.description else []
+        columns = [col[0] for col in cursor.description] if cursor.description else []
 
         return {
             "columns": columns,
@@ -240,85 +233,34 @@ class ConnectionManager:
             "row_count": len(rows),
         }
 
-    @staticmethod
-    def _get_sqlalchemy_table_metadata(service_type: str, url: str, table_name: str) -> dict:
-        engine = create_engine(url)
-        schema_name, physical_table_name = _split_table_name(table_name, "public")
-
-        with engine.connect() as connection:
-            if service_type == "postgres":
-                table_description = connection.execute(
-                    text(
-                        """
-                        SELECT obj_description(c.oid)
-                        FROM pg_class c
-                        JOIN pg_namespace n ON n.oid = c.relnamespace
-                        WHERE c.relname = :table_name
-                          AND n.nspname = :schema_name
-                        """
-                    ),
-                    {"table_name": physical_table_name, "schema_name": schema_name},
-                ).scalar()
-
-                column_rows = connection.execute(
-                    text(
-                        """
-                        SELECT
-                            cols.column_name,
-                            cols.data_type,
-                            pgd.description
-                        FROM information_schema.columns cols
-                        LEFT JOIN pg_catalog.pg_statio_all_tables st
-                            ON st.relname = cols.table_name
-                        LEFT JOIN pg_catalog.pg_description pgd
-                            ON pgd.objoid = st.relid
-                           AND pgd.objsubid = cols.ordinal_position
-                        WHERE cols.table_name = :table_name
-                          AND cols.table_schema = :schema_name
-                        ORDER BY cols.ordinal_position
-                        """
-                    ),
-                    {"table_name": physical_table_name, "schema_name": schema_name},
-                ).mappings().all()
-
-                return {
-                    "table_description": table_description,
-                    "columns": [
-                        {
-                            "column_name": row["column_name"],
-                            "data_type": row["data_type"],
-                            "description": row["description"],
-                        }
-                        for row in column_rows
-                    ],
-                }
-
-        inspector = inspect(engine)
-        columns = inspector.get_columns(physical_table_name, schema=schema_name)
+    except Exception:
         return {
-            "table_description": None,
-            "columns": [
-                {
-                    "column_name": column.get("name"),
-                    "data_type": str(column.get("type") or ""),
-                    "description": column.get("comment"),
-                }
-                for column in columns
-            ],
+            "columns": [],
+            "rows": [],
+            "row_count": 0,
         }
 
-    @staticmethod
-    def _get_trino_table_metadata(url: str, table_name: str) -> dict:
-        trino_config = _parse_trino_config(url)
-        schema_name, physical_table_name = _split_table_name(table_name, "default")
-        connection = connect(
-            host=trino_config["host"],
-            port=trino_config["port"],
-            user=trino_config["user"],
-            catalog=trino_config["catalog"],
-        )
-        cursor = connection.cursor()
-        cursor.execute(f'SHOW COLUMNS FROM "{_quote_identifier(schema_name)}"."{_quote_identifier(physical_table_name)}"')
+
+# ==============================
+# GET TABLE METADATA
+# ==============================
+
+def get_table_metadata(url: str, table_name: str) -> Dict[str, Any]:
+    """
+    Lấy metadata của table
+    """
+
+    try:
+        conn = create_trino_connection(url)
+        cursor = conn.cursor()
+
+        schema_name, table = split_table_name(table_name, "default")
+
+        query = f"""
+        SHOW COLUMNS FROM "{quote_identifier(schema_name)}"."{quote_identifier(table)}"
+        """
+
+        cursor.execute(query)
 
         return {
             "table_description": None,
@@ -330,4 +272,10 @@ class ConnectionManager:
                 }
                 for row in cursor.fetchall()
             ],
+        }
+
+    except Exception:
+        return {
+            "table_description": None,
+            "columns": [],
         }
