@@ -1,356 +1,215 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Box, Button, Chip, Stack, Tab, Tabs, Typography, Switch, FormControlLabel } from "@mui/material";
 import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Drawer,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  Tab,
-  Tabs,
-  TextField,
-  Typography,
-} from "@mui/material";
-import {
-  AutoFixHighOutlined as MlIcon,
   PlayCircleOutline as RunIcon,
-  SettingsApplicationsOutlined as ConfigIcon,
-  TableChartOutlined as MetadataIcon,
+  Assessment as MetadataIcon,
+  Warning as IncidentIcon,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchSnapshots,
+  fetchVolumeTS,
+  fetchSchema,
+  fetchIncidents,
+  fetchVolumePrediction,
+  fetchFreshnessPrediction,
+  fetchSchemaHistory,
+} from "~/stores/slices/exploreSlice/index";
 import { observabilityApi } from "~/apis/observability";
-import { subtlePanelSx } from "~/theme";
-import Profile from "./Profile/Profile.jsx";
-import RulesManagement from "./DataQuality/RulesManagement/RulesManagement";
-import Incidents from "./DataQuality/Incidents/Incidents";
-import AnomalyDetection from "./AnomalyDetection/AnomalyDetection";
 
-const OBSERVABILITY_TABS = ["profile", "rules", "incidents", "anomaly"];
+import Metadata from "./Metadata/Metadata.jsx";
+import IncidentList from "./Incidents/Incidents.jsx";
 
-function DataObservability({ assetDetail, assetObservability, initialTab = "profile", onTabChange }) {
-  const [activeTab, setActiveTab] = useState(Math.max(OBSERVABILITY_TABS.indexOf(initialTab), 0));
-  const [configOpen, setConfigOpen] = useState(false);
-  const [configType, setConfigType] = useState("metadata_profile");
-  const [jobId, setJobId] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [manualRunning, setManualRunning] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [formData, setFormData] = useState({
-    schedule_type: "daily",
-    interval_minutes: 60,
-    hour: 2,
-    minute: 0,
-  });
-  const [mlConfig, setMlConfig] = useState({
-    effective_date: new Date().toISOString().slice(0, 10),
-    sample_size: 10000,
-    sensitivity: "medium",
-  });
+const TABS = ["metadata", "incidents"];
+
+function DataObservability({ assetDetail, assetObservability, initialTab = "metadata", onTabChange }) {
+  const dispatch = useDispatch();
+  const [activeTab, setActiveTab] = useState(0);
+  const [isManualRunning, setIsManualRunning] = useState(false);
+  const [isHourlyActive, setIsHourlyActive] = useState(false);
+  const [isConfigLoading, setIsConfigLoading] = useState(false);
 
   const tableName = assetDetail?.table_name;
-  const schemaName = assetDetail?.schema_name || "public";
-  const assetName = assetDetail?.asset_name || tableName;
+  const schemaName = assetDetail?.schema_name;
 
-  const metadataPayload = useMemo(
-    () => ({
-      catalog: "iceberg",
-      schema_name: schemaName,
-      table_name: tableName,
-      dag_id: "dq_metadata_collector",
-      job_type: "metadata_profile",
-      schedule_type: formData.schedule_type,
-      interval_minutes: formData.schedule_type === "interval" ? Number(formData.interval_minutes) : null,
-      hour: formData.schedule_type === "daily" ? Number(formData.hour) : null,
-      minute: Number(formData.minute),
-      is_active: true,
-    }),
-    [formData.hour, formData.interval_minutes, formData.minute, formData.schedule_type, schemaName, tableName]
-  );
+  const {
+    snapshotsByTable,
+    volumeTSByTable,
+    incidentsByTable,
+    volumePredictionByTable,
+    freshnessPredictionByTable,
+    schemaHistoryByTable,
+  } = useSelector((state) => state.explore.observability);
 
-  useEffect(() => {
-    const nextIndex = OBSERVABILITY_TABS.indexOf(initialTab);
-    setActiveTab(nextIndex >= 0 ? nextIndex : 0);
-  }, [initialTab]);
-
+  // Fetch all observability data when table changes
   useEffect(() => {
     if (!tableName) return;
+    dispatch(fetchSnapshots({ tableName, schemaName }));
+    dispatch(fetchVolumeTS({ tableName, schemaName }));
+    dispatch(fetchSchema({ tableName, schemaName }));
+    dispatch(fetchIncidents({ tableName, schemaName }));
+    dispatch(fetchVolumePrediction({ tableName, schemaName }));
+    dispatch(fetchFreshnessPrediction({ tableName, schemaName }));
+    dispatch(fetchSchemaHistory({ tableName, schemaName }));
+  }, [dispatch, tableName, schemaName]);
 
-    const fetchJobs = async () => {
+  useEffect(() => {
+    const index = TABS.indexOf(initialTab);
+    setActiveTab(index >= 0 ? index : 0);
+  }, [initialTab]);
+
+  // Fetch config for toggle
+  useEffect(() => {
+    if (!assetDetail?.asset_name) return;
+    const fetchConfig = async () => {
       try {
-        const response = await observabilityApi.getJobs();
-        const jobs = response.data || [];
-        const existingMetadataJob = jobs.find(
-          (job) => job.table_name === tableName && (job.job_type || "metadata_profile") === "metadata_profile"
-        );
-
-        if (existingMetadataJob) {
-          setJobId(existingMetadataJob.id);
-          setFormData({
-            schedule_type: existingMetadataJob.schedule_type || "daily",
-            interval_minutes: existingMetadataJob.interval_minutes || 60,
-            hour: existingMetadataJob.hour ?? 2,
-            minute: existingMetadataJob.minute ?? 0,
-          });
-        } else {
-          setJobId(null);
-        }
-      } catch (error) {
-        console.error("Failed to fetch observability jobs", error);
+        const res = await observabilityApi.getConfig({
+          catalog: "iceberg",
+          schema: assetDetail?.schema_name || "public",
+          table: assetDetail?.asset_name,
+        });
+        setIsHourlyActive(res.data?.is_active || false);
+      } catch (e) {
+        console.error("Failed to fetch config", e);
       }
     };
+    fetchConfig();
+  }, [assetDetail]);
 
-    fetchJobs();
-  }, [tableName]);
-
-  const handleSaveJob = async () => {
+  const handleToggleHourly = async (e) => {
+    const newStatus = e.target.checked;
+    setIsHourlyActive(newStatus);
+    setIsConfigLoading(true);
     try {
-      setSaving(true);
-      if (configType === "metadata_profile") {
-        if (jobId) {
-          await observabilityApi.updateJob(jobId, metadataPayload);
-        } else {
-          const response = await observabilityApi.createJob(metadataPayload);
-          setJobId(response.data?.id || null);
-        }
-        toast.success("Metadata profile configuration saved.");
-      } else {
-        toast.success("ML run configuration captured for manual execution.");
-      }
+      await observabilityApi.updateConfig({
+        catalog: "iceberg",
+        schema_name: assetDetail?.schema_name || "public",
+        table_name: assetDetail?.asset_name,
+        is_active: newStatus,
+      });
+      toast.success(`Đã ${newStatus ? "bật" : "tắt"} tự động quét hàng giờ.`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Could not save the job configuration.");
+      toast.error("Lỗi khi cập nhật cấu hình.");
+      setIsHourlyActive(!newStatus); // revert
     } finally {
-      setSaving(false);
+      setIsConfigLoading(false);
     }
   };
 
-  const handleManualRun = async () => {
+  const handleRunNow = async () => {
+    if (!assetDetail?.asset_name) return;
     try {
-      setManualRunning(true);
-      if (configType === "metadata_profile") {
-        if (jobId) {
-          await observabilityApi.triggerJob(jobId);
-        } else {
-          await observabilityApi.triggerScan({
-            catalog: "iceberg",
-            schema_name: schemaName,
-            table_name: tableName,
-          });
-        }
-        toast.success("Metadata profile run has been triggered.");
-      } else {
-        await observabilityApi.triggerMLScan({
-          catalog: "iceberg",
-          schema_name: schemaName,
-          table_name: assetName,
-          effective_date: mlConfig.effective_date,
-          sample_size: Number(mlConfig.sample_size),
-          sensitivity: mlConfig.sensitivity,
-        });
-        toast.success("ML anomaly run has been triggered.");
-      }
+      setIsManualRunning(true);
+      await observabilityApi.triggerScan({
+        catalog: "iceberg",
+        schema_name: assetDetail?.schema_name || "public",
+        table_name: assetDetail?.asset_name,
+      });
+      toast.success("🚀 Đã bắt đầu quét metadata cho bảng " + assetDetail?.asset_name);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Could not trigger the selected run.");
+      toast.error("❌ Lỗi khi kích hoạt quét dữ liệu.");
     } finally {
-      setManualRunning(false);
+      setIsManualRunning(false);
     }
   };
 
-  const handleDisableJob = async () => {
-    if (!jobId) return;
-
-    try {
-      setDeleting(true);
-      await observabilityApi.updateJob(jobId, { is_active: false });
-      toast.success("Schedule disabled and Airflow DAG sync cleaned up.");
-      setJobId(null);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || "Could not disable the current job.");
-    } finally {
-      setDeleting(false);
-    }
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+    if (onTabChange) onTabChange(TABS[newValue]);
   };
 
-  const handleTabChange = (_, nextTab) => {
-    setActiveTab(nextTab);
-    onTabChange?.(OBSERVABILITY_TABS[nextTab] || "profile");
-  };
+  const fullTableName = `${schemaName || "public"}.${tableName}`;
+
+  const incidents = incidentsByTable[fullTableName] || [];
+  const openIncidents = incidents.filter((i) => i.status === "open");
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", md: "center" }}
-        sx={{ mb: 3 }}
-      >
+      <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: "divider", flex: 1 }}>
-          <Tabs value={activeTab} onChange={handleTabChange} variant="scrollable">
-            <Tab label="Profile" />
-            <Tab label="Rules" />
-            <Tab label="Incidents" />
-            <Tab label="Anomaly Detection" />
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            sx={{
+              "& .MuiTab-root": { textTransform: "none", fontWeight: 600, fontSize: 13, minHeight: 42 },
+            }}
+          >
+            <Tab icon={<MetadataIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Metadata & Prediction" />
+            <Tab
+              icon={<IncidentIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label={
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <span>Incidents</span>
+                  {openIncidents.length > 0 && (
+                    <Chip
+                      label={openIncidents.length}
+                      size="small"
+                      color="error"
+                      sx={{ height: 18, fontSize: 11, fontWeight: 700 }}
+                    />
+                  )}
+                </Stack>
+              }
+            />
           </Tabs>
         </Box>
 
-        <Button variant="outlined" startIcon={<ConfigIcon />} onClick={() => setConfigOpen(true)}>
-          Configure Runs
-        </Button>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isHourlyActive}
+                onChange={handleToggleHourly}
+                disabled={isConfigLoading}
+                color="secondary"
+                size="small"
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ fontWeight: 500, fontSize: 13 }}>
+                Auto (Hourly)
+              </Typography>
+            }
+            sx={{ m: 0 }}
+          />
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<RunIcon />}
+            onClick={handleRunNow}
+            disabled={isManualRunning}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 2,
+              fontSize: 13,
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              "&:hover": { background: "linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%)" },
+            }}
+          >
+            {isManualRunning ? "Scanning..." : "Run Scan"}
+          </Button>
+        </Stack>
       </Stack>
 
-      {activeTab === 0 ? <Profile assetDetail={assetDetail} assetObservability={assetObservability} /> : null}
-      {activeTab === 1 ? <RulesManagement assetDetail={assetDetail} /> : null}
-      {activeTab === 2 ? <Incidents assetDetail={assetDetail} assetObservability={assetObservability} /> : null}
-      {activeTab === 3 ? <AnomalyDetection assetDetail={assetDetail} /> : null}
+      <Box sx={{ py: 1 }}>
+        {activeTab === 0 && (
+          <Metadata
+            snapshots={snapshotsByTable[fullTableName] || []}
+            freshnessPrediction={freshnessPredictionByTable[fullTableName]}
+            volumeData={volumeTSByTable[fullTableName] || []}
+            volumePrediction={volumePredictionByTable[fullTableName]}
+            schemaHistory={schemaHistoryByTable[fullTableName]}
+            tableName={fullTableName}
+          />
+        )}
 
-      <Drawer anchor="right" open={configOpen} onClose={() => setConfigOpen(false)} PaperProps={{ sx: { width: 420, p: 3 } }}>
-        <Stack spacing={3} sx={{ height: "100%" }}>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
-              Run Configuration
-            </Typography>
-            <Typography color="text.secondary">
-              Configure metadata collection or ML anomaly execution for <strong>{assetName}</strong>.
-            </Typography>
-          </Box>
-
-          <Stack direction="row" spacing={1}>
-            <Chip
-              icon={<MetadataIcon />}
-              label="Metadata Profile"
-              color={configType === "metadata_profile" ? "primary" : "default"}
-              variant={configType === "metadata_profile" ? "filled" : "outlined"}
-              onClick={() => setConfigType("metadata_profile")}
-            />
-            <Chip
-              icon={<MlIcon />}
-              label="ML Run"
-              color={configType === "ml" ? "primary" : "default"}
-              variant={configType === "ml" ? "filled" : "outlined"}
-              onClick={() => setConfigType("ml")}
-            />
-          </Stack>
-
-          {configType === "metadata_profile" ? (
-            <Stack spacing={2.5}>
-              <Alert severity="info" sx={subtlePanelSx}>
-                Metadata profile combines table-level and column-level statistics in one scheduled job.
-              </Alert>
-
-              <FormControl fullWidth>
-                <InputLabel>Schedule Type</InputLabel>
-                <Select
-                  label="Schedule Type"
-                  value={formData.schedule_type}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      schedule_type: event.target.value,
-                    }))
-                  }
-                >
-                  <MenuItem value="daily">Daily at a specific time</MenuItem>
-                  <MenuItem value="interval">Run every N minutes</MenuItem>
-                </Select>
-              </FormControl>
-
-              {formData.schedule_type === "daily" ? (
-                <Stack direction="row" spacing={2}>
-                  <TextField
-                    type="number"
-                    label="Hour"
-                    value={formData.hour}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, hour: event.target.value }))}
-                    inputProps={{ min: 0, max: 23 }}
-                    fullWidth
-                  />
-                  <TextField
-                    type="number"
-                    label="Minute"
-                    value={formData.minute}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, minute: event.target.value }))}
-                    inputProps={{ min: 0, max: 59 }}
-                    fullWidth
-                  />
-                </Stack>
-              ) : (
-                <TextField
-                  type="number"
-                  label="Interval Minutes"
-                  value={formData.interval_minutes}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, interval_minutes: event.target.value, minute: 0 }))}
-                  inputProps={{ min: 5 }}
-                  fullWidth
-                />
-              )}
-            </Stack>
-          ) : (
-            <Stack spacing={2.5}>
-              <Alert severity="info" sx={subtlePanelSx}>
-                Pillar 4 uses unsupervised ML to detect unknown distribution shifts at scale. Choose which data date
-                should be treated as "today" for the comparison run.
-              </Alert>
-              <TextField label="Catalog" value="iceberg" fullWidth disabled />
-              <TextField label="Schema" value={schemaName} fullWidth disabled />
-              <TextField label="Table" value={assetName} fullWidth disabled />
-              <TextField
-                type="date"
-                label="Treat Data Date As Today"
-                value={mlConfig.effective_date}
-                onChange={(event) => setMlConfig((prev) => ({ ...prev, effective_date: event.target.value }))}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                type="number"
-                label="Sample Size"
-                value={mlConfig.sample_size}
-                onChange={(event) => setMlConfig((prev) => ({ ...prev, sample_size: event.target.value }))}
-                inputProps={{ min: 1000, max: 10000, step: 500 }}
-                fullWidth
-              />
-              <FormControl fullWidth>
-                <InputLabel>Sensitivity</InputLabel>
-                <Select
-                  label="Sensitivity"
-                  value={mlConfig.sensitivity}
-                  onChange={(event) => setMlConfig((prev) => ({ ...prev, sensitivity: event.target.value }))}
-                >
-                  <MenuItem value="high">High sensitivity</MenuItem>
-                  <MenuItem value="medium">Balanced</MenuItem>
-                  <MenuItem value="low">Low sensitivity</MenuItem>
-                </Select>
-              </FormControl>
-              <Alert severity="warning" sx={subtlePanelSx}>
-                The ML engine samples data randomly, removes time-only features, and explains anomalies using feature
-                importance to reduce alert fatigue.
-              </Alert>
-            </Stack>
-          )}
-
-          <Box sx={{ mt: "auto" }}>
-            <Stack direction="row" spacing={1.5} justifyContent="flex-end">
-              {configType === "metadata_profile" && jobId ? (
-                <Button color="inherit" onClick={handleDisableJob} disabled={deleting}>
-                  {deleting ? "Disabling..." : "Disable Schedule"}
-                </Button>
-              ) : null}
-              {configType === "metadata_profile" ? (
-                <Button variant="outlined" onClick={handleSaveJob} disabled={saving}>
-                  {saving ? "Saving..." : "Save Config"}
-                </Button>
-              ) : null}
-              <Button variant="contained" startIcon={<RunIcon />} onClick={handleManualRun} disabled={manualRunning}>
-                {manualRunning ? "Starting..." : "Run Now"}
-              </Button>
-            </Stack>
-          </Box>
-        </Stack>
-      </Drawer>
+        {activeTab === 1 && (
+          <IncidentList incidents={incidents} tableName={tableName} />
+        )}
+      </Box>
     </Box>
   );
 }

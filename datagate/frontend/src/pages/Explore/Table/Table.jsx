@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Box,
   Breadcrumbs,
@@ -9,44 +10,106 @@ import {
   Tab,
   Tabs,
   Typography,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import {
   ArticleOutlined as DescriptionIcon,
   TableChartOutlined as SampleIcon,
   InsightsOutlined as ObservabilityIcon,
+  Rule as QualityIcon,
 } from "@mui/icons-material";
-import TableDescription from "./TableDescription/TableDescription";
+import {
+  fetchAssetOverview,
+  fetchAssetSample,
+} from "~/stores/slices/exploreSlice/index";
+import Overview from "./Overview/Overview";
 import DataSample from "./DataSample/DataSample";
 import DataObservability from "./DataObservability/DataObservability";
+import MetricsMonitoring from "./MetricsMonitoring/MetricsMonitoring";
 import { pageShellSx } from "~/theme";
 
 const getOwnerLabel = (owner) =>
   owner?.full_name || owner?.username || owner?.email || "Unassigned owner";
 
 const SECTION_TO_TAB = {
-  description: 0,
+  overview: 0,
   sample: 1,
   observability: 2,
+  quality: 3,
 };
 
 function TableView({
-  assetDetail,
-  assetObservability,
+  tableName,
+  schemaName,
+  serviceId,
   onBack,
-  onChangeSampleLimit,
   onChangeSection,
-  sampleLimit,
-  section = "description",
+  section = "overview",
   observabilityTab = "profile",
 }) {
+  const dispatch = useDispatch();
+  const [sampleLimit, setSampleLimit] = React.useState(50);
+
+  const {
+    assetOverviewsByKey,
+    assetOverviewStatusByKey,
+    assetOverviewErrorByKey,
+    assetSamplesByKey,
+  } = useSelector((state) => state.explore.overview);
+
+  const {
+    incidentsByTable,
+    schemasByTable,
+    snapshotsByTable,
+    volumeTSByTable,
+  } = useSelector((state) => state.explore.observability);
+
+  const assetKey = `${serviceId}:${schemaName || 'public'}:${tableName}`;
+  const sampleKey = `${serviceId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
+
+  const assetDetail = assetOverviewsByKey[assetKey];
+  const assetSample = assetSamplesByKey[sampleKey];
+  const status = assetOverviewStatusByKey[assetKey];
+  const error = assetOverviewErrorByKey[assetKey];
+
+  // Fetch overview chỉ khi đổi bảng/service
+  React.useEffect(() => {
+    if (!tableName || !serviceId) return;
+    dispatch(fetchAssetOverview({ tableName, schemaName, serviceId }));
+  }, [dispatch, tableName, schemaName, serviceId]);
+
+  // Fetch sample khi đổi bảng/service HOẶC sampleLimit
+  React.useEffect(() => {
+    if (!tableName || !serviceId) return;
+    dispatch(fetchAssetSample({ tableName, schemaName, serviceId, sampleLimit }));
+  }, [dispatch, tableName, schemaName, serviceId, sampleLimit]);
+
   const ownerLabel = useMemo(() => getOwnerLabel(assetDetail?.owner), [assetDetail?.owner]);
   const activeTab = SECTION_TO_TAB[section] ?? 0;
 
-  const handleTabChange = (_, nextTab) => {
-    if (onChangeSection) {
-      const nextSection = Object.keys(SECTION_TO_TAB).find((key) => SECTION_TO_TAB[key] === nextTab) || "description";
-      onChangeSection(nextSection);
-    }
+  if (status === "loading") {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  if (status === "failed") {
+    return <Alert severity="error" sx={{ m: 3 }}>{error}</Alert>;
+  }
+
+  if (!assetDetail && status === "succeeded") {
+    return <Alert severity="warning" sx={{ m: 3 }}>Asset not found.</Alert>;
+  }
+
+  const fullTableName = `${schemaName || 'public'}.${tableName}`;
+  const assetObservability = {
+    incidents: incidentsByTable[fullTableName] || [],
+    schema: schemasByTable[fullTableName] || [],
+    snapshots: snapshotsByTable[fullTableName] || [],
+    volume: volumeTSByTable[fullTableName] || [],
   };
 
   return (
@@ -56,7 +119,8 @@ function TableView({
           <Link underline="hover" color="inherit" onClick={onBack} sx={{ cursor: "pointer" }}>
             Explore
           </Link>
-          <Typography color="text.primary">{assetDetail?.table_name}</Typography>
+          <Typography color="inherit">{assetDetail?.schema_name}</Typography>
+          <Typography color="text.primary" sx={{ fontWeight: 600 }}>{assetDetail?.asset_name}</Typography>
         </Breadcrumbs>
 
         <Stack
@@ -88,25 +152,38 @@ function TableView({
       </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tab icon={<DescriptionIcon fontSize="small" />} iconPosition="start" label="Description" />
+        <Tabs value={activeTab} onChange={(_, nextTab) => {
+          const nextSection = Object.keys(SECTION_TO_TAB).find((key) => SECTION_TO_TAB[key] === nextTab) || "overview";
+          onChangeSection?.(nextSection);
+        }}>
+          <Tab icon={<DescriptionIcon fontSize="small" />} iconPosition="start" label="Overview" />
           <Tab icon={<SampleIcon fontSize="small" />} iconPosition="start" label="Data Sample" />
           <Tab icon={<ObservabilityIcon fontSize="small" />} iconPosition="start" label="Observability" />
+          <Tab icon={<QualityIcon fontSize="small" />} iconPosition="start" label="Quality Metrics" />
         </Tabs>
       </Box>
 
-      {activeTab === 0 ? <TableDescription assetDetail={assetDetail} assetObservability={assetObservability} /> : null}
-      {activeTab === 1 ? (
-        <DataSample assetDetail={assetDetail} onChangeSampleLimit={onChangeSampleLimit} sampleLimit={sampleLimit} />
-      ) : null}
-      {activeTab === 2 ? (
-        <DataObservability
-          assetDetail={assetDetail}
-          assetObservability={assetObservability}
-          initialTab={observabilityTab}
-          onTabChange={(nextTab) => onChangeSection?.("observability", nextTab)}
-        />
-      ) : null}
+      <Box sx={{ py: 1 }}>
+        {section === "overview" && <Overview assetDetail={assetDetail} assetObservability={assetObservability} />}
+        {section === "sample" && (
+          <DataSample
+            assetSample={assetSample}
+            onChangeSampleLimit={(limit) => setSampleLimit(limit)}
+            sampleLimit={sampleLimit}
+          />
+        )}
+        {section === "observability" && (
+          <DataObservability
+            assetDetail={assetDetail}
+            assetObservability={assetObservability}
+            initialTab={observabilityTab}
+            onTabChange={(nextTab) => onChangeSection?.("observability", nextTab)}
+          />
+        )}
+        {section === "quality" && (
+          <MetricsMonitoring assetDetail={assetDetail} />
+        )}
+      </Box>
     </Box>
   );
 }

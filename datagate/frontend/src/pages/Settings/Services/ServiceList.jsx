@@ -25,20 +25,22 @@ import { toast } from 'react-toastify';
 import { servicesApi } from '~/apis/services';
 import { useDispatch, useSelector } from 'react-redux';
 import {
+  refreshServiceTables,
   createService,
   deleteService,
-  fetchServices,
-  refreshServiceTables,
   updateService,
-} from '~/stores/slices/servicesSlice';
+} from '~/stores/slices/settingsSlice';
+import {
+  fetchServices,
+} from '~/stores/slices/exploreSlice/index';
 
 import trinoIcon from '~/assets/images/trino.svg';
 
 const ServiceList = () => {
   const dispatch = useDispatch();
-  const services = useSelector((state) => state.services.services);
-  const servicesStatus = useSelector((state) => state.services.servicesStatus);
-  const refreshingServices = useSelector((state) => state.services.refreshingByService);
+  const services = useSelector((state) => state.explore.services);
+  const servicesStatus = useSelector((state) => state.explore.servicesStatus);
+  const refreshingServices = useSelector((state) => state.settings.refreshingByService);
   
   const [open, setOpen] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -66,18 +68,6 @@ const ServiceList = () => {
         { name: 'catalog', label: 'Catalog', placeholder: 'hive' },
       ],
       urlBuilder: (data) => `trino://${data.username}${data.password ? ':' + data.password : ''}@${data.host_port}/${data.catalog || ''}`
-    },
-    { 
-      id: 'postgres', 
-      name: 'PostgreSQL', 
-      icon: null, // Placeholder
-      fields: [
-        { name: 'username', label: 'Username', required: true },
-        { name: 'password', label: 'Password', type: 'password' },
-        { name: 'host_port', label: 'Host And Port', required: true, placeholder: 'localhost:5432' },
-        { name: 'database', label: 'Database', required: true },
-      ],
-      urlBuilder: (data) => `postgresql://${data.username}:${data.password}@${data.host_port}/${data.database}`
     }
   ];
 
@@ -300,7 +290,7 @@ const ServiceList = () => {
 
       {/* Multi-step Dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-        <DialogTitle sx={{ p: 3, borderBottom: '1px solid #eee' }}>
+        <DialogTitle component="div" sx={{ p: 3, borderBottom: '1px solid #eee' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <Typography variant="caption" color="text.secondary" fontWeight="600">Database Services</Typography>
             <Typography variant="caption" color="text.secondary">/</Typography>

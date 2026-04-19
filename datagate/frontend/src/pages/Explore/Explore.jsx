@@ -26,26 +26,23 @@ import {
   StorageOutlined as ServiceIcon,
   SchemaOutlined as SchemaIcon,
   TableChartOutlined as TableIcon,
+  LightbulbOutlined as DataAssetsIcon,
+  LanOutlined as PipelinesIcon,
+  ApiOutlined as ApisIcon,
+  GavelOutlined as GovernanceIcon,
+  PublicOutlined as DomainsIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { datagateColors, pageShellSx, panelSx } from "~/theme";
 import {
-  fetchColumnStats,
-  fetchIncidents,
-  fetchSchema,
-  fetchSnapshots,
-  fetchVolumeTS,
-} from "~/stores/slices/observabilitySlice";
-import {
-  fetchAssetDetail,
-  fetchServices,
+  fetchExploreData,
   fetchServiceSchemas,
   fetchServiceTables,
-} from "~/stores/slices/servicesSlice";
+} from "~/stores/slices/exploreSlice/index";
 import TableView from "./Table/Table";
 
-const normalizeTable = (table) => {
+const normalizeTable = (table, service = null) => {
   if (typeof table === "string") {
     const [schemaName, ...rest] = table.split(".");
     const assetName = rest.join(".") || table;
@@ -53,13 +50,20 @@ const normalizeTable = (table) => {
       full_name: table,
       table_name: assetName,
       schema_name: rest.length ? schemaName : "",
+      serviceName: service?.name,
+      serviceOwner: service?.owner,
+      serviceId: service?.id,
     };
   }
 
+  const svc = table.service || service;
   return {
     full_name: table.full_name || table.table_name || "",
     table_name: table.table_name || "",
     schema_name: table.schema_name || "",
+    serviceName: svc?.name,
+    serviceOwner: svc?.owner,
+    serviceId: svc?.id,
   };
 };
 
@@ -70,26 +74,25 @@ const Explore = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const tableParam = searchParams.get("table");
+  let tableParam = searchParams.get("table");
+  let schemaParam = searchParams.get("schema");
   const serviceParam = searchParams.get("service");
-  const sectionParam = searchParams.get("section") || "description";
-  const observabilityTabParam = searchParams.get("obsTab") || "profile";
-  const services = useSelector((state) => state.services.services);
-  const servicesStatus = useSelector((state) => state.services.servicesStatus);
-  const servicesError = useSelector((state) => state.services.servicesError);
-  const schemasMap = useSelector((state) => state.services.schemasByService);
-  const tablesMap = useSelector((state) => state.services.tablesByService);
-  const loadingTablesByService = useSelector((state) => state.services.tablesStatusByService);
-  const assetDetailsByKey = useSelector((state) => state.services.assetDetailsByKey);
-  const assetDetailStatusByKey = useSelector((state) => state.services.assetDetailStatusByKey);
-  const assetDetailErrorByKey = useSelector((state) => state.services.assetDetailErrorByKey);
-  const {
-    columnStatsByTable,
-    incidentsByTable,
-    schemasByTable,
-    snapshotsByTable,
-    volumeTSByTable,
-  } = useSelector((state) => state.observability);
+  const sectionParam = searchParams.get("section") || "overview";
+  const observabilityTabParam = searchParams.get("obsTab") || "metadata";
+
+  // Backward compatibility: If old URL had ?table=schema.table
+  if (!schemaParam && tableParam && tableParam.includes(".")) {
+    const parts = tableParam.split(".");
+    schemaParam = parts[0];
+    tableParam = parts.slice(1).join(".");
+  }
+  const services = useSelector((state) => state.explore.discovery.services);
+  const servicesStatus = useSelector((state) => state.explore.discovery.servicesStatus);
+  const servicesError = useSelector((state) => state.explore.discovery.servicesError);
+  const exploreDataLoaded = useSelector((state) => state.explore.discovery.exploreDataLoaded);
+  const schemasMap = useSelector((state) => state.explore.discovery.schemasByService);
+  const tablesMap = useSelector((state) => state.explore.discovery.tablesByService);
+  const loadingTablesByService = useSelector((state) => state.explore.discovery.tablesStatusByService);
 
   const [selectedServiceId, setSelectedServiceId] = useState(null);
   const [selectedSchemaByService, setSelectedSchemaByService] = useState({});
@@ -98,59 +101,11 @@ const Explore = () => {
   const [expandedServiceTypes, setExpandedServiceTypes] = useState({});
   const [expandedServices, setExpandedServices] = useState({});
 
-  const [sampleLimit, setSampleLimit] = useState(50);
-
   useEffect(() => {
-    if (servicesStatus === "idle") {
-      dispatch(fetchServices());
+    if (!exploreDataLoaded && servicesStatus !== "loading") {
+      dispatch(fetchExploreData());
     }
-  }, [dispatch, servicesStatus]);
-
-  useEffect(() => {
-    const nextServiceId =
-      selectedServiceId && services.some((service) => service.id === selectedServiceId)
-        ? selectedServiceId
-        : services[0]?.id ?? null;
-    if (!nextServiceId || tableParam) return;
-    if (!schemasMap[nextServiceId]) {
-      dispatch(fetchServiceSchemas(nextServiceId));
-    }
-    if (!tablesMap[nextServiceId]) {
-      dispatch(fetchServiceTables(nextServiceId));
-    }
-  }, [dispatch, schemasMap, selectedServiceId, services, tableParam, tablesMap]);
-
-  useEffect(() => {
-    if (!tableParam || !serviceParam) {
-      return;
-    }
-    dispatch(fetchAssetDetail({ tableName: tableParam, serviceId: Number(serviceParam), sampleLimit }));
-    dispatch(fetchSnapshots(tableParam));
-    dispatch(fetchSchema(tableParam));
-    dispatch(fetchColumnStats(tableParam));
-    dispatch(fetchIncidents(tableParam));
-    dispatch(fetchVolumeTS(tableParam));
-  }, [dispatch, sampleLimit, serviceParam, tableParam]);
-
-  const updateExploreQuery = useCallback(
-    ({ serviceId = serviceParam, tableName = tableParam, section = sectionParam, obsTab = observabilityTabParam } = {}) => {
-      const params = new URLSearchParams();
-      if (serviceId) params.set("service", serviceId);
-      if (tableName) params.set("table", tableName);
-      if (section && section !== "description") params.set("section", section);
-      if (obsTab && obsTab !== "profile") params.set("obsTab", obsTab);
-      navigate(`/explore${params.toString() ? `?${params.toString()}` : ""}`);
-    },
-    [navigate, observabilityTabParam, sectionParam, serviceParam, tableParam]
-  );
-
-  const openAssetDetail = (serviceId, tableName) => {
-    updateExploreQuery({ serviceId, tableName, section: "description", obsTab: "profile" });
-  };
-
-  const closeAssetDetail = () => {
-    navigate("/explore");
-  };
+  }, [dispatch, exploreDataLoaded, servicesStatus]);
 
   const loading = servicesStatus === "loading";
   const error =
@@ -160,18 +115,44 @@ const Explore = () => {
   const resolvedSelectedServiceId =
     selectedServiceId && services.some((service) => service.id === selectedServiceId)
       ? selectedServiceId
-      : services[0]?.id ?? null;
+      : null;
   const selectedService =
     services.find((service) => service.id === resolvedSelectedServiceId) || null;
   const selectedSchema = resolvedSelectedServiceId
-    ? selectedSchemaByService[resolvedSelectedServiceId] ||
-      schemasMap[resolvedSelectedServiceId]?.[0] ||
-      "all"
+    ? selectedSchemaByService[resolvedSelectedServiceId] || "all"
     : "all";
-  const selectedServiceTables = resolvedSelectedServiceId
-    ? (tablesMap[resolvedSelectedServiceId] || []).map(normalizeTable)
-    : [];
+
+  const allNormalizedTables = useMemo(() => {
+    if (!resolvedSelectedServiceId) {
+      return Object.entries(tablesMap).flatMap(([svcId, tables]) => {
+        const svc = services.find(s => String(s.id) === svcId);
+        return (tables || []).map(t => normalizeTable(t, svc));
+      });
+    }
+    const svc = services.find(s => s.id === resolvedSelectedServiceId);
+    return (tablesMap[resolvedSelectedServiceId] || []).map(t => normalizeTable(t, svc));
+  }, [resolvedSelectedServiceId, tablesMap, services]);
+
+  const selectedServiceTables = allNormalizedTables;
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  const updateExploreQuery = useCallback(
+    ({ serviceId = serviceParam, schemaName = schemaParam, tableName = tableParam, section = sectionParam, obsTab = observabilityTabParam } = {}) => {
+      const params = new URLSearchParams();
+      if (serviceId) params.set("service", serviceId);
+      if (schemaName) params.set("schema", schemaName);
+      if (tableName) params.set("table", tableName);
+      if (section && section !== "overview") params.set("section", section);
+      if (obsTab && obsTab !== "metadata") params.set("obsTab", obsTab);
+      navigate(`/explore${params.toString() ? `?${params.toString()}` : ""}`);
+    },
+    [navigate, observabilityTabParam, sectionParam, serviceParam, schemaParam, tableParam]
+  );
+
+  const handleBackToExplore = () => {
+    navigate("/explore");
+  };
+
   const groupedServices = services.reduce((accumulator, service) => {
     const key = (service.service_type || "Other").toLowerCase();
     if (!accumulator[key]) {
@@ -197,27 +178,19 @@ const Explore = () => {
     return haystack.includes(normalizedSearchQuery);
   });
 
+  // Asset Detail logic removed, moved to TableView component
+  
   const assetCards = visibleTables.map((table, index) => ({
     ...table,
-    summary: `${selectedService?.name || "data_asset"} / ${table.schema_name || "default"} / ${table.table_name}`,
+    summary: `${table.serviceName || selectedService?.name || "data_asset"} / ${table.schema_name || "default"} / ${table.table_name}`,
     description: table.full_name || table.table_name,
-    ownerLabel: getOwnerLabel(selectedService?.owner),
+    ownerLabel: getOwnerLabel(table.serviceOwner || selectedService?.owner),
     accent: index === 0 ? "#F7FAFF" : "#FFFFFF",
     border: index === 0 ? "#7BA7FF" : "#EEF2F7",
   }));
-  const assetDetailKey =
-    tableParam && serviceParam ? `${Number(serviceParam)}:${tableParam}:${sampleLimit}` : "";
-  const assetDetail = assetDetailKey ? assetDetailsByKey[assetDetailKey] || null : null;
-  const assetDetailLoading = assetDetailKey
-    ? assetDetailStatusByKey[assetDetailKey] === "loading"
-    : false;
-  const assetDetailError = assetDetailKey ? assetDetailErrorByKey[assetDetailKey] || null : null;
-  const assetObservability = {
-    columnStats: columnStatsByTable[tableParam] || [],
-    incidents: incidentsByTable[tableParam] || [],
-    schema: schemasByTable[tableParam] || [],
-    snapshots: snapshotsByTable[tableParam] || [],
-    volume: volumeTSByTable[tableParam] || [],
+
+  const openAssetDetail = (serviceId, schemaName, tableName) => {
+    updateExploreQuery({ serviceId, schemaName, tableName, section: "overview", obsTab: "metadata" });
   };
 
   if (loading) {
@@ -229,36 +202,22 @@ const Explore = () => {
   }
 
   if (tableParam && serviceParam) {
-    if (assetDetailLoading) {
-      return (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-          <CircularProgress size={28} />
-        </Box>
-      );
-    }
-
-    if (assetDetailError) {
-      return <Alert severity="error">{assetDetailError}</Alert>;
-    }
-
-    if (!assetDetail) return null;
-
     return (
       <TableView
-        assetDetail={assetDetail}
-        assetObservability={assetObservability}
-        onBack={closeAssetDetail}
+        tableName={tableParam}
+        schemaName={schemaParam}
+        serviceId={Number(serviceParam)}
+        onBack={handleBackToExplore}
         onChangeSection={(nextSection, nextObsTab = observabilityTabParam) =>
           updateExploreQuery({
             serviceId: serviceParam,
+            schemaName: schemaParam,
             tableName: tableParam,
             section: nextSection,
             obsTab: nextObsTab,
           })
         }
-        onChangeSampleLimit={setSampleLimit}
         observabilityTab={observabilityTabParam}
-        sampleLimit={sampleLimit}
         section={sectionParam}
       />
     );
@@ -273,192 +232,154 @@ const Explore = () => {
             minWidth: { lg: 300 },
             p: 1.75,
             ...panelSx,
+            borderRadius: 1,
           }}
         >
           <Stack spacing={1.5} sx={{ height: "100%" }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography sx={{ fontSize: 18, fontWeight: 800 }}>
-                Data Assets
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              sx={{ px: 0.5, cursor: "pointer", "&:hover": { opacity: 0.7 } }}
+              onClick={() => {
+                setSelectedServiceId(null);
+                setSearchQuery("");
+              }}
+            >
+              <DataAssetsIcon sx={{ fontSize: 20, color: "#4B91F7" }} />
+              <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A" }}>
+                Services
               </Typography>
-              <Avatar sx={{ width: 28, height: 28, bgcolor: "#EEF4FF", color: "primary.main" }}>
-                <TableIcon sx={{ fontSize: 16 }} />
-              </Avatar>
             </Stack>
 
             <TextField
               size="small"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search table..."
+              placeholder="Search assets..."
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
+                    <SearchIcon fontSize="small" sx={{ color: "text.disabled" }} />
                   </InputAdornment>
                 ),
                 sx: {
-                  fontSize: 14,
-                  borderRadius: 2,
+                  fontSize: 13,
+                  bgcolor: "#f8f9fa",
+                  "& fieldset": { border: "none" },
+                  borderRadius: 1,
                 },
               }}
             />
-            <Box sx={{ overflow: "auto", pr: 0.5 }}>
+            <Box sx={{ overflow: "auto", pr: 0.5, flexGrow: 1 }}>
               <List disablePadding>
+                {/* Services Header */}
                 <ListItemButton
                   onClick={() => setIsDatabasesExpanded((prev) => !prev)}
-                  sx={{ px: 0.25, py: 0.5, borderRadius: 2, mb: 0.25, minHeight: 32 }}
+                  sx={{ px: 0.5, py: 0.75, borderRadius: 1, mb: 0.25, minHeight: 32 }}
                 >
-                  {isDatabasesExpanded ? <ExpandMoreIcon sx={{ fontSize: 18 }} /> : <ChevronRightIcon sx={{ fontSize: 18 }} />}
-                  <ServiceIcon sx={{ ml: 0.75, mr: 1, color: "text.secondary", fontSize: 18 }} />
+                  {isDatabasesExpanded ? (
+                    <ExpandMoreIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                  ) : (
+                    <ChevronRightIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                  )}
+                  <ServiceIcon sx={{ ml: 0.5, mr: 1, color: "text.secondary", fontSize: 18 }} />
                   <ListItemText
-                    primary="Databases"
-                    slotProps={{ primary: { fontWeight: 700, fontSize: 14 } }}
+                    primary="Services"
+                    slotProps={{ primary: { fontWeight: 600, fontSize: 14, color: "text.primary" } }}
                   />
                 </ListItemButton>
 
-                {isDatabasesExpanded
-                  ? Object.entries(groupedServices).map(([serviceTypeKey, group]) => {
-                      const defaultTypeExpanded = group.services.some(
-                        (service) => service.id === resolvedSelectedServiceId
-                      );
-                      const isTypeExpanded =
-                        expandedServiceTypes[serviceTypeKey] ?? defaultTypeExpanded;
-                      const matchedServices = group.services.filter((service) => {
-                        if (!normalizedSearchQuery) return true;
-
-                        const haystack = [service.name, service.service_type]
-                          .filter(Boolean)
-                          .join(" ")
-                          .toLowerCase();
-
-                        return haystack.includes(normalizedSearchQuery);
-                      });
-
-                      if (matchedServices.length === 0 && normalizedSearchQuery) {
-                        return null;
-                      }
+                {isDatabasesExpanded &&
+                  Object.entries(groupedServices).map(([serviceTypeKey, group]) => {
+                    return group.services.map((service) => {
+                      const isServiceSelected = service.id === resolvedSelectedServiceId;
+                      const isServiceExpanded = expandedServices[service.id] ?? isServiceSelected;
+                      const serviceSchemas = schemasMap[service.id] || [];
 
                       return (
-                        <Box key={serviceTypeKey} sx={{ ml: 1.5 }}>
+                        <Box key={service.id} sx={{ ml: 2 }}>
                           <ListItemButton
-                            onClick={() =>
-                              setExpandedServiceTypes((prev) => ({
+                            onClick={() => {
+                              setExpandedServices((prev) => ({
                                 ...prev,
-                                [serviceTypeKey]: !isTypeExpanded,
-                              }))
-                            }
-                            sx={{ borderRadius: 2, py: 0.4, minHeight: 30 }}
+                                [service.id]: !isServiceExpanded,
+                              }));
+                            }}
+                            sx={{
+                              borderRadius: 1,
+                              py: 0.5,
+                              mb: 0.25,
+                              minHeight: 32,
+                            }}
                           >
-                            {isTypeExpanded ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />}
-                            <ListItemText
-                              primary={group.label}
-                              slotProps={{
-                                primary: { fontWeight: 600, textTransform: "lowercase", fontSize: 13 },
-                              }}
-                              sx={{ ml: 1 }}
-                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                              {serviceSchemas.length > 0 ? (
+                                isServiceExpanded ? (
+                                  <ExpandMoreIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.5 }} />
+                                ) : (
+                                  <ChevronRightIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.5 }} />
+                                )
+                              ) : (
+                                <Box sx={{ width: 21 }} />
+                              )}
+                              
+                              <ServiceIcon sx={{ fontSize: 16, color: "text.secondary", mr: 1 }} />
+
+                              <ListItemText
+                                primary={service.name}
+                                slotProps={{
+                                  primary: { fontWeight: 500, fontSize: 13.5 },
+                                }}
+                              />
+                            </Box>
                           </ListItemButton>
 
-                          {isTypeExpanded
-                            ? matchedServices.map((service) => {
-                                const isSelected = service.id === resolvedSelectedServiceId;
-                                const isServiceExpanded = expandedServices[service.id] ?? isSelected;
-                                const serviceSchemas = schemasMap[service.id] || [];
-                                const visibleSchemas = serviceSchemas.filter((schema) => {
-                                  if (!normalizedSearchQuery) return true;
-                                  return schema.toLowerCase().includes(normalizedSearchQuery);
-                                });
-
+                          {isServiceExpanded && (
+                            <Box sx={{ ml: 2, borderLeft: "1px solid #eee" }}>
+                              {serviceSchemas.map((schema) => {
+                                const isSchemaSelected = isServiceSelected && selectedSchema === schema;
+                                
                                 return (
-                                  <Box key={service.id} sx={{ ml: 1.5 }}>
-                                    <ListItemButton
-                                      selected={isSelected}
-                                      onClick={() => {
-                                        setSelectedServiceId(service.id);
-                                        if (!schemasMap[service.id]) {
-                                          dispatch(fetchServiceSchemas(service.id));
-                                        }
-                                        if (!tablesMap[service.id]) {
-                                          dispatch(fetchServiceTables(service.id));
-                                        }
+                                  <ListItemButton
+                                    key={schema}
+                                    selected={isSchemaSelected}
+                                    onClick={() => {
+                                      setSelectedServiceId(service.id);
+                                      setSelectedSchemaByService((prev) => ({
+                                        ...prev,
+                                        [service.id]: schema,
+                                      }));
+                                    }}
+                                    sx={{
+                                      ml: 1,
+                                      borderRadius: 1,
+                                      py: 0.25,
+                                      minHeight: 28,
+                                      bgcolor: isSchemaSelected ? "rgba(75, 145, 247, 0.08)" : "transparent",
+                                      "&.Mui-selected": {
+                                        bgcolor: "rgba(75, 145, 247, 0.12)",
+                                        "&:hover": { bgcolor: "rgba(75, 145, 247, 0.16)" },
+                                      },
+                                    }}
+                                  >
+                                    <SchemaIcon sx={{ mr: 1, color: "text.secondary", fontSize: 14 }} />
+                                    <ListItemText
+                                      primary={schema}
+                                      slotProps={{
+                                        primary: { fontSize: 12.5, fontWeight: isSchemaSelected ? 600 : 400 },
                                       }}
-                                      sx={{
-                                        borderRadius: 2,
-                                        py: 0.45,
-                                        mb: 0.25,
-                                        minHeight: 34,
-                                        bgcolor: isSelected ? datagateColors.selectedBackground : "transparent",
-                                        "&.Mui-selected": {
-                                          bgcolor: datagateColors.selectedBackground,
-                                        },
-                                      }}
-                                    >
-                                      <IconButton
-                                        size="small"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          setExpandedServices((prev) => ({
-                                            ...prev,
-                                            [service.id]: !isServiceExpanded,
-                                          }));
-                                        }}
-                                        sx={{ mr: 0.5, p: 0.25 }}
-                                      >
-                                        {isServiceExpanded ? (
-                                          <ExpandMoreIcon sx={{ fontSize: 16 }} />
-                                        ) : (
-                                          <ChevronRightIcon sx={{ fontSize: 16 }} />
-                                        )}
-                                      </IconButton>
-                                      <ListItemText
-                                        primary={service.name}
-                                        secondary={service.service_type}
-                                        slotProps={{
-                                          primary: { fontWeight: isSelected ? 700 : 500, fontSize: 13 },
-                                          secondary: { fontSize: 11 },
-                                        }}
-                                      />
-                                    </ListItemButton>
-
-                                    {isServiceExpanded && isSelected
-                                      ? visibleSchemas.map((schema) => {
-                                          const schemaTableCount = selectedServiceTables.filter(
-                                            (table) => table.schema_name === schema
-                                          ).length;
-
-                                          return (
-                                            <ListItemButton
-                                              key={schema}
-                                              selected={selectedSchema === schema}
-                                              onClick={() =>
-                                                setSelectedSchemaByService((prev) => ({
-                                                  ...prev,
-                                                  [service.id]: schema,
-                                                }))
-                                              }
-                                              sx={{ ml: 3, borderRadius: 2, py: 0.25, minHeight: 28 }}
-                                            >
-                                              <SchemaIcon sx={{ mr: 1, color: "text.secondary", fontSize: 15 }} />
-                                              <ListItemText
-                                                primary={schema}
-                                                secondary={`${schemaTableCount} tables`}
-                                                slotProps={{
-                                                  primary: { fontSize: 12.5 },
-                                                  secondary: { fontSize: 10.5 },
-                                                }}
-                                              />
-                                            </ListItemButton>
-                                          );
-                                        })
-                                      : null}
-                                  </Box>
+                                    />
+                                  </ListItemButton>
                                 );
-                              })
-                            : null}
+                              })}
+                            </Box>
+                          )}
                         </Box>
                       );
-                    })
-                  : null}
+                    });
+                  })}
+
               </List>
             </Box>
           </Stack>
@@ -476,16 +397,16 @@ const Explore = () => {
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
               <Box>
                 <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
-                  {selectedService?.name || "Data Assets"}
+                  {selectedService?.name || "Tables"}
                 </Typography>
                 <Typography sx={{ fontSize: 12.5 }} color="text.secondary">
                   {selectedSchema === "all"
-                    ? `${visibleTables.length} assets available`
-                    : `${visibleTables.length} assets in schema ${selectedSchema}`}
+                    ? `${visibleTables.length} tables available`
+                    : `${visibleTables.length} tables in schema ${selectedSchema}`}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1}>
-                <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={() => dispatch(fetchServices())} sx={{ textTransform: "none", fontSize: 12, borderColor: "#E6EBF2" }}>
+                <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={() => dispatch(fetchExploreData())} sx={{ textTransform: "none", fontSize: 12, borderColor: "#E6EBF2" }}>
                   Refresh
                 </Button>
               </Stack>
@@ -510,11 +431,11 @@ const Explore = () => {
               <Stack spacing={2.5}>
                 {assetCards.map((table) => (
                   <Paper
-                    key={table.full_name}
-                    onClick={() => openAssetDetail(resolvedSelectedServiceId, table.full_name)}
+                    key={`${table.serviceId}_${table.schema_name}_${table.table_name}`}
+                    onClick={() => openAssetDetail(table.serviceId || resolvedSelectedServiceId, table.schema_name, table.table_name)}
                     sx={{
                       p: 2,
-                      borderRadius: 3,
+                      borderRadius: 1,
                       border: `1px solid ${table.border}`,
                       borderLeft: `3px solid ${table.border}`,
                       bgcolor: table.accent,

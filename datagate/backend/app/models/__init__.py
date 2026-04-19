@@ -1,6 +1,10 @@
-from .auth import User, Role, user_roles
-from .service import Service
-from .rule import ActiveRule
-from .profiling import ProfilingRun, ColumnProfile
-from .quality import QualityCheckRun, QualityCheckResult, MLAnomalyRun, MLFeatureImportance
-from .observability import DQJobConfig, DQJobRunHistory, DQTableSnapshot, DQTableVolumeTS, DQTableSchema, DQColumnStats, DQIncident
+from .auth import User, Role, Permission, user_roles, role_permissions
+from .service_model import Service
+from .observability_model import (
+    DGObservabilityConfig,
+    DGObservabilityRunHistory,
+    DGObservabilitySnapshot,
+    DGObservabilityVolumeTS,
+    DGObservabilitySchema,
+    DGObservabilityIncident
+)

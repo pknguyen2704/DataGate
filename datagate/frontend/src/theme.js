@@ -2,7 +2,7 @@ import { createTheme } from "@mui/material/styles";
 
 const APP_BAR_HEIGHT = 64;
 const SIDEBAR_WIDTH = 260;
-const BASE_RADIUS = 10;
+const BASE_RADIUS = 8;
 
 export const datagateColors = {
   pageBackground: "#F7F9FC",
@@ -18,7 +18,7 @@ export const datagateColors = {
 export const datagateLayout = {
   pagePadding: { xs: 2, md: 3 },
   sectionGap: 3,
-  panelRadius: 3,
+  panelRadius: 1,
 };
 
 export const pageShellSx = {
@@ -43,7 +43,7 @@ export const sectionHeaderSx = {
 };
 
 export const subtlePanelSx = {
-  borderRadius: 3,
+  borderRadius: 1,
   border: `1px solid ${datagateColors.cardBorder}`,
   bgcolor: datagateColors.cardBackgroundMuted,
 };
@@ -229,7 +229,7 @@ const theme = createTheme({
         root: {
           minHeight: 40,
           padding: "10px 18px",
-          borderRadius: 10,
+          borderRadius: 1,
           boxShadow: "none",
         },
         sizeSmall: {
@@ -252,7 +252,7 @@ const theme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
+          borderRadius: 1,
         },
         sizeSmall: {
           padding: 6,
@@ -268,7 +268,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           minHeight: 44,
-          borderRadius: 14,
+          borderRadius: 1,
           backgroundColor: "#FFFFFF",
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: "#D8E1EC",
@@ -306,7 +306,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           height: 30,
-          borderRadius: 10,
+          borderRadius: 1,
           fontSize: "0.8125rem",
           fontWeight: 600,
         },
@@ -362,7 +362,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           minHeight: 44,
-          borderRadius: 10,
+          borderRadius: 1,
           "&.Mui-selected": {
             backgroundColor: "#EFF6FF",
             color: "#2563EB",
@@ -379,14 +379,14 @@ const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 18,
+          borderRadius: 1.5,
         },
       },
     },
     MuiMenu: {
       styleOverrides: {
         paper: {
-          borderRadius: 14,
+          borderRadius: 1,
           border: "1px solid #E5EAF2",
           boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)",
         },

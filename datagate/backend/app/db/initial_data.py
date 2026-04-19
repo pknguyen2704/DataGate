@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from app import models, schemas
 from app.core import security
 from app.db.session import SessionLocal, engine
-from app.db.base_class import Base
+from app.db.base import Base
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

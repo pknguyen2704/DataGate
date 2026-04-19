@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.api import deps
 from app.core import security
-from app.core.config import settings
+from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter()
 
@@ -20,22 +20,16 @@ def login_access_token(
     """
     OAuth2 compatible token login. Accepts username OR email in the username field.
     """
-    # Try username first, then fall back to email
-    user = db.query(models.auth.User).filter(
-        models.auth.User.username == form_data.username
+    user = db.query(models.User).filter(
+        models.User.username == form_data.username
     ).first()
-
-    if not user:
-        user = db.query(models.auth.User).filter(
-            models.auth.User.email == form_data.username
-        ).first()
 
     if not user or not security.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
 
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": security.create_access_token(
             user.id, expires_delta=access_token_expires
@@ -46,7 +40,7 @@ def login_access_token(
 
 @router.get("/me", response_model=schemas.UserOut)
 def read_users_me(
-    current_user: models.auth.User = Depends(deps.get_current_user),
+    current_user: models.User = Depends(deps.get_current_user),
 ) -> Any:
     """
     Get current logged-in user info.

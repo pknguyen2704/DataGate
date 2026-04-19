@@ -19,9 +19,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import DataGateLogo from "~/assets/images/datagate.svg";
 
 const navItems = [
-  { text: "Overview", icon: <DashboardIcon />, path: "/home" },
-  { text: "Metrics Monitoring", icon: <MetricsIcon />, path: "/metrics" },
-  { text: "Data Assets", icon: <ExplorerIcon />, path: "/explore" },
+  { text: "Home", icon: <DashboardIcon />, path: "/home" },
+  { text: "Explore", icon: <ExplorerIcon />, path: "/explore" },
   { text: "Settings", icon: <SettingsIcon />, path: "/settings" },
 ];
 
