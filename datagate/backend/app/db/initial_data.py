@@ -1,115 +1,73 @@
-from pathlib import Path
-import sys
 import logging
 from sqlalchemy.orm import Session
-
-# Allow direct execution via `uv run python app/db/initial_data.py`.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from app import models, schemas
-from app.core import security
-from app.db.session import SessionLocal, engine
+from app import models
 from app.db.base import Base
+from app.db.session import SessionLocal, engine
+from app.core.security import get_password_hash
+from datetime import datetime, timedelta
 
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def init_db(db: Session) -> None:
-    # Create tables
+    # 0. Tạo tất cả các bảng nếu chưa tồn tại
+    logger.info("Ensuring database tables exist...")
     Base.metadata.create_all(bind=engine)
 
-    admin_role = db.query(models.Role).filter(models.Role.name == "ADMIN").first()
-    if not admin_role:
-        admin_role = models.Role(name="ADMIN", description="Platform Administrator")
-        db.add(admin_role)
-
-    owner_role = db.query(models.Role).filter(models.Role.name == "DATA_OWNER").first()
-    if not owner_role:
-        owner_role = models.Role(name="DATA_OWNER", description="Data Asset Owner")
-        db.add(owner_role)
-
-    viewer_role = db.query(models.Role).filter(models.Role.name == "VIEWER").first()
-    if not viewer_role:
-        viewer_role = models.Role(name="VIEWER", description="Data Consumer / Viewer")
-        db.add(viewer_role)
-
-    db.commit()
-
-    # Check if superuser already exists
-    user = db.query(models.User).filter(models.User.email == "admin@datagate.ai").first()
+    # 1. Initialize Users
+    user = db.query(models.User).filter(models.User.username == "admin").first()
     if not user:
-        # Create Superuser
-        user_in = models.User(
-            email="admin@datagate.ai",
+        user = models.User(
             username="admin",
-            hashed_password=security.get_password_hash("admin123"),
-            full_name="System Administrator",
+            email="admin@datagate.io",
+            full_name="Administrator",
+            hashed_password=get_password_hash("admin123"),
             is_active=True,
             is_superuser=True,
+            accessible_tables=[] # Khởi tạo rỗng, người dùng sẽ tự cấu hình
         )
-        db.add(user_in)
-        
-        db.add(user_in)
+        db.add(user)
         db.commit()
-        db.refresh(user_in)
-        
-        # Assign ADMIN role to the superuser
-        user_in.roles.append(admin_role)
-        db.commit()
-        
-        logger.info("Database initialized with superuser: admin@datagate.ai / admin123")
+        db.refresh(user)
+        logger.info(f"Created superuser: {user.username}/admin123")
     else:
-        logger.info("Database already initialized.")
+        logger.info("Superuser already exists")
 
-    sample_users = [
-        {
-            "email": "owner.a@datagate.ai",
-            "username": "owner_a",
-            "password": "owner123",
-            "full_name": "Owner A",
-            "is_superuser": False,
-            "role": owner_role,
-        },
-        {
-            "email": "viewer.b@datagate.ai",
-            "username": "viewer_b",
-            "password": "viewer123",
-            "full_name": "Viewer B",
-            "is_superuser": False,
-            "role": viewer_role,
-        },
-    ]
+    # 2. KHÔNG khởi tạo Connection mặc định
+    # Người dùng muốn tự nhập từ UI ban đầu
+    logger.info("Skipping default connection seeding (as requested).")
 
-    for sample_user in sample_users:
-        existing_user = db.query(models.User).filter(models.User.email == sample_user["email"]).first()
-        if existing_user:
-            if sample_user["role"] not in existing_user.roles:
-                existing_user.roles.append(sample_user["role"])
-                db.add(existing_user)
-                db.commit()
-            continue
+    # 3. Initialize Sample Observability Data (Tùy chọn, giữ lại để UI không trống không)
+    table_name = "customer_bronze"
+    schema_name = "bronze"
+    catalog = "iceberg"
 
-        created_user = models.User(
-            email=sample_user["email"],
-            username=sample_user["username"],
-            hashed_password=security.get_password_hash(sample_user["password"]),
-            full_name=sample_user["full_name"],
-            is_active=True,
-            is_superuser=sample_user["is_superuser"],
+    db.query(models.ObservabilitySnapshot).filter(
+        models.ObservabilitySnapshot.table_name == table_name
+    ).delete()
+
+    for i in range(30):
+        snap_time = datetime.now() - timedelta(days=30-i)
+        snap = models.ObservabilitySnapshot(
+            table_name=table_name,
+            schema_name=schema_name,
+            catalog=catalog,
+            snapshot_time=snap_time,
+            total_records=1000 + (i * 50) + (i % 3 * 20),
+            total_size=1024 * 50 * (i + 1),
+            last_updated_time=snap_time - timedelta(hours=2)
         )
-        db.add(created_user)
-        db.commit()
-        db.refresh(created_user)
-        created_user.roles.append(sample_user["role"])
-        db.add(created_user)
-        db.commit()
+        db.add(snap)
+
+    db.commit()
+    logger.info("Seeding script completed.")
 
 def main() -> None:
+    logger.info("Seeding data...")
     db = SessionLocal()
-    try:
-        init_db(db)
-    finally:
-        db.close()
+    init_db(db)
+    logger.info("Seeding complete.")
 
 if __name__ == "__main__":
     main()

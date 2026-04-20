@@ -1,54 +1,54 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { servicesApi } from "~/apis/services";
+import { connectionsApi } from "~/apis/connections";
 import { usersApi } from "~/apis/users";
 import { observabilityApi } from "~/apis/observability";
 
 const getErrorMessage = (error, fallback) =>
   error.response?.data?.detail || error.message || fallback;
 
-// --- 1. SERVICE MANAGEMENT ---
+// --- 1. CONNECTION MANAGEMENT ---
 
-export const createService = createAsyncThunk(
-  "settings/createService",
+export const createConnection = createAsyncThunk(
+  "settings/createConnection",
   async (payload, { rejectWithValue }) => {
     try {
-      const response = await servicesApi.createService(payload);
+      const response = await connectionsApi.createConnection(payload);
       return response.data;
     } catch (error) {
-      return rejectWithValue(getErrorMessage(error, "Could not create service."));
+      return rejectWithValue(getErrorMessage(error, "Could not create connection."));
     }
   }
 );
 
-export const updateService = createAsyncThunk(
-  "settings/updateService",
-  async ({ serviceId, data }, { rejectWithValue }) => {
+export const updateConnection = createAsyncThunk(
+  "settings/updateConnection",
+  async ({ connectionId, data }, { rejectWithValue }) => {
     try {
-      const response = await servicesApi.updateService(serviceId, data);
+      const response = await connectionsApi.updateConnection(connectionId, data);
       return response.data;
     } catch (error) {
-      return rejectWithValue(getErrorMessage(error, "Could not update service."));
+      return rejectWithValue(getErrorMessage(error, "Could not update connection."));
     }
   }
 );
 
-export const deleteService = createAsyncThunk(
-  "settings/deleteService",
-  async (serviceId, { rejectWithValue }) => {
+export const deleteConnection = createAsyncThunk(
+  "settings/deleteConnection",
+  async (connectionId, { rejectWithValue }) => {
     try {
-      await servicesApi.deleteService(serviceId);
-      return serviceId;
+      await connectionsApi.deleteConnection(connectionId);
+      return connectionId;
     } catch (error) {
-      return rejectWithValue(getErrorMessage(error, "Could not delete service."));
+      return rejectWithValue(getErrorMessage(error, "Could not delete connection."));
     }
   }
 );
 
-export const testServiceConnection = createAsyncThunk(
-  "settings/testServiceConnection",
+export const testConnection = createAsyncThunk(
+  "settings/testConnection",
   async (payload, { rejectWithValue }) => {
     try {
-      const response = await servicesApi.testConnection(payload);
+      const response = await connectionsApi.testConnection(payload);
       return response.data;
     } catch (error) {
       return rejectWithValue(getErrorMessage(error, "Connection test failed."));
@@ -56,16 +56,17 @@ export const testServiceConnection = createAsyncThunk(
   }
 );
 
-export const refreshServiceTables = createAsyncThunk(
-  "settings/refreshServiceTables",
-  async (serviceId, { rejectWithValue }) => {
+export const refreshConnectionTables = createAsyncThunk(
+  "settings/refreshConnectionTables",
+  async (connectionId, { rejectWithValue }) => {
     try {
-      await observabilityApi.refreshTables(serviceId);
-      return serviceId;
+      // Logic for refreshing table metadata, possibly via observability sync
+      await observabilityApi.triggerScan({ connection_id: connectionId }); 
+      return connectionId;
     } catch (error) {
       return rejectWithValue({
-        serviceId,
-        message: getErrorMessage(error, "Could not refresh service tables."),
+        connectionId,
+        message: getErrorMessage(error, "Could not refresh connection tables."),
       });
     }
   }
@@ -108,7 +109,7 @@ const initialState = {
   testConnectionResult: null,
   testConnectionStatus: "idle",
   
-  refreshingByService: {},
+  refreshingByConnection: {},
 };
 
 const settingsSlice = createSlice({
@@ -126,23 +127,23 @@ const settingsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Service Mutations
-      .addCase(createService.pending, (state) => {
+      // Connection Mutations
+      .addCase(createConnection.pending, (state) => {
         state.mutationStatus = "loading";
       })
-      .addCase(createService.fulfilled, (state) => {
+      .addCase(createConnection.fulfilled, (state) => {
         state.mutationStatus = "succeeded";
       })
-      .addCase(createService.rejected, (state, action) => {
+      .addCase(createConnection.rejected, (state, action) => {
         state.mutationStatus = "failed";
         state.mutationError = action.payload;
       })
       
       // Connection Test
-      .addCase(testServiceConnection.pending, (state) => {
+      .addCase(testConnection.pending, (state) => {
         state.testConnectionStatus = "loading";
       })
-      .addCase(testServiceConnection.fulfilled, (state, action) => {
+      .addCase(testConnection.fulfilled, (state, action) => {
         state.testConnectionStatus = "succeeded";
         state.testConnectionResult = action.payload;
       })
@@ -153,16 +154,16 @@ const settingsSlice = createSlice({
         state.users = action.payload;
       })
       
-      // Refresh Service Tables
-      .addCase(refreshServiceTables.pending, (state, action) => {
-        state.refreshingByService[action.meta.arg] = true;
+      // Refresh Connection Tables
+      .addCase(refreshConnectionTables.pending, (state, action) => {
+        state.refreshingByConnection[action.meta.arg] = true;
       })
-      .addCase(refreshServiceTables.fulfilled, (state, action) => {
-        state.refreshingByService[action.payload] = false;
+      .addCase(refreshConnectionTables.fulfilled, (state, action) => {
+        state.refreshingByConnection[action.payload] = false;
       })
-      .addCase(refreshServiceTables.rejected, (state, action) => {
-        const serviceId = action.meta.arg;
-        state.refreshingByService[serviceId] = false;
+      .addCase(refreshConnectionTables.rejected, (state, action) => {
+        const connectionId = action.meta.arg;
+        state.refreshingByConnection[connectionId] = false;
       });
   },
 });

@@ -86,58 +86,59 @@ batch_ingestion = build_spark_task(
         "{{ dag_run.conf.get('source_user', 'admin') }}",
         "{{ dag_run.conf.get('source_password', 'postgrespassword') }}",
         "{{ dag_run.conf.get('source_table', 'public.yellow_tripdata') }}",
-        "{{ dag_run.conf.get('raw_table', 'bronze_raw.yellow_tripdata') }}",
+        "{{ dag_run.conf.get('raw_table', 'bronze.yellow_tripdata') }}",
         "{{ dag_run.conf.get('ingest_time', 'NONE') }}",
         "{{ dag_run.conf.get('batch_interval', '60') }}",
     ],
     dag=dag,
 )
 
-clean_data = build_spark_task(
-    task_id="clean_data",
-    script_name="clean_data.py",
-    application_args=[
-        "{{ dag_run.conf.get('rest_uri', 'http://iceberg-rest:8181') }}",
-        "{{ dag_run.conf.get('s3_endpoint', 'http://minio:9000') }}",
-        "{{ dag_run.conf.get('s3_access_key', 'admin') }}",
-        "{{ dag_run.conf.get('s3_secret_key', 'miniopassword') }}",
-        "{{ dag_run.conf.get('aws_region', 'us-east-1') }}",
-        "{{ dag_run.conf.get('raw_table', 'bronze_raw.yellow_tripdata') }}",
-        "{{ dag_run.conf.get('bronze_table', 'bronze.yellow_tripdata') }}",
-    ],
-    dag=dag,
-)
+# clean_data = build_spark_task(
+#     task_id="clean_data",
+#     script_name="clean_data.py",
+#     application_args=[
+#         "{{ dag_run.conf.get('rest_uri', 'http://iceberg-rest:8181') }}",
+#         "{{ dag_run.conf.get('s3_endpoint', 'http://minio:9000') }}",
+#         "{{ dag_run.conf.get('s3_access_key', 'admin') }}",
+#         "{{ dag_run.conf.get('s3_secret_key', 'miniopassword') }}",
+#         "{{ dag_run.conf.get('aws_region', 'us-east-1') }}",
+#         "{{ dag_run.conf.get('raw_table', 'bronze_raw.yellow_tripdata') }}",
+#         "{{ dag_run.conf.get('bronze_table', 'bronze.yellow_tripdata') }}",
+#     ],
+#     dag=dag,
+# )
 
-transform = build_spark_task(
-    task_id="transform",
-    script_name="transform.py",
-    application_args=[
-        "{{ dag_run.conf.get('rest_uri', 'http://iceberg-rest:8181') }}",
-        "{{ dag_run.conf.get('s3_endpoint', 'http://minio:9000') }}",
-        "{{ dag_run.conf.get('s3_access_key', 'admin') }}",
-        "{{ dag_run.conf.get('s3_secret_key', 'miniopassword') }}",
-        "{{ dag_run.conf.get('aws_region', 'us-east-1') }}",
-        "{{ dag_run.conf.get('bronze_table', 'bronze.yellow_tripdata') }}",
-        "{{ dag_run.conf.get('silver_table', 'silver.yellow_tripdata') }}",
-        "{{ dag_run.conf.get('gold_table', 'gold.yellow_trip_summary') }}",
-    ],
-    dag=dag,
-)
+# transform = build_spark_task(
+#     task_id="transform",
+#     script_name="transform.py",
+#     application_args=[
+#         "{{ dag_run.conf.get('rest_uri', 'http://iceberg-rest:8181') }}",
+#         "{{ dag_run.conf.get('s3_endpoint', 'http://minio:9000') }}",
+#         "{{ dag_run.conf.get('s3_access_key', 'admin') }}",
+#         "{{ dag_run.conf.get('s3_secret_key', 'miniopassword') }}",
+#         "{{ dag_run.conf.get('aws_region', 'us-east-1') }}",
+#         "{{ dag_run.conf.get('bronze_table', 'bronze.yellow_tripdata') }}",
+#         "{{ dag_run.conf.get('silver_table', 'silver.yellow_tripdata') }}",
+#         "{{ dag_run.conf.get('gold_table', 'gold.yellow_trip_summary') }}",
+#     ],
+#     dag=dag,
+# )
 
-trigger_observability = TriggerDagRunOperator(
-    task_id="trigger_observability",
-    trigger_dag_id="data_observability",
-    wait_for_completion=False,
-    reset_dag_run=False,
-    conf={
-        "catalog": "{{ dag_run.conf.get('catalog', 'iceberg') }}",
-        "tables": [
-            {"layer": "bronze", "schema": "bronze", "table": "{{ dag_run.conf.get('bronze_table', 'bronze.yellow_tripdata').split('.')[1] }}"},
-            {"layer": "silver", "schema": "silver", "table": "{{ dag_run.conf.get('silver_table', 'silver.yellow_tripdata').split('.')[1] }}"},
-            {"layer": "gold", "schema": "gold", "table": "{{ dag_run.conf.get('gold_table', 'gold.yellow_trip_summary').split('.')[1] }}"},
-        ],
-    },
-    dag=dag,
-)
+# trigger_observability = TriggerDagRunOperator(
+#     task_id="trigger_observability",
+#     trigger_dag_id="data_observability",
+#     wait_for_completion=False,
+#     reset_dag_run=False,
+#     conf={
+#         "catalog": "{{ dag_run.conf.get('catalog', 'iceberg') }}",
+#         "tables": [
+#             {"layer": "bronze", "schema": "bronze", "table": "{{ dag_run.conf.get('bronze_table', 'bronze.yellow_tripdata').split('.')[1] }}"},
+#             {"layer": "silver", "schema": "silver", "table": "{{ dag_run.conf.get('silver_table', 'silver.yellow_tripdata').split('.')[1] }}"},
+#             {"layer": "gold", "schema": "gold", "table": "{{ dag_run.conf.get('gold_table', 'gold.yellow_trip_summary').split('.')[1] }}"},
+#         ],
+#     },
+#     dag=dag,
+# )
 
-batch_ingestion >> clean_data >> transform >> trigger_observability
+batch_ingestion 
+# >> clean_data >> transform >> trigger_observability

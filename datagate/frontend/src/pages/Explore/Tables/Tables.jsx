@@ -17,16 +17,16 @@ import {
   ArticleOutlined as DescriptionIcon,
   TableChartOutlined as SampleIcon,
   InsightsOutlined as ObservabilityIcon,
-  Rule as QualityIcon,
+  ErrorOutline as IncidentIcon,
 } from "@mui/icons-material";
 import {
   fetchAssetOverview,
   fetchAssetSample,
 } from "~/stores/slices/exploreSlice/index";
-import Overview from "./Overview/Overview";
-import DataSample from "./DataSample/DataSample";
-import DataObservability from "./DataObservability/DataObservability";
-import MetricsMonitoring from "./MetricsMonitoring/MetricsMonitoring";
+import Overview from "./TableDetail/Overview/Overview";
+import DataSample from "./TableDetail/DataSample/DataSample";
+import DataObservability from "./TableDetail/Observability/Observability";
+import Incidents from "./TableDetail/Incidents/Incidents";
 import { pageShellSx } from "~/theme";
 
 const getOwnerLabel = (owner) =>
@@ -36,17 +36,17 @@ const SECTION_TO_TAB = {
   overview: 0,
   sample: 1,
   observability: 2,
-  quality: 3,
+  incidents: 3,
 };
 
 function TableView({
   tableName,
   schemaName,
-  serviceId,
+  connectionId,
   onBack,
   onChangeSection,
   section = "overview",
-  observabilityTab = "profile",
+  observabilityTab = "metadata",
 }) {
   const dispatch = useDispatch();
   const [sampleLimit, setSampleLimit] = React.useState(50);
@@ -59,31 +59,30 @@ function TableView({
   } = useSelector((state) => state.explore.overview);
 
   const {
-    incidentsByTable,
-    schemasByTable,
     snapshotsByTable,
     volumeTSByTable,
+    schemasByTable,
   } = useSelector((state) => state.explore.observability);
 
-  const assetKey = `${serviceId}:${schemaName || 'public'}:${tableName}`;
-  const sampleKey = `${serviceId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
+  const assetKey = `${connectionId}:${schemaName || 'public'}:${tableName}`;
+  const sampleKey = `${connectionId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
 
   const assetDetail = assetOverviewsByKey[assetKey];
   const assetSample = assetSamplesByKey[sampleKey];
   const status = assetOverviewStatusByKey[assetKey];
   const error = assetOverviewErrorByKey[assetKey];
 
-  // Fetch overview chỉ khi đổi bảng/service
+  // Fetch overview
   React.useEffect(() => {
-    if (!tableName || !serviceId) return;
-    dispatch(fetchAssetOverview({ tableName, schemaName, serviceId }));
-  }, [dispatch, tableName, schemaName, serviceId]);
+    if (!tableName || !connectionId) return;
+    dispatch(fetchAssetOverview({ tableName, schemaName, connectionId }));
+  }, [dispatch, tableName, schemaName, connectionId]);
 
-  // Fetch sample khi đổi bảng/service HOẶC sampleLimit
+  // Fetch sample
   React.useEffect(() => {
-    if (!tableName || !serviceId) return;
-    dispatch(fetchAssetSample({ tableName, schemaName, serviceId, sampleLimit }));
-  }, [dispatch, tableName, schemaName, serviceId, sampleLimit]);
+    if (!tableName || !connectionId) return;
+    dispatch(fetchAssetSample({ tableName, schemaName, connectionId, sampleLimit }));
+  }, [dispatch, tableName, schemaName, connectionId, sampleLimit]);
 
   const ownerLabel = useMemo(() => getOwnerLabel(assetDetail?.owner), [assetDetail?.owner]);
   const activeTab = SECTION_TO_TAB[section] ?? 0;
@@ -106,7 +105,6 @@ function TableView({
 
   const fullTableName = `${schemaName || 'public'}.${tableName}`;
   const assetObservability = {
-    incidents: incidentsByTable[fullTableName] || [],
     schema: schemasByTable[fullTableName] || [],
     snapshots: snapshotsByTable[fullTableName] || [],
     volume: volumeTSByTable[fullTableName] || [],
@@ -134,14 +132,13 @@ function TableView({
               <Typography variant="h4" fontWeight={800}>
                 {assetDetail?.asset_name}
               </Typography>
-              <Chip size="small" color="primary" variant="outlined" label={`Owner: ${ownerLabel}`} />
+              <Chip size="small" color="primary" variant="outlined" label={`Permitted to: ${ownerLabel}`} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }}>
               <Typography variant="body2" color="text.secondary">
                 {assetDetail?.table_name}
               </Typography>
-              {assetDetail?.service_name ? <Chip size="small" label={assetDetail.service_name} variant="outlined" /> : null}
-              {assetDetail?.service_type ? <Chip size="small" label={assetDetail.service_type} variant="outlined" /> : null}
+              {assetDetail?.connection_name ? <Chip size="small" label={`Source: ${assetDetail.connection_name}`} variant="outlined" /> : null}
             </Stack>
           </Stack>
 
@@ -159,7 +156,7 @@ function TableView({
           <Tab icon={<DescriptionIcon fontSize="small" />} iconPosition="start" label="Overview" />
           <Tab icon={<SampleIcon fontSize="small" />} iconPosition="start" label="Data Sample" />
           <Tab icon={<ObservabilityIcon fontSize="small" />} iconPosition="start" label="Observability" />
-          <Tab icon={<QualityIcon fontSize="small" />} iconPosition="start" label="Quality Metrics" />
+          <Tab icon={<IncidentIcon fontSize="small" />} iconPosition="start" label="Incidents" />
         </Tabs>
       </Box>
 
@@ -175,13 +172,12 @@ function TableView({
         {section === "observability" && (
           <DataObservability
             assetDetail={assetDetail}
-            assetObservability={assetObservability}
             initialTab={observabilityTab}
             onTabChange={(nextTab) => onChangeSection?.("observability", nextTab)}
           />
         )}
-        {section === "quality" && (
-          <MetricsMonitoring assetDetail={assetDetail} />
+        {section === "incidents" && (
+          <Incidents assetDetail={assetDetail} />
         )}
       </Box>
     </Box>

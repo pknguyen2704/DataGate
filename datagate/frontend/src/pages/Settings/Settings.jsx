@@ -9,7 +9,7 @@ import {
   ArrowBack as BackIcon
 } from '@mui/icons-material';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import ServiceList from './Services/ServiceList';
+import ServiceList from './Connection/Connection';
 import UserList from './Users/UserList';
 import PasswordChange from './Security/PasswordChange';
 
@@ -74,11 +74,11 @@ const SettingsDashboard = () => {
   
   const categories = [
     { 
-      title: 'Services', 
+      title: 'Connect Management', 
       description: 'Set up connectors and ingest metadata from diverse sources including databases, warehouses, and data lakes.', 
       icon: <StorageIcon />, 
       color: 'secondary', 
-      path: '/settings/services' 
+      path: '/settings/connection' 
     },
     { 
       title: 'Users', 
@@ -145,7 +145,7 @@ const Settings = () => {
 
       <Routes>
         <Route index element={<SettingsDashboard />} />
-        <Route path="services" element={<ServiceList />} />
+        <Route path="connection/*" element={<ServiceList />} />
         <Route path="users" element={<UserList />} />
         <Route path="account" element={<PasswordChange />} />
         <Route path="security" element={<PasswordChange />} /> 

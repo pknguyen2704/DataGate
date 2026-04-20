@@ -4,17 +4,17 @@ import { getErrorMessage } from "~/utils/errorUtils";
 
 export const fetchAssetOverview = createAsyncThunk(
   "overview/fetchAssetOverview",
-  async ({ tableName, schemaName, serviceId }, { rejectWithValue }) => {
+  async ({ tableName, schemaName, connectionId }, { rejectWithValue }) => {
     try {
       const response = await exploreApi.getAssetOverview({
         table: tableName,
         schema: schemaName || null,
-        service_id: serviceId,
+        connection_id: connectionId,
       });
-      return { key: `${serviceId}:${schemaName || 'public'}:${tableName}`, data: response.data };
+      return { key: `${connectionId}:${schemaName || 'public'}:${tableName}`, data: response.data };
     } catch (error) {
       return rejectWithValue({
-        key: `${serviceId}:${schemaName || 'public'}:${tableName}`,
+        key: `${connectionId}:${schemaName || 'public'}:${tableName}`,
         message: getErrorMessage(error, "Could not load asset overview."),
       });
     }
@@ -23,18 +23,18 @@ export const fetchAssetOverview = createAsyncThunk(
 
 export const fetchAssetSample = createAsyncThunk(
   "overview/fetchAssetSample",
-  async ({ tableName, schemaName, serviceId, sampleLimit = 50 }, { rejectWithValue }) => {
+  async ({ tableName, schemaName, connectionId, sampleLimit = 50 }, { rejectWithValue }) => {
     try {
       const response = await exploreApi.getAssetSample({
         table: tableName,
         schema: schemaName || null,
-        service_id: serviceId,
+        connection_id: connectionId,
         sample_limit: sampleLimit,
       });
-      const key = `${serviceId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
+      const key = `${connectionId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
       return { key, data: response.data };
     } catch (error) {
-      const key = `${serviceId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
+      const key = `${connectionId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
       return rejectWithValue({
         key,
         message: getErrorMessage(error, "Could not load asset sample."),
@@ -63,8 +63,8 @@ const overviewSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchAssetOverview.pending, (state, action) => {
-        const { tableName, serviceId, schemaName } = action.meta.arg;
-        const key = `${serviceId}:${schemaName || 'public'}:${tableName}`;
+        const { tableName, connectionId, schemaName } = action.meta.arg;
+        const key = `${connectionId}:${schemaName || 'public'}:${tableName}`;
         state.assetOverviewStatusByKey[key] = "loading";
       })
       .addCase(fetchAssetOverview.fulfilled, (state, action) => {
@@ -80,8 +80,8 @@ const overviewSlice = createSlice({
         }
       })
       .addCase(fetchAssetSample.pending, (state, action) => {
-        const { tableName, serviceId, schemaName, sampleLimit = 50 } = action.meta.arg;
-        const key = `${serviceId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
+        const { tableName, connectionId, schemaName, sampleLimit = 50 } = action.meta.arg;
+        const key = `${connectionId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
         state.assetSampleStatusByKey[key] = "loading";
       })
       .addCase(fetchAssetSample.fulfilled, (state, action) => {

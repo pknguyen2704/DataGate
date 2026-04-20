@@ -1,4 +1,13 @@
-from .token_schema import Token, TokenPayload
-from .user_schema import UserBase, UserCreate, UserUpdate, UserOut
-from .service_schema import ServiceOut, ServiceBase, ServiceCreate, ServiceUpdate, ConnectionTestResult
-from .observability_schema import DGObservabilityConfig, DGObservabilityConfigCreate, DGObservabilityConfigUpdate, DGObservabilityRunHistory, DGObservabilitySnapshot, DGObservabilityVolumeTS, DGObservabilityTriggerOnDemand, DGObservabilitySchema, DGObservabilityIncident, DGObservabilityIncidentCreate
+from .token import Token, TokenPayload
+from .user import UserBase, UserCreate, UserUpdate, UserOut
+from .connection import ConnectionOut, ConnectionBase, ConnectionCreate, ConnectionUpdate, ConnectionTestResult, ConnectionExplore
+from .observability import (
+    ObservabilityConfig, 
+    ObservabilityConfigCreate, 
+    ObservabilitySnapshot, 
+    ObservabilityVolumeTS, 
+    ObservabilityTriggerOnDemand, 
+    ObservabilitySchema, 
+    ObservabilityIncident, 
+    ObservabilityIncidentCreate
+)
