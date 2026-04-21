@@ -8,15 +8,13 @@ engine = create_engine(DATABASE_URL)
 
 # Session factory
 SessionLocal = sessionmaker(
-    autocommit=False,
     autoflush=False,
     bind=engine,
 )
 
 def get_db():
     """
-    FastAPI dependency
-    → cấp DB session cho mỗi request
+    Fast API dependence
     """
     db = SessionLocal()
     try:
