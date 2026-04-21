@@ -23,26 +23,20 @@ import {
   ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
-  StorageOutlined as ServiceIcon,
+  StorageOutlined as ConnectionIcon,
   SchemaOutlined as SchemaIcon,
   TableChartOutlined as TableIcon,
   LightbulbOutlined as DataAssetsIcon,
-  LanOutlined as PipelinesIcon,
-  ApiOutlined as ApisIcon,
-  GavelOutlined as GovernanceIcon,
-  PublicOutlined as DomainsIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { datagateColors, pageShellSx, panelSx } from "~/theme";
+import { pageShellSx, panelSx } from "~/theme";
 import {
   fetchExploreData,
-  fetchServiceSchemas,
-  fetchServiceTables,
 } from "~/stores/slices/exploreSlice/index";
-import TableView from "./Table/Table";
+import TableDetail from "./Tables/TableDetail/TableDetail";
 
-const normalizeTable = (table, service = null) => {
+const normalizeTable = (table, connection = null) => {
   if (typeof table === "string") {
     const [schemaName, ...rest] = table.split(".");
     const assetName = rest.join(".") || table;
@@ -50,172 +44,132 @@ const normalizeTable = (table, service = null) => {
       full_name: table,
       table_name: assetName,
       schema_name: rest.length ? schemaName : "",
-      serviceName: service?.name,
-      serviceOwner: service?.owner,
-      serviceId: service?.id,
+      connectionName: connection?.name,
+      connectionOwner: connection?.owner,
+      connectionId: connection?.id,
     };
   }
 
-  const svc = table.service || service;
+  const conn = table.connection || connection;
   return {
     full_name: table.full_name || table.table_name || "",
     table_name: table.table_name || "",
     schema_name: table.schema_name || "",
-    serviceName: svc?.name,
-    serviceOwner: svc?.owner,
-    serviceId: svc?.id,
+    connectionName: conn?.name,
+    connectionOwner: conn?.owner,
+    connectionId: conn?.id,
   };
 };
 
-const getOwnerLabel = (owner) => owner?.full_name || owner?.username || owner?.email || "Unknown owner";
+const getOwnerLabel = (owner) => owner?.full_name || owner?.username || owner?.email || "System";
 
 const Explore = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  
   let tableParam = searchParams.get("table");
   let schemaParam = searchParams.get("schema");
-  const serviceParam = searchParams.get("service");
+  const connectionParam = searchParams.get("connection") || searchParams.get("service");
   const sectionParam = searchParams.get("section") || "overview";
   const observabilityTabParam = searchParams.get("obsTab") || "metadata";
 
-  // Backward compatibility: If old URL had ?table=schema.table
-  if (!schemaParam && tableParam && tableParam.includes(".")) {
+  if (tableParam && tableParam.includes(".")) {
     const parts = tableParam.split(".");
-    schemaParam = parts[0];
+    if (!schemaParam) schemaParam = parts[0];
     tableParam = parts.slice(1).join(".");
   }
-  const services = useSelector((state) => state.explore.discovery.services);
-  const servicesStatus = useSelector((state) => state.explore.discovery.servicesStatus);
-  const servicesError = useSelector((state) => state.explore.discovery.servicesError);
-  const exploreDataLoaded = useSelector((state) => state.explore.discovery.exploreDataLoaded);
-  const schemasMap = useSelector((state) => state.explore.discovery.schemasByService);
-  const tablesMap = useSelector((state) => state.explore.discovery.tablesByService);
-  const loadingTablesByService = useSelector((state) => state.explore.discovery.tablesStatusByService);
 
-  const [selectedServiceId, setSelectedServiceId] = useState(null);
-  const [selectedSchemaByService, setSelectedSchemaByService] = useState({});
+  const connections = useSelector((state) => state.explore.discovery.connections) || [];
+  const connectionsStatus = useSelector((state) => state.explore.discovery.connectionsStatus);
+  const connectionsError = useSelector((state) => state.explore.discovery.connectionsError);
+  const exploreDataLoaded = useSelector((state) => state.explore.discovery.exploreDataLoaded);
+  const schemasMap = useSelector((state) => state.explore.discovery.schemasByConnection) || {};
+  const tablesMap = useSelector((state) => state.explore.discovery.tablesByConnection) || {};
+
+  const [selectedConnectionId, setSelectedConnectionId] = useState(null);
+  const [selectedSchemaByConnection, setSelectedSchemaByConnection] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [isDatabasesExpanded, setIsDatabasesExpanded] = useState(true);
-  const [expandedServiceTypes, setExpandedServiceTypes] = useState({});
-  const [expandedServices, setExpandedServices] = useState({});
+  const [expandedConnections, setExpandedConnections] = useState({});
 
   useEffect(() => {
-    if (!exploreDataLoaded && servicesStatus !== "loading") {
+    if (!exploreDataLoaded && connectionsStatus !== "loading") {
       dispatch(fetchExploreData());
     }
-  }, [dispatch, exploreDataLoaded, servicesStatus]);
+  }, [dispatch, exploreDataLoaded, connectionsStatus]);
 
-  const loading = servicesStatus === "loading";
-  const error =
-    servicesStatus === "failed"
-      ? servicesError || "Could not load data platform services. Please check connection."
+  const loading = connectionsStatus === "loading" && !exploreDataLoaded;
+  const error = connectionsStatus === "failed" ? connectionsError : null;
+
+  const resolvedSelectedConnectionId =
+    selectedConnectionId && connections.some((c) => c.id === selectedConnectionId)
+      ? selectedConnectionId
       : null;
-  const resolvedSelectedServiceId =
-    selectedServiceId && services.some((service) => service.id === selectedServiceId)
-      ? selectedServiceId
-      : null;
-  const selectedService =
-    services.find((service) => service.id === resolvedSelectedServiceId) || null;
-  const selectedSchema = resolvedSelectedServiceId
-    ? selectedSchemaByService[resolvedSelectedServiceId] || "all"
+
+  const selectedConnection =
+    connections.find((c) => c.id === resolvedSelectedConnectionId) || null;
+
+  const selectedSchema = resolvedSelectedConnectionId
+    ? selectedSchemaByConnection[resolvedSelectedConnectionId] || "all"
     : "all";
 
   const allNormalizedTables = useMemo(() => {
-    if (!resolvedSelectedServiceId) {
-      return Object.entries(tablesMap).flatMap(([svcId, tables]) => {
-        const svc = services.find(s => String(s.id) === svcId);
-        return (tables || []).map(t => normalizeTable(t, svc));
+    if (!resolvedSelectedConnectionId) {
+      return Object.entries(tablesMap).flatMap(([connId, tables]) => {
+        const conn = connections.find(c => String(c.id) === connId);
+        return (tables || []).map(t => normalizeTable(t, conn));
       });
     }
-    const svc = services.find(s => s.id === resolvedSelectedServiceId);
-    return (tablesMap[resolvedSelectedServiceId] || []).map(t => normalizeTable(t, svc));
-  }, [resolvedSelectedServiceId, tablesMap, services]);
+    const conn = connections.find(c => c.id === resolvedSelectedConnectionId);
+    return (tablesMap[resolvedSelectedConnectionId] || []).map(t => normalizeTable(t, conn));
+  }, [resolvedSelectedConnectionId, tablesMap, connections]);
 
-  const selectedServiceTables = allNormalizedTables;
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const visibleTables = allNormalizedTables.filter((table) => {
+    const matchesSchema = selectedSchema === "all" || table.schema_name === selectedSchema;
+    if (!matchesSchema) return false;
+    if (!searchQuery.trim()) return true;
+
+    const normQuery = searchQuery.trim().toLowerCase();
+    const haystack = [table.table_name, table.schema_name, table.full_name].filter(Boolean).join(" ").toLowerCase();
+    return haystack.includes(normQuery);
+  });
 
   const updateExploreQuery = useCallback(
-    ({ serviceId = serviceParam, schemaName = schemaParam, tableName = tableParam, section = sectionParam, obsTab = observabilityTabParam } = {}) => {
+    ({ connectionId = connectionParam, schemaName = schemaParam, tableName = tableParam, section = sectionParam, obsTab = observabilityTabParam } = {}) => {
       const params = new URLSearchParams();
-      if (serviceId) params.set("service", serviceId);
+      if (connectionId) params.set("connection", connectionId);
       if (schemaName) params.set("schema", schemaName);
-      if (tableName) params.set("table", tableName);
+      if (tableName) {
+        // Ensure we only store the table name part if it's qualified
+        const cleanTable = tableName.includes('.') ? tableName.split('.').pop() : tableName;
+        params.set("table", cleanTable);
+      }
       if (section && section !== "overview") params.set("section", section);
       if (obsTab && obsTab !== "metadata") params.set("obsTab", obsTab);
       navigate(`/explore${params.toString() ? `?${params.toString()}` : ""}`);
     },
-    [navigate, observabilityTabParam, sectionParam, serviceParam, schemaParam, tableParam]
+    [navigate, observabilityTabParam, sectionParam, connectionParam, schemaParam, tableParam]
   );
 
-  const handleBackToExplore = () => {
-    navigate("/explore");
-  };
-
-  const groupedServices = services.reduce((accumulator, service) => {
-    const key = (service.service_type || "Other").toLowerCase();
-    if (!accumulator[key]) {
-      accumulator[key] = {
-        label: service.service_type || "Other",
-        services: [],
-      };
-    }
-    accumulator[key].services.push(service);
-    return accumulator;
-  }, {});
-
-  const visibleTables = selectedServiceTables.filter((table) => {
-    const matchesSchema = selectedSchema === "all" || table.schema_name === selectedSchema;
-    if (!matchesSchema) return false;
-    if (!normalizedSearchQuery) return true;
-
-    const haystack = [table.table_name, table.schema_name, table.full_name]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(normalizedSearchQuery);
-  });
-
-  // Asset Detail logic removed, moved to TableView component
-  
-  const assetCards = visibleTables.map((table, index) => ({
-    ...table,
-    summary: `${table.serviceName || selectedService?.name || "data_asset"} / ${table.schema_name || "default"} / ${table.table_name}`,
-    description: table.full_name || table.table_name,
-    ownerLabel: getOwnerLabel(table.serviceOwner || selectedService?.owner),
-    accent: index === 0 ? "#F7FAFF" : "#FFFFFF",
-    border: index === 0 ? "#7BA7FF" : "#EEF2F7",
-  }));
-
-  const openAssetDetail = (serviceId, schemaName, tableName) => {
-    updateExploreQuery({ serviceId, schemaName, tableName, section: "overview", obsTab: "metadata" });
+  const openAssetDetail = (connectionId, schemaName, tableName) => {
+    updateExploreQuery({ connectionId, schemaName, tableName, section: "overview", obsTab: "metadata" });
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-        <CircularProgress size={32} />
-      </Box>
-    );
+    return <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}><CircularProgress size={32} /></Box>;
   }
 
-  if (tableParam && serviceParam) {
+  if (tableParam && connectionParam) {
     return (
-      <TableView
+      <TableDetail
         tableName={tableParam}
         schemaName={schemaParam}
-        serviceId={Number(serviceParam)}
-        onBack={handleBackToExplore}
+        connectionId={Number(connectionParam)}
+        onBack={() => navigate("/explore")}
         onChangeSection={(nextSection, nextObsTab = observabilityTabParam) =>
-          updateExploreQuery({
-            serviceId: serviceParam,
-            schemaName: schemaParam,
-            tableName: tableParam,
-            section: nextSection,
-            obsTab: nextObsTab,
-          })
+          updateExploreQuery({ connectionId: connectionParam, schemaName: schemaParam, tableName: tableParam, section: nextSection, obsTab: nextObsTab })
         }
         observabilityTab={observabilityTabParam}
         section={sectionParam}
@@ -226,265 +180,112 @@ const Explore = () => {
   return (
     <Box sx={pageShellSx}>
       <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5} alignItems="stretch">
-        <Paper
-          sx={{
-            width: { xs: "100%", lg: 300 },
-            minWidth: { lg: 300 },
-            p: 1.75,
-            ...panelSx,
-            borderRadius: 1,
-          }}
-        >
-          <Stack spacing={1.5} sx={{ height: "100%" }}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1}
-              sx={{ px: 0.5, cursor: "pointer", "&:hover": { opacity: 0.7 } }}
-              onClick={() => {
-                setSelectedServiceId(null);
-                setSearchQuery("");
-              }}
-            >
-              <DataAssetsIcon sx={{ fontSize: 20, color: "#4B91F7" }} />
-              <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A" }}>
-                Services
-              </Typography>
+        {/* Left Sidebar */}
+        <Paper sx={{ width: { xs: "100%", lg: 300 }, minWidth: { lg: 300 }, p: 2, ...panelSx, borderRadius: 3 }}>
+          <Stack spacing={2} sx={{ height: "100%" }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ cursor: "pointer" }} onClick={() => { setSelectedConnectionId(null); setSearchQuery(""); }}>
+              <DataAssetsIcon sx={{ fontSize: 20, color: "primary.main" }} />
+              <Typography sx={{ fontSize: 16, fontWeight: 900 }}>Data Infrastructure</Typography>
             </Stack>
 
             <TextField
               size="small"
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search assets..."
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tables..."
               InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" sx={{ color: "text.disabled" }} />
-                  </InputAdornment>
-                ),
-                sx: {
-                  fontSize: 13,
-                  bgcolor: "#f8f9fa",
-                  "& fieldset": { border: "none" },
-                  borderRadius: 1,
-                },
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                sx: { borderRadius: 2, bgcolor: '#f8fafc' }
               }}
             />
-            <Box sx={{ overflow: "auto", pr: 0.5, flexGrow: 1 }}>
+
+            <Box sx={{ overflow: "auto", flexGrow: 1 }}>
               <List disablePadding>
-                {/* Services Header */}
-                <ListItemButton
-                  onClick={() => setIsDatabasesExpanded((prev) => !prev)}
-                  sx={{ px: 0.5, py: 0.75, borderRadius: 1, mb: 0.25, minHeight: 32 }}
-                >
-                  {isDatabasesExpanded ? (
-                    <ExpandMoreIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                  ) : (
-                    <ChevronRightIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                  )}
-                  <ServiceIcon sx={{ ml: 0.5, mr: 1, color: "text.secondary", fontSize: 18 }} />
-                  <ListItemText
-                    primary="Services"
-                    slotProps={{ primary: { fontWeight: 600, fontSize: 14, color: "text.primary" } }}
-                  />
+                <ListItemButton onClick={() => setIsDatabasesExpanded(!isDatabasesExpanded)} sx={{ borderRadius: 2 }}>
+                  {isDatabasesExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                  <ConnectionIcon sx={{ ml: 1, mr: 1 }} />
+                  <ListItemText primary="Connections" slotProps={{ primary: { fontWeight: 800, fontSize: 14 } }} />
                 </ListItemButton>
 
-                {isDatabasesExpanded &&
-                  Object.entries(groupedServices).map(([serviceTypeKey, group]) => {
-                    return group.services.map((service) => {
-                      const isServiceSelected = service.id === resolvedSelectedServiceId;
-                      const isServiceExpanded = expandedServices[service.id] ?? isServiceSelected;
-                      const serviceSchemas = schemasMap[service.id] || [];
+                {isDatabasesExpanded && connections.map((conn) => {
+                  const isExpanded = expandedConnections[conn.id] ?? (conn.id === resolvedSelectedConnectionId);
+                  const schemas = schemasMap[conn.id] || [];
+                  
+                  return (
+                    <Box key={conn.id} sx={{ ml: 2 }}>
+                      <ListItemButton onClick={() => setExpandedConnections({ ...expandedConnections, [conn.id]: !isExpanded })} sx={{ borderRadius: 2 }}>
+                        {schemas.length > 0 ? (isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />) : <Box sx={{ width: 20 }} />}
+                        <ConnectionIcon sx={{ fontSize: 16, mx: 1 }} />
+                        <ListItemText primary={conn.name} slotProps={{ primary: { fontWeight: 600, fontSize: 13 } }} />
+                      </ListItemButton>
 
-                      return (
-                        <Box key={service.id} sx={{ ml: 2 }}>
-                          <ListItemButton
-                            onClick={() => {
-                              setExpandedServices((prev) => ({
-                                ...prev,
-                                [service.id]: !isServiceExpanded,
-                              }));
-                            }}
-                            sx={{
-                              borderRadius: 1,
-                              py: 0.5,
-                              mb: 0.25,
-                              minHeight: 32,
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                              {serviceSchemas.length > 0 ? (
-                                isServiceExpanded ? (
-                                  <ExpandMoreIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.5 }} />
-                                ) : (
-                                  <ChevronRightIcon sx={{ fontSize: 16, color: "text.secondary", mr: 0.5 }} />
-                                )
-                              ) : (
-                                <Box sx={{ width: 21 }} />
-                              )}
-                              
-                              <ServiceIcon sx={{ fontSize: 16, color: "text.secondary", mr: 1 }} />
-
-                              <ListItemText
-                                primary={service.name}
-                                slotProps={{
-                                  primary: { fontWeight: 500, fontSize: 13.5 },
-                                }}
-                              />
-                            </Box>
-                          </ListItemButton>
-
-                          {isServiceExpanded && (
-                            <Box sx={{ ml: 2, borderLeft: "1px solid #eee" }}>
-                              {serviceSchemas.map((schema) => {
-                                const isSchemaSelected = isServiceSelected && selectedSchema === schema;
-                                
-                                return (
-                                  <ListItemButton
-                                    key={schema}
-                                    selected={isSchemaSelected}
-                                    onClick={() => {
-                                      setSelectedServiceId(service.id);
-                                      setSelectedSchemaByService((prev) => ({
-                                        ...prev,
-                                        [service.id]: schema,
-                                      }));
-                                    }}
-                                    sx={{
-                                      ml: 1,
-                                      borderRadius: 1,
-                                      py: 0.25,
-                                      minHeight: 28,
-                                      bgcolor: isSchemaSelected ? "rgba(75, 145, 247, 0.08)" : "transparent",
-                                      "&.Mui-selected": {
-                                        bgcolor: "rgba(75, 145, 247, 0.12)",
-                                        "&:hover": { bgcolor: "rgba(75, 145, 247, 0.16)" },
-                                      },
-                                    }}
-                                  >
-                                    <SchemaIcon sx={{ mr: 1, color: "text.secondary", fontSize: 14 }} />
-                                    <ListItemText
-                                      primary={schema}
-                                      slotProps={{
-                                        primary: { fontSize: 12.5, fontWeight: isSchemaSelected ? 600 : 400 },
-                                      }}
-                                    />
-                                  </ListItemButton>
-                                );
-                              })}
-                            </Box>
-                          )}
-                        </Box>
-                      );
-                    });
-                  })}
-
+                      {isExpanded && schemas.map((schema) => (
+                        <ListItemButton 
+                          key={schema} 
+                          selected={selectedConnectionId === conn.id && selectedSchema === schema}
+                          onClick={() => {
+                            setSelectedConnectionId(conn.id);
+                            setSelectedSchemaByConnection({ ...selectedSchemaByConnection, [conn.id]: schema });
+                          }}
+                          sx={{ ml: 3, borderRadius: 2, my: 0.25 }}
+                        >
+                          <SchemaIcon sx={{ fontSize: 14, mr: 1, color: 'text.secondary' }} />
+                          <ListItemText primary={schema} slotProps={{ primary: { fontSize: 12, fontWeight: (selectedSchema === schema) ? 800 : 400 } }} />
+                        </ListItemButton>
+                      ))}
+                    </Box>
+                  );
+                })}
               </List>
             </Box>
           </Stack>
         </Paper>
 
+        {/* Right Content */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {error ? <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert> : null}
+          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-          <Paper
-            sx={{
-              p: 2,
-              ...panelSx,
-            }}
-          >
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+          <Paper sx={{ p: 3, ...panelSx, borderRadius: 3 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
               <Box>
-                <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
-                  {selectedService?.name || "Tables"}
-                </Typography>
-                <Typography sx={{ fontSize: 12.5 }} color="text.secondary">
-                  {selectedSchema === "all"
-                    ? `${visibleTables.length} tables available`
-                    : `${visibleTables.length} tables in schema ${selectedSchema}`}
+                <Typography variant="h5" fontWeight="900">{selectedConnection?.name || "All Data Assets"}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedSchema === "all" ? `${visibleTables.length} tables integrated` : `Viewing ${visibleTables.length} tables in ${selectedSchema}`}
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={1}>
-                <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={() => dispatch(fetchExploreData())} sx={{ textTransform: "none", fontSize: 12, borderColor: "#E6EBF2" }}>
-                  Refresh
-                </Button>
-              </Stack>
+              <Button size="small" startIcon={<RefreshIcon />} onClick={() => dispatch(fetchExploreData())} variant="outlined" sx={{ borderRadius: 2 }}>Refresh</Button>
             </Stack>
+            <Divider sx={{ mb: 3 }} />
 
-            <Divider sx={{ mb: 2 }} />
-
-            {loadingTablesByService[resolvedSelectedServiceId] === "loading" ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-                <CircularProgress size={28} />
-              </Box>
-            ) : assetCards.length === 0 ? (
-              <Box sx={{ py: 10, textAlign: "center" }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                  Không có asset phù hợp
-                </Typography>
-                <Typography color="text.secondary">
-                  Thử chọn service khác hoặc đổi từ khóa tìm kiếm.
-                </Typography>
-              </Box>
-            ) : (
-              <Stack spacing={2.5}>
-                {assetCards.map((table) => (
-                  <Paper
-                    key={`${table.serviceId}_${table.schema_name}_${table.table_name}`}
-                    onClick={() => openAssetDetail(table.serviceId || resolvedSelectedServiceId, table.schema_name, table.table_name)}
-                    sx={{
-                      p: 2,
-                      borderRadius: 1,
-                      border: `1px solid ${table.border}`,
-                      borderLeft: `3px solid ${table.border}`,
-                      bgcolor: table.accent,
-                      cursor: "pointer",
-                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                      "&:hover": {
-                        transform: "translateY(-2px)",
-                        boxShadow: "0 8px 18px rgba(15, 23, 42, 0.06)",
-                      },
-                    }}
-                  >
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ md: "flex-start" }}>
-                      <Avatar sx={{ bgcolor: "#EEF4FF", color: "primary.main", width: 38, height: 38 }}>
-                        <TableIcon sx={{ fontSize: 18 }} />
-                      </Avatar>
-
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography
-                          color="text.secondary"
-                          sx={{ mb: 0.5, wordBreak: "break-word", fontSize: 12.5 }}
-                        >
-                          {table.summary}
-                        </Typography>
-
-                        <Typography
-                          sx={{ color: "#2F6FED", fontWeight: 700, mb: 0.75, textTransform: "lowercase", fontSize: 24 }}
-                        >
-                          {table.table_name}
-                        </Typography>
-
-                        <Typography color="text.secondary" sx={{ mb: 1.5, fontSize: 13.5 }}>
-                          {table.description}
-                        </Typography>
-
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
-                          <Chip
-                            icon={<OwnerIcon />}
-                            label={table.ownerLabel}
-                            size="small"
-                            variant="outlined"
-                            sx={{ height: 24, fontSize: 11.5, borderColor: "#E6EBF2" }}
-                          />
-                        </Stack>
-                      </Box>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Stack>
-            )}
+            <Stack spacing={2}>
+              {visibleTables.map((table) => (
+                <Paper
+                  key={table.full_name}
+                  onClick={() => openAssetDetail(table.connectionId || resolvedSelectedConnectionId, table.schema_name, table.table_name)}
+                  sx={{
+                    p: 2.5, borderRadius: 3, border: '1px solid #f1f5f9', cursor: 'pointer',
+                    '&:hover': { bgcolor: '#f8fafc', transform: 'translateX(4px)', transition: 'all 0.2s' }
+                  }}
+                >
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Avatar sx={{ bgcolor: 'primary.50', color: 'primary.main' }}><TableIcon /></Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{table.connectionName} / {table.schema_name}</Typography>
+                      <Typography variant="h6" fontWeight="900" color="primary.dark">{table.table_name}</Typography>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <Chip icon={<OwnerIcon sx={{ fontSize: '14px !important' }} />} label={getOwnerLabel(table.connectionOwner)} size="small" variant="outlined" />
+                      </Stack>
+                    </Box>
+                    <ChevronRightIcon color="disabled" />
+                  </Stack>
+                </Paper>
+              ))}
+              {visibleTables.length === 0 && (
+                <Box sx={{ py: 10, textAlign: 'center' }}>
+                  <Typography color="text.secondary">No tables found. Adjust filters or contact Admin for access.</Typography>
+                </Box>
+              )}
+            </Stack>
           </Paper>
         </Box>
       </Stack>

@@ -14,6 +14,13 @@ RUN apt-get update \
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
+RUN curl -L https://downloads.apache.org/spark/spark-3.5.7/spark-3.5.7-bin-hadoop3.tgz \
+    | tar -xz -C /opt/ \
+    && ln -s /opt/spark-3.5.7-bin-hadoop3 /opt/spark
+
+ENV SPARK_HOME=/opt/spark
+ENV PATH="${SPARK_HOME}/bin:${PATH}"
+
 # Tải các JAR vào /opt/spark/jars (Đường dẫn chuẩn cho Airflow worker)
 RUN mkdir -p /opt/spark/jars && cd /opt/spark/jars && \
     curl -L -O https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.10.1/iceberg-spark-runtime-3.5_2.12-1.10.1.jar && \

@@ -3,13 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app import models, schemas
 from app.api import deps
-from app.api.v1.endpoints.services_router import (
-    _get_accessible_services_query,
-    _filter_schemas_by_integration,
-    _filter_tables_by_integration,
-    get_service_by_table_or_403,
+from app.api.v1.endpoints.connections_router import (
+    get_system_connection,
+    _filter_schemas_by_rbac,
+    _filter_tables_by_rbac,
+    check_table_access,
 )
-from app.schemas.service_schema import ServiceExplore
+from app.models.connection.connection import Connection
+from app.schemas.connection import ConnectionExplore
 from app.services.connection_manager_service import (
     get_schemas as db_get_schemas,
     get_tables as db_get_tables,
@@ -19,34 +20,45 @@ from app.services.connection_manager_service import (
 
 router = APIRouter()
 
-
 # --- 1. DISCOVERY ---
 
-@router.get("", response_model=List[ServiceExplore])
+@router.get("", response_model=List[ConnectionExplore])
 def get_explore_data(
     db: Session = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
 ):
-    """Lấy toàn bộ thông tin metadata (services, schemas, tables) phục vụ trang Explore."""
-    services = _get_accessible_services_query(db, current_user).all()
-    result = []
-    for service in services:
-        discovered_schemas = db_get_schemas(service.connection_url)
-        filtered_schemas = _filter_schemas_by_integration(discovered_schemas, service.integrated_tables)
+    """Lấy dữ liệu hạ tầng dựa trên quyền truy cập bảng của User."""
+    # Kiểm tra xem hệ thống đã có kết nối nào chưa
+    conn = db.query(Connection).first()
+    if not conn:
+        return []
+    
+    # 1. Lấy schema gốc từ DB
+    try:
+        discovered_schemas = db_get_schemas(conn.connection_url)
+    except Exception:
+        discovered_schemas = []
+    
+    # 2. Lọc schema dựa trên các bảng user được phép (nếu không phải superuser)
+    system_integrated = set(conn.integrated_tables or [])
+    filtered_schemas = _filter_schemas_by_rbac(current_user, discovered_schemas, list(system_integrated))
 
-        all_tables = []
-        for schema in filtered_schemas:
-            tables = db_get_tables(service.connection_url, schema)
-            filtered_tables = _filter_tables_by_integration(tables, service.integrated_tables, schema)
-            all_tables.extend(filtered_tables)
+    all_tables = []
+    for schema in filtered_schemas:
+        try:
+            tables = db_get_tables(conn.connection_url, schema)
+            # Chỉ lấy những bảng đã được hệ thống integrate VÀ user có quyền
+            integrated_in_schema = [t for t in tables if f"{schema}.{t}" in system_integrated or t in system_integrated]
+            user_permitted_tables = _filter_tables_by_rbac(current_user, integrated_in_schema, schema)
+            all_tables.extend([f"{schema}.{t}" for t in user_permitted_tables])
+        except Exception:
+            continue
 
-        result.append({
-            "service": service,
-            "schemas": filtered_schemas,
-            "tables": all_tables,
-        })
-    return result
-
+    return [{
+        "connection": conn,
+        "schemas": filtered_schemas,
+        "tables": all_tables,
+    }]
 
 # --- 2. ASSET OVERVIEW ---
 
@@ -54,26 +66,26 @@ def get_explore_data(
 def get_asset_overview(
     table: str = Query(...),
     schema: Optional[str] = Query(default=None),
-    service_id: Optional[int] = Query(default=None),
     db: Session = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
 ):
-    """Lấy thông tin tổng quan về bảng (Metadata)."""
+    """Lấy thông tin tổng quan về bảng (Metadata). Kiểm tra RBAC tới bảng."""
     full_table_name = f"{schema}.{table}" if schema else table
-    service = get_service_by_table_or_403(db, current_user, full_table_name, service_id)
+    check_table_access(current_user, full_table_name)
+    
+    conn = get_system_connection(db)
+    metadata = db_get_table_metadata(conn.connection_url, full_table_name)
 
-    metadata = db_get_table_metadata(service.connection_url, full_table_name)
-
-    snap = db.query(models.DGObservabilitySnapshot)\
-             .filter(models.DGObservabilitySnapshot.table_name == full_table_name)\
-             .order_by(models.DGObservabilitySnapshot.snapshot_time.desc())\
+    snap = db.query(models.ObservabilitySnapshot)\
+             .filter(
+                 models.ObservabilitySnapshot.table_name == table,
+                 models.ObservabilitySnapshot.schema_name == (schema or "public")
+             )\
+             .order_by(models.ObservabilitySnapshot.snapshot_time.desc())\
              .first()
 
     return {
-        "service_id": service.id,
-        "service_name": service.name,
-        "service_type": service.service_type,
-        "owner": service.owner,
+        "connection_name": conn.name,
         "table_name": full_table_name,
         "schema_name": schema or "",
         "asset_name": table,
@@ -84,23 +96,22 @@ def get_asset_overview(
         "columns": metadata.get("columns", []),
     }
 
-
 # --- 3. ASSET SAMPLE ---
 
 @router.get("/sample")
 def get_asset_sample(
     table: str = Query(...),
     schema: Optional[str] = Query(default=None),
-    service_id: Optional[int] = Query(default=None),
     sample_limit: int = Query(default=50, ge=1, le=500),
     db: Session = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_active_user),
 ):
-    """Lấy dữ liệu mẫu (Sample data)."""
+    """Lấy dữ liệu mẫu. Kiểm tra RBAC tới bảng."""
     full_table_name = f"{schema}.{table}" if schema else table
-    service = get_service_by_table_or_403(db, current_user, full_table_name, service_id)
-
-    sample_data = db_get_sample_data(service.connection_url, full_table_name, sample_limit)
+    check_table_access(current_user, full_table_name)
+    
+    conn = get_system_connection(db)
+    sample_data = db_get_sample_data(conn.connection_url, full_table_name, sample_limit)
 
     return {
         "table_name": full_table_name,
@@ -108,7 +119,3 @@ def get_asset_sample(
         "table": table,
         "sample_data": sample_data,
     }
-
-
-# --- 4. COLUMN STATS ---
-

@@ -1,16 +1,16 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { exploreApi } from "~/apis/explore";
-import { servicesApi } from "~/apis/services";
+import { connectionsApi } from "~/apis/connections";
 import { getErrorMessage } from "~/utils/errorUtils";
 
-export const fetchServices = createAsyncThunk(
-  "discovery/fetchServices",
+export const fetchConnections = createAsyncThunk(
+  "discovery/fetchConnections",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await servicesApi.getServices();
+      const response = await connectionsApi.getConnections();
       return response.data || [];
     } catch (error) {
-      return rejectWithValue(getErrorMessage(error, "Could not load services."));
+      return rejectWithValue(getErrorMessage(error, "Could not load connections."));
     }
   }
 );
@@ -27,44 +27,13 @@ export const fetchExploreData = createAsyncThunk(
   }
 );
 
-export const fetchServiceSchemas = createAsyncThunk(
-  "discovery/fetchServiceSchemas",
-  async (serviceId, { rejectWithValue }) => {
-    try {
-      const response = await servicesApi.getServiceSchemas(serviceId);
-      return { serviceId, schemas: response.data || [] };
-    } catch (error) {
-      return rejectWithValue({
-        serviceId,
-        message: getErrorMessage(error, "Could not load schemas."),
-      });
-    }
-  }
-);
-
-export const fetchServiceTables = createAsyncThunk(
-  "discovery/fetchServiceTables",
-  async (serviceId, { rejectWithValue }) => {
-    try {
-      const response = await servicesApi.getServiceTables(serviceId);
-      return { serviceId, tables: response.data || [] };
-    } catch (error) {
-      return rejectWithValue({
-        serviceId,
-        message: getErrorMessage(error, "Could not load tables."),
-      });
-    }
-  }
-);
-
 const initialState = {
-  services: [],
-  servicesStatus: "idle",
-  servicesError: null,
+  connections: [],
+  connectionsStatus: "idle",
+  connectionsError: null,
   exploreDataLoaded: false,
-  schemasByService: {},
-  tablesByService: {},
-  tablesStatusByService: {},
+  schemasByConnection: {},
+  tablesByConnection: {},
 };
 
 const discoverySlice = createSlice({
@@ -72,63 +41,41 @@ const discoverySlice = createSlice({
   initialState,
   reducers: {
     clearDiscoveryCache: (state) => {
-      state.services = [];
+      state.connections = [];
       state.exploreDataLoaded = false;
-      state.schemasByService = {};
-      state.tablesByService = {};
+      state.schemasByConnection = {};
+      state.tablesByConnection = {};
     }
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchServices.pending, (state) => {
-        state.servicesStatus = "loading";
-        state.servicesError = null;
+      .addCase(fetchConnections.pending, (state) => {
+        state.connectionsStatus = "loading";
       })
-      .addCase(fetchServices.fulfilled, (state, action) => {
-        state.servicesStatus = "succeeded";
-        state.services = action.payload;
+      .addCase(fetchConnections.fulfilled, (state, action) => {
+        state.connectionsStatus = "succeeded";
+        state.connections = action.payload;
       })
-      .addCase(fetchServices.rejected, (state, action) => {
-        state.servicesStatus = "failed";
-        state.servicesError = action.payload;
+      .addCase(fetchConnections.rejected, (state, action) => {
+        state.connectionsStatus = "failed";
+        state.connectionsError = action.payload;
       })
       .addCase(fetchExploreData.pending, (state) => {
-        state.servicesStatus = "loading";
-        state.servicesError = null;
+        state.connectionsStatus = "loading";
       })
       .addCase(fetchExploreData.fulfilled, (state, action) => {
-        state.servicesStatus = "succeeded";
+        state.connectionsStatus = "succeeded";
         state.exploreDataLoaded = true;
         const exploreData = action.payload;
-        state.services = exploreData.map(d => d.service);
+        state.connections = exploreData.map(d => d.connection);
         exploreData.forEach(d => {
-          state.schemasByService[d.service.id] = d.schemas;
-          state.tablesByService[d.service.id] = d.tables;
-          state.tablesStatusByService[d.service.id] = "succeeded";
+          state.schemasByConnection[d.connection.id] = d.schemas;
+          state.tablesByConnection[d.connection.id] = d.tables;
         });
       })
       .addCase(fetchExploreData.rejected, (state, action) => {
-        state.servicesStatus = "failed";
-        state.servicesError = action.payload;
-      })
-      .addCase(fetchServiceSchemas.fulfilled, (state, action) => {
-        const { serviceId, schemas } = action.payload;
-        state.schemasByService[serviceId] = schemas;
-      })
-      .addCase(fetchServiceTables.pending, (state, action) => {
-        const serviceId = action.meta.arg;
-        state.tablesStatusByService[serviceId] = "loading";
-      })
-      .addCase(fetchServiceTables.fulfilled, (state, action) => {
-        const { serviceId, tables } = action.payload;
-        state.tablesStatusByService[serviceId] = "succeeded";
-        state.tablesByService[serviceId] = tables;
-      })
-      .addCase(fetchServiceTables.rejected, (state, action) => {
-        const { serviceId } = action.payload || {};
-        if (serviceId) {
-          state.tablesStatusByService[serviceId] = "failed";
-        }
+        state.connectionsStatus = "failed";
+        state.connectionsError = action.payload;
       });
   },
 });
