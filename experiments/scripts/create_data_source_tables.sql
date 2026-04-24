@@ -18,7 +18,8 @@ CREATE TABLE yellow_tripdata (
     total_amount DOUBLE PRECISION,
     congestion_surcharge DOUBLE PRECISION,
     Airport_fee DOUBLE PRECISION,
-    cbd_congestion_fee DOUBLE PRECISION
+    cbd_congestion_fee DOUBLE PRECISION,
+    date_hour TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS green_tripdata (
@@ -42,5 +43,17 @@ CREATE TABLE IF NOT EXISTS green_tripdata (
     payment_type DOUBLE PRECISION,
     trip_type DOUBLE PRECISION,
     congestion_surcharge DOUBLE PRECISION,
-    cbd_congestion_fee DOUBLE PRECISION
+    cbd_congestion_fee DOUBLE PRECISION,
+    date_hour TIMESTAMP
 );
+drop table public.yellow_tripdata
+
+select * from yellow_tripdata
+select count(distinct date_hour) from yellow_tripdata
+
+
+SELECT DISTINCT date_hour::date AS date
+FROM yellow_tripdata
+WHERE date_hour >= TIMESTAMP '2025-01-01'
+  AND date_hour <  TIMESTAMP '2025-02-01'
+ORDER BY date;

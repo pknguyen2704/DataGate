@@ -1,4 +1,4 @@
-FROM spark:3.5.7-scala2.12-java17-python3-ubuntu
+FROM spark:3.5.8-scala2.12-java17-python3-ubuntu
 USER root
 
 RUN cd /opt/spark/jars && \

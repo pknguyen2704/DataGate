@@ -4,5 +4,5 @@ apache-airflow-providers-trino
 apache-airflow-providers-postgres
 apache-airflow-providers-apache-spark
 psycopg2-binary
-pydeequ==1.5.0
+pydeequ
 prophet

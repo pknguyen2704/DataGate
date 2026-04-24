@@ -42,13 +42,12 @@ services:
     volumes:
       - ./conf:/opt/spark/conf
       - ./logs:/opt/spark/work
-      # - ${SPARK_JOBS_DIR}:/opt/spark/work-dir/jobs
     command: >
       /opt/spark/bin/spark-class
       org.apache.spark.deploy.worker.Worker
       spark://spark-master:7077
-      --cores 2
-      --memory 4G
+      --cores 5
+      --memory 10G
       --webui-port 8081
     networks:
       - datagate-net
@@ -75,13 +74,12 @@ services:
     volumes:
       - ./conf:/opt/spark/conf
       - ./logs:/opt/spark/work
-      # - ${SPARK_JOBS_DIR}:/opt/spark/work-dir/jobs
     command: >
       /opt/spark/bin/spark-class
       org.apache.spark.deploy.worker.Worker
       spark://spark-master:7077
-      --cores 2
-      --memory 4G
+      --cores 5
+      --memory 10G
       --webui-port 8081
     networks:
       - datagate-net

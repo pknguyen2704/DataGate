@@ -6,17 +6,20 @@ USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && mkdir -p /opt/java \
-    && curl -L https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.10%2B7/OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.10_7.tar.gz | tar -xz -C /opt/java \
+    && curl -fL https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.10%2B7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.10_7.tar.gz -o /tmp/jdk.tgz \
+    && tar -xzf /tmp/jdk.tgz -C /opt/java \
     && mv /opt/java/jdk-17.0.10+7 /opt/java/openjdk \
+    && rm /tmp/jdk.tgz \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-RUN curl -L https://downloads.apache.org/spark/spark-3.5.7/spark-3.5.7-bin-hadoop3.tgz \
-    | tar -xz -C /opt/ \
-    && ln -s /opt/spark-3.5.7-bin-hadoop3 /opt/spark
+RUN curl -fL https://downloads.apache.org/spark/spark-3.5.8/spark-3.5.8-bin-hadoop3.tgz -o /tmp/spark.tgz \
+    && tar -xzf /tmp/spark.tgz -C /opt/ \
+    && ln -s /opt/spark-3.5.8-bin-hadoop3 /opt/spark \
+    && rm /tmp/spark.tgz
 
 ENV SPARK_HOME=/opt/spark
 ENV PATH="${SPARK_HOME}/bin:${PATH}"
