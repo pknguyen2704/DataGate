@@ -1,0 +1,24 @@
+{
+    {column_name=vendorid, column_type=bigint, ordinal_position=1, is_nullable=YES
+    }','{column_name=tpep_pickup_datetime, column_type=timestamp(6), ordinal_position=2, is_nullable=YES
+    }','{column_name=tpep_dropoff_datetime, column_type=timestamp(6), ordinal_position=3, is_nullable=YES
+    }','{column_name=passenger_count, column_type=bigint, ordinal_position=4, is_nullable=YES
+    }','{column_name=trip_distance, column_type=double, ordinal_position=5, is_nullable=YES
+    }','{column_name=ratecodeid, column_type=bigint, ordinal_position=6, is_nullable=YES
+    }','{column_name=store_and_fwd_flag, column_type=varchar, ordinal_position=7, is_nullable=YES
+    }','{column_name=pulocationid, column_type=bigint, ordinal_position=8, is_nullable=YES
+    }','{column_name=dolocationid, column_type=bigint, ordinal_position=9, is_nullable=YES
+    }','{column_name=payment_type, column_type=bigint, ordinal_position=10, is_nullable=YES
+    }','{column_name=fare_amount, column_type=double, ordinal_position=11, is_nullable=YES
+    }','{column_name=extra, column_type=double, ordinal_position=12, is_nullable=YES
+    }','{column_name=mta_tax, column_type=double, ordinal_position=13, is_nullable=YES
+    }','{column_name=tip_amount, column_type=double, ordinal_position=14, is_nullable=YES
+    }','{column_name=tolls_amount, column_type=double, ordinal_position=15, is_nullable=YES
+    }','{column_name=improvement_surcharge, column_type=double, ordinal_position=16, is_nullable=YES
+    }','{column_name=total_amount, column_type=double, ordinal_position=17, is_nullable=YES
+    }','{column_name=congestion_surcharge, column_type=double, ordinal_position=18, is_nullable=YES
+    }','{column_name=airport_fee, column_type=double, ordinal_position=19, is_nullable=YES
+    }','{column_name=cbd_congestion_fee, column_type=double, ordinal_position=20, is_nullable=YES
+    }','{column_name=date_hour, column_type=timestamp(6), ordinal_position=21, is_nullable=YES
+    }
+}

@@ -1,59 +1,48 @@
 CREATE TABLE yellow_tripdata (
-    VendorID INTEGER,
+    vendor_id SMALLINT,
     tpep_pickup_datetime TIMESTAMP,
     tpep_dropoff_datetime TIMESTAMP,
-    passenger_count DOUBLE PRECISION,
-    trip_distance DOUBLE PRECISION,
-    RatecodeID DOUBLE PRECISION,
-    store_and_fwd_flag TEXT,
-    PULocationID INTEGER,
-    DOLocationID INTEGER,
-    payment_type INTEGER,
-    fare_amount DOUBLE PRECISION,
-    extra DOUBLE PRECISION,
-    mta_tax DOUBLE PRECISION,
-    tip_amount DOUBLE PRECISION,
-    tolls_amount DOUBLE PRECISION,
-    improvement_surcharge DOUBLE PRECISION,
-    total_amount DOUBLE PRECISION,
-    congestion_surcharge DOUBLE PRECISION,
-    Airport_fee DOUBLE PRECISION,
-    cbd_congestion_fee DOUBLE PRECISION,
-    date_hour TIMESTAMP
-);
+    passenger_count SMALLINT,
+    trip_distance REAL,
+    ratecode_id SMALLINT,
+    store_and_fwd_flag CHAR(1),
+    pulocationid INTEGER,
+    dolocationid INTEGER,
+    payment_type SMALLINT,
+    fare_amount NUMERIC(10,2),
+    extra NUMERIC(10,2),
+    mta_tax NUMERIC(10,2),
+    tip_amount NUMERIC(10,2),
+    tolls_amount NUMERIC(10,2),
+    improvement_surcharge NUMERIC(10,2),
+    total_amount NUMERIC(10,2),
+    congestion_surcharge NUMERIC(10,2),
+    airport_fee NUMERIC(10,2),
+    cbd_congestion_fee NUMERIC(10,2),
+    date_hour TIMESTAMP NOT NULL
+) PARTITION BY RANGE (date_hour);
 
-CREATE TABLE IF NOT EXISTS green_tripdata (
-    VendorID INTEGER,
+CREATE TABLE green_tripdata (
+    vendor_id SMALLINT,
     lpep_pickup_datetime TIMESTAMP,
     lpep_dropoff_datetime TIMESTAMP,
-    store_and_fwd_flag TEXT,
-    RatecodeID DOUBLE PRECISION,
-    PULocationID DOUBLE PRECISION,
-    DOLocationID DOUBLE PRECISION,
-    passenger_count DOUBLE PRECISION,
-    trip_distance DOUBLE PRECISION,
-    fare_amount DOUBLE PRECISION,
-    extra DOUBLE PRECISION,
-    mta_tax DOUBLE PRECISION,
-    tip_amount DOUBLE PRECISION,
-    tolls_amount DOUBLE PRECISION,
-    ehail_fee DOUBLE PRECISION,
-    improvement_surcharge DOUBLE PRECISION,
-    total_amount DOUBLE PRECISION,
-    payment_type DOUBLE PRECISION,
-    trip_type DOUBLE PRECISION,
-    congestion_surcharge DOUBLE PRECISION,
-    cbd_congestion_fee DOUBLE PRECISION,
-    date_hour TIMESTAMP
-);
-drop table public.yellow_tripdata
-
-select * from yellow_tripdata
-select count(distinct date_hour) from yellow_tripdata
-
-
-SELECT DISTINCT date_hour::date AS date
-FROM yellow_tripdata
-WHERE date_hour >= TIMESTAMP '2025-01-01'
-  AND date_hour <  TIMESTAMP '2025-02-01'
-ORDER BY date;
+    store_and_fwd_flag CHAR(1),
+    ratecode_id SMALLINT,
+    pulocationid INTEGER,
+    dolocationid INTEGER,
+    passenger_count SMALLINT,
+    trip_distance REAL,
+    fare_amount NUMERIC(10,2),
+    extra NUMERIC(10,2),
+    mta_tax NUMERIC(10,2),
+    tip_amount NUMERIC(10,2),
+    tolls_amount NUMERIC(10,2),
+    ehail_fee NUMERIC(10,2),
+    improvement_surcharge NUMERIC(10,2),
+    total_amount NUMERIC(10,2),
+    payment_type SMALLINT,
+    trip_type SMALLINT,
+    congestion_surcharge NUMERIC(10,2),
+    cbd_congestion_fee NUMERIC(10,2),
+    date_hour TIMESTAMP NOT NULL
+) PARTITION BY RANGE (date_hour);
