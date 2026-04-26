@@ -1,5 +1,4 @@
-{
-    {column_name=vendorid, column_type=bigint, ordinal_position=1, is_nullable=YES
+{'{column_name=vendorid, column_type=bigint, ordinal_position=1, is_nullable=YES
     }','{column_name=tpep_pickup_datetime, column_type=timestamp(6), ordinal_position=2, is_nullable=YES
     }','{column_name=tpep_dropoff_datetime, column_type=timestamp(6), ordinal_position=3, is_nullable=YES
     }','{column_name=passenger_count, column_type=bigint, ordinal_position=4, is_nullable=YES
@@ -20,5 +19,5 @@
     }','{column_name=airport_fee, column_type=double, ordinal_position=19, is_nullable=YES
     }','{column_name=cbd_congestion_fee, column_type=double, ordinal_position=20, is_nullable=YES
     }','{column_name=date_hour, column_type=timestamp(6), ordinal_position=21, is_nullable=YES
-    }
+    }'
 }
