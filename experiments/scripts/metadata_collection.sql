@@ -1,39 +1,3 @@
-select count(*) from iceberg.bronze.yellow_tripdata 
-drop table iceberg.bronze.yellow_tripdata 
-
-CREATE TABLE iceberg.bronze.yellow_tripdata (
-    vendorid BIGINT,
-    tpep_pickup_datetime TIMESTAMP,
-    tpep_dropoff_datetime TIMESTAMP,
-    passenger_count BIGINT,
-    trip_distance DOUBLE,
-    ratecodeid BIGINT,
-    store_and_fwd_flag VARCHAR,
-    pulocationid BIGINT,
-    dolocationid BIGINT,
-    payment_type BIGINT,
-    fare_amount DOUBLE,
-    extra DOUBLE,
-    mta_tax DOUBLE,
-    tip_amount DOUBLE,
-    tolls_amount DOUBLE,
-    improvement_surcharge DOUBLE,
-    total_amount DOUBLE,
-    congestion_surcharge DOUBLE,
-    airport_fee DOUBLE,
-    cbd_congestion_fee DOUBLE,
-    date_hour TIMESTAMP
-)
-WITH (
-    format = 'PARQUET',
-    partitioning = ARRAY['date_hour']
-);
-
-describe iceberg.bronze."yellow_tripdata$history"
-select * from iceberg.bronze."yellow_tripdata$history"
-DESCRIBE iceberg.bronze."yellow_tripdata$snapshots";
-select * from iceberg.bronze."yellow_tripdata$snapshots";
-
 WITH latest_snapshot AS (
     SELECT
         committed_at,
@@ -46,106 +10,76 @@ WITH latest_snapshot AS (
     LIMIT 1
 ),
 
-manifest_stats AS (
+latest_metadata AS (
     SELECT
-        m.added_snapshot_id AS snapshot_id,
-
-        SUM(m.added_data_files_count) AS batch_added_files,
-        SUM(m.added_rows_count) AS batch_added_rows,
-
-        SUM(m.existing_data_files_count) AS existing_files,
-        SUM(m.existing_rows_count) AS existing_rows,
-
-        SUM(m.deleted_data_files_count) AS deleted_files,
-        SUM(m.deleted_rows_count) AS deleted_rows
-    FROM iceberg.bronze."yellow_tripdata$manifests" m
-    JOIN latest_snapshot s
-        ON m.added_snapshot_id = s.snapshot_id
-    GROUP BY m.added_snapshot_id
-),
-
-current_table_stats AS (
-    SELECT
-        COUNT(*) AS current_file_count,
-        SUM(record_count) AS current_total_rows,
-        SUM(file_size_in_bytes) AS current_total_size_bytes
-    FROM iceberg.bronze."yellow_tripdata$files"
-),
-
-column_metadata AS (
-    SELECT
-        ARRAY_AGG(
-            CAST(
-                ROW(
-                    column_name,
-                    data_type,
-                    ordinal_position,
-                    is_nullable
-                )
-                AS ROW(
-                    column_name VARCHAR,
-                    column_type VARCHAR,
-                    ordinal_position INTEGER,
-                    is_nullable VARCHAR
-                )
-            )
-            ORDER BY ordinal_position
-        ) AS columns
-    FROM iceberg.information_schema.columns
-    WHERE table_schema = 'bronze'
-      AND table_name = 'yellow_tripdata'
+        latest_snapshot_id,
+        latest_schema_id,
+        latest_sequence_number,
+        timestamp AS metadata_recorded_at
+    FROM iceberg.bronze."yellow_tripdata$metadata_log_entries"
+    ORDER BY timestamp DESC
+    LIMIT 1
 )
 
 SELECT
-    -- Table identity
     'iceberg' AS catalog_name,
     'bronze' AS schema_name,
     'yellow_tripdata' AS table_name,
 
-    -- Snapshot metadata
     s.snapshot_id,
     s.parent_id AS parent_snapshot_id,
     s.operation,
     s.committed_at AS last_updated_time,
 
-    -- Batch-level changes
     COALESCE(
-        m.batch_added_rows,
-        TRY_CAST(element_at(s.summary, 'added-records') AS BIGINT)
+        TRY_CAST(element_at(s.summary, 'added-records') AS BIGINT),
+        0
     ) AS batch_added_rows,
 
     COALESCE(
-        m.batch_added_files,
         TRY_CAST(element_at(s.summary, 'added-data-files') AS BIGINT),
-        TRY_CAST(element_at(s.summary, 'added-files') AS BIGINT)
+        TRY_CAST(element_at(s.summary, 'added-files') AS BIGINT),
+        0
     ) AS batch_added_files,
 
-    m.existing_rows,
-    m.existing_files,
-    m.deleted_rows,
-    m.deleted_files,
+    COALESCE(
+        TRY_CAST(element_at(s.summary, 'deleted-records') AS BIGINT),
+        0
+    ) AS deleted_rows,
 
-    -- Table-level stats after commit
-    TRY_CAST(element_at(s.summary, 'total-records') AS BIGINT) AS table_total_rows_after_commit,
-    TRY_CAST(element_at(s.summary, 'total-data-files') AS BIGINT) AS table_total_files_after_commit,
-    TRY_CAST(element_at(s.summary, 'total-files-size') AS BIGINT) AS table_total_size_bytes_after_commit,
+    COALESCE(
+        TRY_CAST(element_at(s.summary, 'deleted-data-files') AS BIGINT),
+        TRY_CAST(element_at(s.summary, 'deleted-files') AS BIGINT),
+        0
+    ) AS deleted_files,
 
-    -- Current file-level table stats
-    f.current_file_count,
-    f.current_total_rows,
-    f.current_total_size_bytes,
+    TRY_CAST(element_at(s.summary, 'total-records') AS BIGINT) AS table_total_rows,
+    TRY_CAST(element_at(s.summary, 'total-data-files') AS BIGINT) AS table_total_files,
+    TRY_CAST(element_at(s.summary, 'total-files-size') AS BIGINT) AS table_total_size_bytes,
 
-    -- Schema / partition change metadata
     TRY_CAST(element_at(s.summary, 'changed-partition-count') AS BIGINT) AS changed_partition_count,
 
-    -- Column metadata
-    c.columns AS column_metadata,
+    m.latest_schema_id AS schema_id,
+    m.latest_sequence_number,
+    m.metadata_recorded_at,
 
-    -- Collection time
     current_timestamp AS collected_at
 
 FROM latest_snapshot s
-LEFT JOIN manifest_stats m
-    ON s.snapshot_id = m.snapshot_id
-CROSS JOIN current_table_stats f
-CROSS JOIN column_metadata c;
+LEFT JOIN latest_metadata m
+    ON m.latest_snapshot_id = s.snapshot_id;
+
+
+SELECT
+    'iceberg' AS catalog_name,
+    table_schema AS schema_name,
+    table_name,
+    column_name,
+    data_type AS column_type,
+    ordinal_position,
+    is_nullable,
+    current_timestamp AS collected_at
+FROM iceberg.information_schema.columns
+WHERE table_schema = 'bronze'
+  AND table_name = 'yellow_tripdata'
+ORDER BY ordinal_position;
