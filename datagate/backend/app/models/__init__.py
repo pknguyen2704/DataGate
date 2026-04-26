@@ -1,7 +1,31 @@
+"""
+Models __init__ — import all models for Alembic auto-discovery
+"""
 from .auth import User, Role, Permission, user_roles, role_permissions
-from .connection.connection import Connection
-from .connection.table import Table
-from .metadata.table_metdata import TableMetadata
-from .metadata.table_schema_detail import TableSchemaDetail
-from .metadata.table_schema_version import TableSchemaVersion
-from .metadata.table_schema_change_event import TableSchemaEventChange
+from .connection import Connection, TableInfo, UserTableAccess
+from .quality import (
+    TableBatchMetadata,
+    TableSchemaMetadata,
+    SchemaChangeEvent,
+    ColumnProfileMetric,
+    QualityRule,
+    RuleValidationRun,
+    RuleValidationResult,
+    QualityThreshold,
+    AnomalyDetectionRun,
+    AnomalyFeatureImportance,
+    Alert,
+    JobRun,
+)
+
+__all__ = [
+    "User", "Role", "Permission", "user_roles", "role_permissions",
+    "Connection", "TableInfo", "UserTableAccess",
+    "TableBatchMetadata", "TableSchemaMetadata", "SchemaChangeEvent",
+    "ColumnProfileMetric",
+    "QualityRule", "RuleValidationRun", "RuleValidationResult",
+    "QualityThreshold",
+    "AnomalyDetectionRun", "AnomalyFeatureImportance",
+    "Alert",
+    "JobRun",
+]

@@ -1,56 +1,97 @@
-from datetime import timedelta
-from typing import Any
-from fastapi import APIRouter, Depends, HTTPException
+"""
+Auth endpoints — login, /me, logout
+"""
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
+from datetime import timedelta
 
-from app import models, schemas
-from app.api import deps
-from app.core import security
-from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
+from app.db.session import get_db
+from app.core.security import verify_password, create_access_token, get_password_hash
+from app.core.config import settings
+from app.models.auth import User
+from app.api.deps import get_current_user
 
 router = APIRouter()
 
 
-@router.post("/login/access-token", response_model=schemas.Token)
-def login_access_token(
-    db: Session = Depends(deps.get_db),
-    form_data: OAuth2PasswordRequestForm = Depends(),
-) -> Any:
-    """
-    OAuth2 compatible token login. Accepts username OR email in the username field.
-    """
-    user = db.query(models.User).filter(
-        models.User.username == form_data.username
-    ).first()
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+
+class UserOut(BaseModel):
+    id: str
+    username: str
+    email: str
+    full_name: str | None
+    is_active: bool
+    permissions: list[str]
+    roles: list[str]
+
+    class Config:
+        from_attributes = True
+
+
+class LoginRequest(BaseModel):
+    username: str  # accepts username or email
+    password: str
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    form_data: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Authenticate with username/email + password."""
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.roles))
+        .where(
+            or_(
+                User.username == form_data.username,
+                User.email == form_data.username,
+            )
+        )
+    )
+    user = result.scalars().first()
+
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
     if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled",
+        )
 
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return {
-        "access_token": security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        ),
-        "token_type": "bearer",
-    }
+    token = create_access_token(
+        subject=user.id,
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    return TokenResponse(access_token=token)
 
 
-@router.get("/me", response_model=schemas.UserOut)
-def read_users_me(
-    current_user: models.User = Depends(deps.get_current_user),
-) -> Any:
-    """
-    Get current logged-in user info.
-    """
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "username": current_user.username,
-        "full_name": current_user.full_name,
-        "is_active": current_user.is_active,
-        "is_superuser": current_user.is_superuser,
-        "roles": [r.name for r in current_user.roles],
-    }
+@router.get("/me", response_model=UserOut)
+async def get_me(current_user: User = Depends(get_current_user)):
+    """Return the currently authenticated user."""
+    return UserOut(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        is_active=current_user.is_active,
+        permissions=list(current_user.permission_codes),
+        roles=[r.name for r in current_user.roles if r.is_active],
+    )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout():
+    """Logout (client-side token removal)."""
+    return None

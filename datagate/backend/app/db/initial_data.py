@@ -1,73 +1,117 @@
-import logging
-from sqlalchemy.orm import Session
-from app import models
-from app.db.base import Base
-from app.db.session import SessionLocal, engine
+"""
+Database seed script — creates default permissions, roles, and admin user.
+Run once after migrations: python -m app.db.initial_data
+"""
+import asyncio
+import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import AsyncSessionLocal
+from app.models.auth import User, Role, Permission
 from app.core.security import get_password_hash
-from datetime import datetime, timedelta
+from app.core.permissions import ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-def init_db(db: Session) -> None:
-    # 0. Tạo tất cả các bảng nếu chưa tồn tại
-    logger.info("Ensuring database tables exist...")
-    Base.metadata.create_all(bind=engine)
+async def seed(db: AsyncSession):
+    from sqlalchemy import select
 
-    # 1. Initialize Users
-    user = db.query(models.User).filter(models.User.username == "admin").first()
-    if not user:
-        user = models.User(
+    print("🌱 Seeding permissions...")
+    perm_map: dict[str, Permission] = {}
+
+    for perm_data in ALL_PERMISSIONS:
+        result = await db.execute(select(Permission).where(Permission.code == perm_data["code"]))
+        existing = result.scalars().first()
+        if not existing:
+            perm = Permission(
+                id=str(uuid.uuid4()),
+                code=perm_data["code"],
+                name=perm_data["name"],
+                group=perm_data["group"],
+            )
+            db.add(perm)
+            perm_map[perm_data["code"]] = perm
+        else:
+            perm_map[perm_data["code"]] = existing
+
+    await db.flush()
+    print(f"   ✓ {len(ALL_PERMISSIONS)} permissions seeded")
+
+    print("🌱 Seeding roles...")
+    role_map: dict[str, Role] = {}
+
+    from sqlalchemy.orm import selectinload
+
+    for role_name, perm_codes in DEFAULT_ROLE_PERMISSIONS.items():
+        result = await db.execute(
+            select(Role)
+            .options(selectinload(Role.permissions))
+            .where(Role.name == role_name)
+        )
+        existing = result.scalars().first()
+        if not existing:
+            role = Role(
+                id=str(uuid.uuid4()),
+                name=role_name,
+                description=f"System-defined {role_name} role",
+                is_system=True,
+                is_active=True,
+                permissions=[],
+            )
+            db.add(role)
+            role_map[role_name] = role
+        else:
+            role_map[role_name] = existing
+
+    await db.flush()
+
+    # Assign permissions to roles
+    for role_name, perm_codes in DEFAULT_ROLE_PERMISSIONS.items():
+        role = role_map[role_name]
+        existing_perm_codes = {p.code for p in role.permissions}
+        for code in perm_codes:
+            if code in perm_map and code not in existing_perm_codes:
+                role.permissions.append(perm_map[code])
+
+    await db.flush()
+    print(f"   ✓ {len(DEFAULT_ROLE_PERMISSIONS)} roles seeded")
+
+    print("🌱 Seeding admin user...")
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.roles))
+        .where(User.username == "admin")
+    )
+    admin_user = result.scalars().first()
+
+    if not admin_user:
+        admin_user = User(
+            id=str(uuid.uuid4()),
             username="admin",
             email="admin@datagate.io",
-            full_name="Administrator",
             hashed_password=get_password_hash("admin123"),
+            full_name="DataGate Admin",
             is_active=True,
-            is_superuser=True,
-            accessible_tables=[] # Khởi tạo rỗng, người dùng sẽ tự cấu hình
+            roles=[],
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"Created superuser: {user.username}/admin123")
+        db.add(admin_user)
+        await db.flush()
+
+        admin_role = role_map.get("Admin")
+        if admin_role:
+            admin_user.roles.append(admin_role)
+
+        print("   ✓ Admin user created (username: admin, password: admin123)")
     else:
-        logger.info("Superuser already exists")
+        print("   ℹ Admin user already exists, skipping")
 
-    # 2. KHÔNG khởi tạo Connection mặc định
-    # Người dùng muốn tự nhập từ UI ban đầu
-    logger.info("Skipping default connection seeding (as requested).")
+    await db.commit()
+    print("✅ Seeding complete!")
 
-    # 3. Initialize Sample Observability Data (Tùy chọn, giữ lại để UI không trống không)
-    table_name = "customer_bronze"
-    schema_name = "bronze"
-    catalog = "iceberg"
 
-    db.query(models.ObservabilitySnapshot).filter(
-        models.ObservabilitySnapshot.table_name == table_name
-    ).delete()
+async def main():
+    async with AsyncSessionLocal() as db:
+        await seed(db)
 
-    for i in range(30):
-        snap_time = datetime.now() - timedelta(days=30-i)
-        snap = models.ObservabilitySnapshot(
-            table_name=table_name,
-            schema_name=schema_name,
-            catalog=catalog,
-            snapshot_time=snap_time,
-            total_records=1000 + (i * 50) + (i % 3 * 20),
-            total_size=1024 * 50 * (i + 1),
-            last_updated_time=snap_time - timedelta(hours=2)
-        )
-        db.add(snap)
-
-    db.commit()
-    logger.info("Seeding script completed.")
-
-def main() -> None:
-    logger.info("Seeding data...")
-    db = SessionLocal()
-    init_db(db)
-    logger.info("Seeding complete.")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

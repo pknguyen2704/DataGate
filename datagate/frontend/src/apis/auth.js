@@ -1,19 +1,10 @@
 import apiClient from './index';
 
 export const authApi = {
-  login: async (username, password) => {
-    const formData = new FormData();
-    formData.append('username', username);
-    formData.append('password', password);
-    
-    return apiClient.post(`/auth/login/access-token`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-  
-  getMe: async () => {
-    return apiClient.get(`/auth/me`);
-  },
+  login: (username, password) =>
+    apiClient.post('/auth/login', { username, password }),
+
+  getMe: () => apiClient.get('/auth/me'),
+
+  logout: () => apiClient.post('/auth/logout'),
 };

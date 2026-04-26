@@ -1,50 +1,33 @@
 import React from 'react';
-import { Box, Typography, Button, Container } from '@mui/material';
+import { Box, Typography, Button } from '@mui/material';
+import { HomeOutlined } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
-const NotFound = () => {
+export default function NotFound() {
   const navigate = useNavigate();
-
   return (
-    <Container maxWidth="md">
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '80vh',
-          textAlign: 'center',
-          gap: 3,
-        }}
-      >
-        <ErrorOutlineIcon sx={{ fontSize: 100, color: 'text.secondary', opacity: 0.5 }} />
-        
-        <Typography variant="h1" fontWeight="bold" color="primary.main">
-          404
-        </Typography>
-        
-        <Typography variant="h4" color="text.primary" fontWeight={600}>
-          Page not found
-        </Typography>
-        
-        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 500, mb: 2 }}>
-          Oops! The page you are looking for might have been moved, renamed, or never existed in the DataGate system.
-        </Typography>
-
-        <Button
-          variant="contained"
-          color="primary"
-          size="large"
-          onClick={() => navigate('/')}
-          sx={{ borderRadius: 2, px: 4, py: 1.5, textTransform: 'none', fontWeight: 'bold' }}
-        >
-          Back to Home
-        </Button>
-      </Box>
-    </Container>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        textAlign: 'center',
+        gap: 3,
+        px: 2,
+      }}
+    >
+      <Typography variant="h1" fontWeight={900} sx={{ fontSize: '6rem', color: 'divider', lineHeight: 1 }}>
+        404
+      </Typography>
+      <Typography variant="h5" fontWeight={700}>Page not found</Typography>
+      <Typography variant="body1" color="text.secondary">
+        The page you're looking for doesn't exist or has been moved.
+      </Typography>
+      <Button variant="contained" startIcon={<HomeOutlined />} onClick={() => navigate('/home')}>
+        Back to Home
+      </Button>
+    </Box>
   );
-};
-
-export default NotFound;
+}

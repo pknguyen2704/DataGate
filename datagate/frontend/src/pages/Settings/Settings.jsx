@@ -1,115 +1,122 @@
 import React from 'react';
-import { 
-  Box, Typography, Grid, Paper, Container, IconButton 
+import {
+  Box, Typography, Grid, Paper, IconButton, Chip
 } from '@mui/material';
-import { 
-  Storage as StorageIcon, 
+import {
+  Storage as StorageIcon,
   Group as GroupIcon,
   ManageAccounts as AccountIcon,
-  ArrowBack as BackIcon
+  Shield as RolesIcon,
+  ArrowBack as BackIcon,
 } from '@mui/icons-material';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import ServiceList from './Connection/Connection';
+import Connection from './Connection/Connection';
 import UserList from './Users/UserList';
 import PasswordChange from './Security/PasswordChange';
+import RoleManagement from './Roles/RoleManagement';
+import { pageShellSx } from '~/theme';
 
 const SettingsCard = ({ title, description, icon, color, onClick }) => (
-  <Paper 
+  <Paper
     elevation={0}
     onClick={onClick}
-    sx={{ 
-      p: 3, 
-      display: 'flex', 
+    sx={{
+      p: 3,
+      display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      borderRadius: '4px', 
+      borderRadius: '8px',
       border: '1px solid',
       borderColor: 'divider',
       cursor: 'pointer',
-      transition: 'all 0.2s ease-in-out',
-      position: 'relative',
-      overflow: 'hidden',
+      transition: 'all 0.2s ease',
       '&:hover': {
         borderColor: 'primary.main',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-        '& .icon-box': {
-          transform: 'scale(1.05)',
-          bgcolor: `${color}.main`,
-          color: 'white',
-        }
-      }
+        boxShadow: '0 4px 16px rgba(37,99,235,0.1)',
+        transform: 'translateY(-2px)',
+      },
     }}
   >
-    <Box 
-      className="icon-box"
-      sx={{ 
-        bgcolor: `${color}.light`,
-        borderRadius: '200px',
-        color: `${color}.main`,
-        opacity: 0.9,
-        width: 56,
-        height: 56,
+    <Box
+      sx={{
+        bgcolor: `${color}.main`,
+        borderRadius: '10px',
+        opacity: 0.12,
+        width: 52,
+        height: 52,
+        position: 'absolute',
+      }}
+    />
+    <Box
+      sx={{
+        width: 52,
+        height: 52,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         mb: 2.5,
-        transition: 'all 0.2s ease-in-out',
+        bgcolor: `${color}.50`,
+        borderRadius: '10px',
+        color: `${color}.main`,
       }}
     >
-      {React.cloneElement(icon, { sx: { fontSize: 28 } })}
+      {React.cloneElement(icon, { sx: { fontSize: 26 } })}
     </Box>
-    <Box sx={{ flexGrow: 1 }}>
-      <Typography variant="h6" fontWeight="600" sx={{ mb: 1, lineHeight: 1.2 }}>
-        {title}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-        {description}
-      </Typography>
-    </Box>
+    <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 0.75 }}>
+      {title}
+    </Typography>
+    <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+      {description}
+    </Typography>
   </Paper>
 );
 
 const SettingsDashboard = () => {
   const navigate = useNavigate();
-  
+
   const categories = [
-    { 
-      title: 'Connect Management', 
-      description: 'Set up connectors and ingest metadata from diverse sources including databases, warehouses, and data lakes.', 
-      icon: <StorageIcon />, 
-      color: 'secondary', 
-      path: '/settings/connection' 
+    {
+      title: 'Connections',
+      description: 'Configure lakehouse connections: Trino, Iceberg REST Catalog, MinIO.',
+      icon: <StorageIcon />,
+      color: 'secondary',
+      path: '/settings/connection',
     },
-    { 
-      title: 'Users', 
-      description: 'Manage users, teams, and access permissions within the DataGate workspace.', 
-      icon: <GroupIcon />, 
-      color: 'error', 
-      path: '/settings/users' 
+    {
+      title: 'Users',
+      description: 'Manage user accounts, activation, and role assignments.',
+      icon: <GroupIcon />,
+      color: 'error',
+      path: '/settings/users',
     },
-    { 
-      title: 'Account Settings', 
-      description: 'Update your personal profile, security credentials, and platform preferences.', 
-      icon: <AccountIcon />, 
-      color: 'primary', 
-      path: '/settings/account' 
+    {
+      title: 'Roles & Permissions',
+      description: 'Configure system roles and assign permission codes to control access.',
+      icon: <RolesIcon />,
+      color: 'warning',
+      path: '/settings/roles',
+    },
+    {
+      title: 'Account Settings',
+      description: 'Update your personal profile and change your password.',
+      icon: <AccountIcon />,
+      color: 'primary',
+      path: '/settings/account',
     },
   ];
 
   return (
     <Box>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5 }}>
-          Settings
-        </Typography>
+        <Typography variant="h4" fontWeight={800} mb={0.5}>Settings</Typography>
         <Typography variant="body1" color="text.secondary">
-          Configure the DataGate platform to suit your data governance and observability requirements.
+          Configure users, roles, connections, and platform preferences.
         </Typography>
       </Box>
 
-      <Grid container spacing={4} alignItems="stretch">
+      <Grid container spacing={3} alignItems="stretch">
         {categories.map((cat) => (
-          <Grid item xs={12} md={6} lg={4} key={cat.title}>
+          <Grid item xs={12} sm={6} lg={3} key={cat.title} sx={{ position: 'relative' }}>
             <SettingsCard {...cat} onClick={() => navigate(cat.path)} />
           </Grid>
         ))}
@@ -124,36 +131,30 @@ const Settings = () => {
   const isBasePage = location.pathname === '/settings' || location.pathname === '/settings/';
 
   return (
-    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
+    <Box sx={pageShellSx}>
       {!isBasePage && (
-        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton 
-            onClick={() => navigate('/settings')} 
-            sx={{ 
-              bgcolor: 'white', 
-              border: '1px solid', 
-              borderColor: 'divider',
-              borderRadius: '4px',
-              '&:hover': { bgcolor: 'action.hover' }
-            }}
+        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton
+            onClick={() => navigate('/settings')}
+            size="small"
+            sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}
           >
             <BackIcon fontSize="small" />
           </IconButton>
-          <Typography variant="h5" fontWeight="800">Settings</Typography>
+          <Typography variant="h5" fontWeight={800}>Settings</Typography>
         </Box>
       )}
 
       <Routes>
         <Route index element={<SettingsDashboard />} />
-        <Route path="connection/*" element={<ServiceList />} />
+        <Route path="connection/*" element={<Connection />} />
         <Route path="users" element={<UserList />} />
+        <Route path="roles" element={<RoleManagement />} />
         <Route path="account" element={<PasswordChange />} />
-        <Route path="security" element={<PasswordChange />} /> 
+        <Route path="security" element={<PasswordChange />} />
       </Routes>
     </Box>
   );
 };
 
 export default Settings;
-
-

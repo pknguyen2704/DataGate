@@ -5,14 +5,14 @@ const SIDEBAR_WIDTH = 260;
 const BASE_RADIUS = 8;
 
 export const datagateColors = {
-  pageBackground: "#F7F9FC",
-  cardBorder: "#E5EAF2",
-  cardBorderSoft: "#EEF2F7",
-  cardBackground: "#FFFFFF",
-  cardBackgroundMuted: "#FCFDFE",
-  selectedBackground: "#EEF4FF",
-  selectedBorder: "#7BA7FF",
-  tableHeadBackground: "#F8FAFC",
+  pageBackground: "#0B1120", // Deep midnight blue
+  cardBorder: "#334155", // Slate 700
+  cardBorderSoft: "#1E293B", // Slate 800
+  cardBackground: "#0F172A", // Slate 900
+  cardBackgroundMuted: "#1E293B", // Slate 800
+  selectedBackground: "rgba(59, 130, 246, 0.15)", // Translucent blue
+  selectedBorder: "#3B82F6", // Blue 500
+  tableHeadBackground: "#131E35", // Slightly lighter than card
 };
 
 export const datagateLayout = {
@@ -31,7 +31,7 @@ export const pageShellSx = {
 export const panelSx = {
   borderRadius: datagateLayout.panelRadius,
   border: `1px solid ${datagateColors.cardBorderSoft}`,
-  boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
+  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.4)",
   backgroundColor: datagateColors.cardBackground,
 };
 
@@ -51,14 +51,15 @@ export const subtlePanelSx = {
 const theme = createTheme({
   spacing: 8,
   palette: {
+    mode: 'dark',
     primary: {
-      main: "#2563EB",
-      light: "#60A5FA",
-      dark: "#1E40AF",
+      main: "#3B82F6", // Blue 500
+      light: "#60A5FA", // Blue 400
+      dark: "#1E40AF", // Blue 800
       contrastText: "#FFFFFF",
     },
     secondary: {
-      main: "#3B82F6",
+      main: "#F59E0B", // Amber 500 for CTA
     },
     error: {
       main: "#EF4444",
@@ -70,17 +71,17 @@ const theme = createTheme({
       main: "#3B82F6",
     },
     success: {
-      main: "#16A34A",
+      main: "#10B981",
     },
     background: {
       default: datagateColors.pageBackground,
-      paper: "#FFFFFF",
+      paper: datagateColors.cardBackground,
     },
     text: {
-      primary: "#1E293B",
-      secondary: "#64748B",
+      primary: "#F8FAFC", // Slate 50
+      secondary: "#94A3B8", // Slate 400
     },
-    divider: "#E2E8F0",
+    divider: datagateColors.cardBorderSoft,
   },
   typography: {
     fontFamily: '"Outfit", "system-ui", "-apple-system", "Segoe UI", sans-serif',
@@ -172,7 +173,7 @@ const theme = createTheme({
         },
         body: {
           backgroundColor: datagateColors.pageBackground,
-          color: "#1E293B",
+          color: "#F8FAFC",
           fontFamily: '"Outfit", "system-ui", "-apple-system", "Segoe UI", sans-serif',
           margin: 0,
           WebkitFontSmoothing: "antialiased",
@@ -185,16 +186,16 @@ const theme = createTheme({
             background: "transparent",
           },
           "&::-webkit-scrollbar-thumb": {
-            background: "#CBD5E1",
+            background: "#475569",
             borderRadius: "999px",
           },
         },
         ".glass-card": {
-          background: "rgba(255, 255, 255, 0.82)",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
-          border: "1px solid rgba(226, 232, 240, 0.8)",
-          boxShadow: "0 12px 30px rgba(15, 23, 42, 0.06)",
+          background: "rgba(15, 23, 42, 0.7)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(51, 65, 85, 0.5)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
         },
       },
     },
@@ -216,7 +217,7 @@ const theme = createTheme({
         root: {
           backgroundImage: "none",
           boxShadow: "none",
-          border: "1px solid #E5EAF2",
+          border: `1px solid ${datagateColors.cardBorderSoft}`,
           borderRadius: BASE_RADIUS,
         },
       },
@@ -269,16 +270,16 @@ const theme = createTheme({
         root: {
           minHeight: 44,
           borderRadius: 1,
-          backgroundColor: "#FFFFFF",
+          backgroundColor: datagateColors.cardBackground,
           "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#D8E1EC",
+            borderColor: datagateColors.cardBorder,
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#B8C5D6",
+            borderColor: "#64748B",
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
             borderWidth: 1,
-            borderColor: "#2563EB",
+            borderColor: "#3B82F6",
           },
         },
         input: {
@@ -321,7 +322,7 @@ const theme = createTheme({
         head: {
           fontSize: "0.8125rem",
           fontWeight: 700,
-          color: "#475569",
+          color: "#94A3B8",
           paddingTop: 14,
           paddingBottom: 14,
         },
@@ -353,8 +354,8 @@ const theme = createTheme({
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          backgroundColor: "#FFFFFF",
-          borderRight: "1px solid #E2E8F0",
+          backgroundColor: datagateColors.cardBackground,
+          borderRight: `1px solid ${datagateColors.cardBorderSoft}`,
         },
       },
     },
@@ -364,13 +365,13 @@ const theme = createTheme({
           minHeight: 44,
           borderRadius: 1,
           "&.Mui-selected": {
-            backgroundColor: "#EFF6FF",
-            color: "#2563EB",
+            backgroundColor: "rgba(59, 130, 246, 0.15)",
+            color: "#60A5FA",
             "& .MuiListItemIcon-root": {
-              color: "#2563EB",
+              color: "#60A5FA",
             },
             "&:hover": {
-              backgroundColor: "#DBEAFE",
+              backgroundColor: "rgba(59, 130, 246, 0.25)",
             },
           },
         },
@@ -387,8 +388,8 @@ const theme = createTheme({
       styleOverrides: {
         paper: {
           borderRadius: 1,
-          border: "1px solid #E5EAF2",
-          boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)",
+          border: `1px solid ${datagateColors.cardBorderSoft}`,
+          boxShadow: "0 18px 40px rgba(0, 0, 0, 0.5)",
         },
       },
     },

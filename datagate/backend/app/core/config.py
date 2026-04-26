@@ -1,30 +1,57 @@
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-def get_env(key: str, default=None):
-    return os.getenv(key, default)
+from pydantic_settings import BaseSettings
+from functools import lru_cache
+from typing import Optional
 
 
-# Security
-SECRET_KEY = get_env("SECRET_KEY")
-ALGORITHM = get_env("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(get_env("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+class Settings(BaseSettings):
+    # App
+    APP_NAME: str = "DataGate"
+    APP_VERSION: str = "1.0.0"
+    API_V1_STR: str = "/api/v1"
+    DEBUG: bool = False
 
-# Database
-DATABASE_URL = get_env("DATABASE_URL")
+    # Security
+    SECRET_KEY: str = "changeme-very-secret-key"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
-# Airflow
-AIRFLOW_URL = get_env("AIRFLOW_URL")
-AIRFLOW_USER = get_env("AIRFLOW_USER")
-AIRFLOW_PASS = get_env("AIRFLOW_PASS")
+    # Database
+    DATABASE_USER: str = "postgres"
+    DATABASE_PASSWORD: str = "postgres"
+    DATABASE_HOST: str = "localhost"
+    DATABASE_PORT: str = "5432"
+    DATABASE_DB: str = "datagate"
 
-# Minio
-MINIO_ENDPOINT = get_env("MINIO_ENDPOINT")
-MINIO_USER = get_env("MINIO_USER")
-MINIO_PASSWORD = get_env("MINIO_PASSWORD")
+    @property
+    def DATABASE_URL(self) -> str:
+        return (
+            f"postgresql+asyncpg://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}"
+            f"@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_DB}"
+        )
 
-# Timezone
-TZ = get_env("TZ", "Asia/Ho_Chi_Minh")
+    @property
+    def DATABASE_URL_SYNC(self) -> str:
+        return (
+            f"postgresql://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}"
+            f"@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_DB}"
+        )
 
+    # Encryption key for sensitive connection configs
+    ENCRYPTION_KEY: Optional[str] = None
+
+    # Airflow
+    AIRFLOW_BASE_URL: Optional[str] = "http://localhost:8080"
+    AIRFLOW_USERNAME: Optional[str] = "airflow"
+    AIRFLOW_PASSWORD: Optional[str] = "airflow"
+
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
