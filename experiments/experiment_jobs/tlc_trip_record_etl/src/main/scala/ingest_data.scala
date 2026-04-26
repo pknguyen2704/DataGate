@@ -1,11 +1,10 @@
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.col
 
 import java.time.{Duration, Instant, LocalDate, LocalDateTime}
 import java.time.format.DateTimeFormatter
 
 object ingest_data {
-
   case class JobConfig(
                         jdbc_url: String,
                         source_db_user: String,
