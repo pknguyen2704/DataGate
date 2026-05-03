@@ -1,19 +1,18 @@
 import React from 'react';
 import {
-  Box, Typography, Grid, Paper, IconButton, Chip
+  Box, Typography, Grid, Paper, IconButton
 } from '@mui/material';
 import {
   Storage as StorageIcon,
   Group as GroupIcon,
   ManageAccounts as AccountIcon,
-  Shield as RolesIcon,
   ArrowBack as BackIcon,
 } from '@mui/icons-material';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import Connection from './Connection/Connection';
-import UserList from './Users/UserList';
-import PasswordChange from './Security/PasswordChange';
-import RoleManagement from './Roles/RoleManagement';
+import PlatformConnection from './PlatformConnection/PlatformConnection';
+import Connection from './PlatformConnection/Connection/Connection';
+import UserManagement from './UserManagement/UserManagement';
+import AccountSettings from './Account/AccountSettings';
 import { pageShellSx } from '~/theme';
 
 const SettingsCard = ({ title, description, icon, color, onClick }) => (
@@ -76,25 +75,18 @@ const SettingsDashboard = () => {
 
   const categories = [
     {
-      title: 'Connections',
+      title: 'Platform Connections',
       description: 'Configure lakehouse connections: Trino, Iceberg REST Catalog, MinIO.',
       icon: <StorageIcon />,
       color: 'secondary',
       path: '/settings/connection',
     },
     {
-      title: 'Users',
-      description: 'Manage user accounts, activation, and role assignments.',
+      title: 'User Management',
+      description: 'Manage user accounts, activation, roles, and system permissions.',
       icon: <GroupIcon />,
       color: 'error',
-      path: '/settings/users',
-    },
-    {
-      title: 'Roles & Permissions',
-      description: 'Configure system roles and assign permission codes to control access.',
-      icon: <RolesIcon />,
-      color: 'warning',
-      path: '/settings/roles',
+      path: '/settings/identity',
     },
     {
       title: 'Account Settings',
@@ -116,7 +108,7 @@ const SettingsDashboard = () => {
 
       <Grid container spacing={3} alignItems="stretch">
         {categories.map((cat) => (
-          <Grid item xs={12} sm={6} lg={3} key={cat.title} sx={{ position: 'relative' }}>
+          <Grid item xs={12} sm={6} lg={4} key={cat.title} sx={{ position: 'relative' }}>
             <SettingsCard {...cat} onClick={() => navigate(cat.path)} />
           </Grid>
         ))}
@@ -147,11 +139,14 @@ const Settings = () => {
 
       <Routes>
         <Route index element={<SettingsDashboard />} />
-        <Route path="connection/*" element={<Connection />} />
-        <Route path="users" element={<UserList />} />
-        <Route path="roles" element={<RoleManagement />} />
-        <Route path="account" element={<PasswordChange />} />
-        <Route path="security" element={<PasswordChange />} />
+        
+        {/* Unified Platform Connection Suite */}
+        <Route path="connection" element={<PlatformConnection />} />
+        <Route path="connection/new" element={<Connection />} />
+        <Route path="connection/:connectionId" element={<Connection />} />
+        
+        <Route path="identity/*" element={<UserManagement />} />
+        <Route path="account" element={<AccountSettings />} />
       </Routes>
     </Box>
   );

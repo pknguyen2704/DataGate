@@ -14,7 +14,7 @@ import {
 import { Visibility, VisibilityOff, LockOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { login } from "~/stores/slices/authSlice";
+import { login } from "~/stores/slices/authSlice/authSlice";
 import { toast } from "react-toastify";
 import LogoImage from "~/assets/images/datagate.svg";
 
@@ -56,10 +56,10 @@ const Login = () => {
         maxWidth: 420,
         p: { xs: 3, sm: 4.5 },
         borderRadius: "16px",
-        bgcolor: "rgba(255,255,255,0.92)",
+        bgcolor: "#FFFFFF",
         backdropFilter: "blur(24px)",
-        boxShadow: "0 8px 40px 0 rgba(31,38,135,0.18)",
-        border: "1px solid rgba(255,255,255,0.6)",
+        boxShadow: "0 18px 48px rgba(15, 23, 42, 0.12)",
+        border: "1px solid #E2E8F0",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

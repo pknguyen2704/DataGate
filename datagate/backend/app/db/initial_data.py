@@ -1,56 +1,78 @@
-"""
-Database seed script — creates default permissions, roles, and admin user.
-Run once after migrations: python -m app.db.initial_data
-"""
-import asyncio
-import uuid
-from sqlalchemy.ext.asyncio import AsyncSession
+"""Reset and seed the DataGate database."""
 
-from app.db.session import AsyncSessionLocal
-from app.models.auth import User, Role, Permission
+import argparse
+import os
+
+from sqlalchemy.orm import Session, selectinload
+
+from app.db.base import Base
+from app.db.session import SessionLocal
+from app.models import User, Role, Permission
 from app.core.security import get_password_hash
-from app.core.permissions import ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS
+from app.rbac.permissions import ALL_PERMISSIONS
+from app.rbac.roles import DEFAULT_ROLE_PERMISSIONS
 
 
-async def seed(db: AsyncSession):
-    from sqlalchemy import select
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Seed or reset the DataGate database."
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Delete existing application data before seeding defaults again.",
+    )
+    return parser.parse_args()
 
-    print("🌱 Seeding permissions...")
+
+def reset_database(db: Session) -> None:
+    print("Resetting DataGate application tables...")
+
+    for table in reversed(Base.metadata.sorted_tables):
+        db.execute(table.delete())
+
+    db.commit()
+    print(f"   Cleared {len(Base.metadata.sorted_tables)} tables")
+
+
+def seed(db: Session) -> None:
+    admin_password = os.getenv("DATAGATE_ADMIN_PASSWORD", "admin123")
+
+    print("Seeding permissions...")
     perm_map: dict[str, Permission] = {}
 
     for perm_data in ALL_PERMISSIONS:
-        result = await db.execute(select(Permission).where(Permission.code == perm_data["code"]))
-        existing = result.scalars().first()
+        existing = db.query(Permission).filter(Permission.code == perm_data["code"]).first()
         if not existing:
             perm = Permission(
-                id=str(uuid.uuid4()),
                 code=perm_data["code"],
                 name=perm_data["name"],
                 group=perm_data["group"],
+                description=perm_data.get("description"),
             )
             db.add(perm)
             perm_map[perm_data["code"]] = perm
         else:
+            existing.name = perm_data["name"]
+            existing.group = perm_data["group"]
+            existing.description = perm_data.get("description")
             perm_map[perm_data["code"]] = existing
 
-    await db.flush()
-    print(f"   ✓ {len(ALL_PERMISSIONS)} permissions seeded")
+    db.flush()
+    print(f"   {len(ALL_PERMISSIONS)} permissions seeded")
 
-    print("🌱 Seeding roles...")
+    print("Seeding roles...")
     role_map: dict[str, Role] = {}
 
-    from sqlalchemy.orm import selectinload
-
     for role_name, perm_codes in DEFAULT_ROLE_PERMISSIONS.items():
-        result = await db.execute(
-            select(Role)
+        existing = (
+            db.query(Role)
             .options(selectinload(Role.permissions))
-            .where(Role.name == role_name)
+            .filter(Role.name == role_name)
+            .first()
         )
-        existing = result.scalars().first()
         if not existing:
             role = Role(
-                id=str(uuid.uuid4()),
                 name=role_name,
                 description=f"System-defined {role_name} role",
                 is_system=True,
@@ -60,58 +82,77 @@ async def seed(db: AsyncSession):
             db.add(role)
             role_map[role_name] = role
         else:
+            existing.description = existing.description or f"System-defined {role_name} role"
+            existing.is_system = True
+            existing.is_active = True
             role_map[role_name] = existing
 
-    await db.flush()
+    db.flush()
 
-    # Assign permissions to roles
     for role_name, perm_codes in DEFAULT_ROLE_PERMISSIONS.items():
         role = role_map[role_name]
-        existing_perm_codes = {p.code for p in role.permissions}
-        for code in perm_codes:
-            if code in perm_map and code not in existing_perm_codes:
-                role.permissions.append(perm_map[code])
+        role.permissions = [
+            perm_map[code]
+            for code in perm_codes
+            if code in perm_map
+        ]
 
-    await db.flush()
-    print(f"   ✓ {len(DEFAULT_ROLE_PERMISSIONS)} roles seeded")
+    db.flush()
+    print(f"   {len(DEFAULT_ROLE_PERMISSIONS)} roles seeded")
 
-    print("🌱 Seeding admin user...")
-    result = await db.execute(
-        select(User)
+    print("Seeding admin user...")
+    admin_user = (
+        db.query(User)
         .options(selectinload(User.roles))
-        .where(User.username == "admin")
+        .filter(User.username == "admin")
+        .first()
     )
-    admin_user = result.scalars().first()
 
     if not admin_user:
         admin_user = User(
-            id=str(uuid.uuid4()),
             username="admin",
             email="admin@datagate.io",
-            hashed_password=get_password_hash("admin123"),
+            hashed_password=get_password_hash(admin_password),
             full_name="DataGate Admin",
             is_active=True,
             roles=[],
         )
         db.add(admin_user)
-        await db.flush()
+        db.flush()
 
         admin_role = role_map.get("Admin")
         if admin_role:
             admin_user.roles.append(admin_role)
 
-        print("   ✓ Admin user created (username: admin, password: admin123)")
+        if "DATAGATE_ADMIN_PASSWORD" in os.environ:
+            print("   Admin user created (username: admin, password: DATAGATE_ADMIN_PASSWORD)")
+        else:
+            print("   Admin user created (username: admin, password: admin123)")
     else:
-        print("   ℹ Admin user already exists, skipping")
+        admin_user.email = "admin@datagate.io"
+        admin_user.full_name = "DataGate Admin"
+        admin_user.hashed_password = get_password_hash(admin_password)
+        admin_user.is_active = True
+        admin_user.roles = []
+        admin_role = role_map.get("Admin")
+        if admin_role:
+            admin_user.roles.append(admin_role)
+        print("   Admin user refreshed")
 
-    await db.commit()
-    print("✅ Seeding complete!")
+    db.commit()
+    print("Seeding complete.")
 
 
-async def main():
-    async with AsyncSessionLocal() as db:
-        await seed(db)
+def main() -> None:
+    args = parse_args()
+    db = SessionLocal()
+    try:
+        if args.reset:
+            reset_database(db)
+        seed(db)
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

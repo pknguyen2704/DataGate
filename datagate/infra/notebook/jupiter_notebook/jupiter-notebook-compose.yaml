@@ -1,0 +1,23 @@
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: jupiter_notebook
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+      - "4041:4041"
+      - "4042:4042"
+    env_file:
+      - .env
+    volumes:
+      - ./notebooks:/opt/spark/notebooks
+      - ./workspace:/opt/spark/workspace
+      - ../../compute_engine/spark/conf:/opt/spark/conf:ro
+    networks:
+      - datagate-net
+
+networks:
+  datagate-net:
+    external: true

@@ -1,5 +1,11 @@
-select count(*) from iceberg.bronze.yellow_tripdata 
-drop table iceberg.bronze.yellow_tripdata 
+DROP TABLE IF EXISTS iceberg.gold.vendor_hourly_metrics;
+DROP TABLE IF EXISTS iceberg.gold.payment_hourly_metrics;
+DROP TABLE IF EXISTS iceberg.gold.location_hourly_metrics;
+DROP TABLE IF EXISTS iceberg.gold.trip_hourly_metrics;
+DROP TABLE IF EXISTS iceberg.gold.yellow_tripdata_enriched;
+DROP TABLE IF EXISTS iceberg.silver.cleaned_yellow_tripdata;
+DROP TABLE IF EXISTS iceberg.silver.yellow_tripdata;
+DROP TABLE IF EXISTS iceberg.bronze.yellow_tripdata;
 
 CREATE TABLE iceberg.bronze.yellow_tripdata (
     vendorid BIGINT,
@@ -22,17 +28,13 @@ CREATE TABLE iceberg.bronze.yellow_tripdata (
     congestion_surcharge DOUBLE,
     airport_fee DOUBLE,
     cbd_congestion_fee DOUBLE,
-    date_hour TIMESTAMP
+    date_hour TIMESTAMP,
+    processing_date_hour TIMESTAMP
 )
 WITH (
     format = 'PARQUET',
-    partitioning = ARRAY['date_hour']
+    partitioning = ARRAY['processing_date_hour']
 );
-
-describe iceberg.bronze."yellow_tripdata$history"
-select * from iceberg.bronze."yellow_tripdata$history"
-DESCRIBE iceberg.bronze."yellow_tripdata$snapshots";
-select * from iceberg.bronze."yellow_tripdata$snapshots";
 
 CREATE TABLE iceberg.silver.cleaned_yellow_tripdata (
     vendorid BIGINT,
@@ -55,14 +57,13 @@ CREATE TABLE iceberg.silver.cleaned_yellow_tripdata (
     congestion_surcharge DOUBLE,
     airport_fee DOUBLE,
     cbd_congestion_fee DOUBLE,
-    date_hour TIMESTAMP
+    date_hour TIMESTAMP,
+    processing_date_hour TIMESTAMP
 )
 WITH (
     format = 'PARQUET',
-    partitioning = ARRAY['date_hour']
+    partitioning = ARRAY['processing_date_hour']
 );
-drop table iceberg.silver.yellow_tripdata 
-
 
 CREATE TABLE iceberg.gold.yellow_tripdata_enriched (
     vendorid BIGINT,
@@ -86,95 +87,88 @@ CREATE TABLE iceberg.gold.yellow_tripdata_enriched (
     airport_fee DOUBLE,
     cbd_congestion_fee DOUBLE,
     date_hour TIMESTAMP,
-
     trip_duration_minutes DOUBLE,
     amount_per_mile DOUBLE,
-    tip_rate DOUBLE
+    tip_rate DOUBLE,
+    processing_date_hour TIMESTAMP
 )
 WITH (
     format = 'PARQUET',
-    partitioning = ARRAY['date_hour']
+    partitioning = ARRAY['processing_date_hour']
 );
 
 CREATE TABLE iceberg.gold.trip_hourly_metrics (
     date_hour TIMESTAMP,
-
     trip_count BIGINT,
     total_passenger_count BIGINT,
-
     total_trip_distance DOUBLE,
     avg_trip_distance DOUBLE,
-
     total_fare_amount DOUBLE,
     total_tip_amount DOUBLE,
     total_total_amount DOUBLE,
     avg_total_amount DOUBLE,
-
     avg_trip_duration_minutes DOUBLE,
-
     min_pickup_datetime TIMESTAMP,
     max_pickup_datetime TIMESTAMP,
     min_dropoff_datetime TIMESTAMP,
-    max_dropoff_datetime TIMESTAMP
+    max_dropoff_datetime TIMESTAMP,
+    processing_date_hour TIMESTAMP
 )
 WITH (
     format = 'PARQUET',
-    partitioning = ARRAY['date_hour']
+    partitioning = ARRAY['processing_date_hour']
 );
 
 CREATE TABLE iceberg.gold.location_hourly_metrics (
     date_hour TIMESTAMP,
     pulocationid BIGINT,
     dolocationid BIGINT,
-
     trip_count BIGINT,
     total_passenger_count BIGINT,
-
     total_trip_distance DOUBLE,
     avg_trip_distance DOUBLE,
-
     total_fare_amount DOUBLE,
     total_tip_amount DOUBLE,
     total_total_amount DOUBLE,
-    avg_total_amount DOUBLE
+    avg_total_amount DOUBLE,
+    processing_date_hour TIMESTAMP
 )
 WITH (
     format = 'PARQUET',
-    partitioning = ARRAY['date_hour']
+    partitioning = ARRAY['processing_date_hour']
 );
 
 CREATE TABLE iceberg.gold.payment_hourly_metrics (
     date_hour TIMESTAMP,
     payment_type BIGINT,
-
     trip_count BIGINT,
     total_trip_distance DOUBLE,
-
     total_fare_amount DOUBLE,
     total_tip_amount DOUBLE,
     total_total_amount DOUBLE,
     avg_total_amount DOUBLE,
-
-    avg_tip_rate DOUBLE
+    avg_tip_rate DOUBLE,
+    processing_date_hour TIMESTAMP
 )
 WITH (
     format = 'PARQUET',
-    partitioning = ARRAY['date_hour']
+    partitioning = ARRAY['processing_date_hour']
 );
 
 CREATE TABLE iceberg.gold.vendor_hourly_metrics (
     date_hour TIMESTAMP,
     vendorid BIGINT,
-
     trip_count BIGINT,
     total_passenger_count BIGINT,
-
     total_trip_distance DOUBLE,
     avg_trip_distance DOUBLE,
-
     total_fare_amount DOUBLE,
     total_tip_amount DOUBLE,
     total_total_amount DOUBLE,
-    avg_total_amount DOUBLE
+    avg_total_amount DOUBLE,
+    processing_date_hour TIMESTAMP
 )
-
+WITH (
+    format = 'PARQUET',
+    partitioning = ARRAY['processing_date_hour']
+);

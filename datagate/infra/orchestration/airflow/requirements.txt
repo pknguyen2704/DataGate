@@ -4,4 +4,3 @@ apache-airflow-providers-postgres
 apache-airflow-providers-apache-spark
 psycopg2-binary
 pydeequ
-prophet

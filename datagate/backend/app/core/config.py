@@ -1,57 +1,63 @@
-from pydantic_settings import BaseSettings
-from functools import lru_cache
-from typing import Optional
+import os
+from dotenv import load_dotenv
 
 
-class Settings(BaseSettings):
-    # App
-    APP_NAME: str = "DataGate"
-    APP_VERSION: str = "1.0.0"
-    API_V1_STR: str = "/api/v1"
-    DEBUG: bool = False
-
-    # Security
-    SECRET_KEY: str = "changeme-very-secret-key"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
-
-    # Database
-    DATABASE_USER: str = "postgres"
-    DATABASE_PASSWORD: str = "postgres"
-    DATABASE_HOST: str = "localhost"
-    DATABASE_PORT: str = "5432"
-    DATABASE_DB: str = "datagate"
-
-    @property
-    def DATABASE_URL(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}"
-            f"@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_DB}"
-        )
-
-    @property
-    def DATABASE_URL_SYNC(self) -> str:
-        return (
-            f"postgresql://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}"
-            f"@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_DB}"
-        )
-
-    # Encryption key for sensitive connection configs
-    ENCRYPTION_KEY: Optional[str] = None
-
-    # Airflow
-    AIRFLOW_BASE_URL: Optional[str] = "http://localhost:8080"
-    AIRFLOW_USERNAME: Optional[str] = "airflow"
-    AIRFLOW_PASSWORD: Optional[str] = "airflow"
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+load_dotenv()
 
 
-@lru_cache()
-def get_settings() -> Settings:
-    return Settings()
+def _get_env(key: str, default: str | None = None) -> str:
+    value = os.getenv(key, default)
+
+    if value is None or value.strip() == "":
+        raise RuntimeError(f"Missing required environment variable: {key}")
+
+    return value.strip()
 
 
-settings = get_settings()
+def _get_int_env(key: str, default: int | None = None) -> int:
+    value = os.getenv(key)
+
+    if value is None or value.strip() == "":
+        if default is not None:
+            return default
+        raise RuntimeError(f"Missing required environment variable: {key}")
+
+    return int(value)
+
+
+def _build_database_url() -> str:
+    user = _get_env("DATABASE_USER")
+    password = _get_env("DATABASE_PASSWORD")
+    host = _get_env("DATABASE_HOST")
+    port = _get_env("DATABASE_PORT")
+    db = _get_env("DATABASE_DB")
+
+    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
+
+
+class Config:
+    app_name: str = _get_env("APP_NAME", "DataGate")
+    app_version: str = _get_env("APP_VERSION", "1.0.0")
+    api_v1_str: str = _get_env("API_V1_STR", "/api/v1")
+    tz: str = _get_env("TZ", "Asia/Ho_Chi_Minh")
+
+    secret_key: str = _get_env("SECRET_KEY")
+    algorithm: str = _get_env("ALGORITHM", "HS256")
+    access_token_expire_minutes: int = _get_int_env(
+        "ACCESS_TOKEN_EXPIRE_MINUTES",
+        default=60,
+    )
+
+    database_host: str = _get_env("DATABASE_HOST")
+    database_port: int = _get_int_env("DATABASE_PORT")
+    database_user: str = _get_env("DATABASE_USER")
+    database_password: str = _get_env("DATABASE_PASSWORD")
+    database_db: str = _get_env("DATABASE_DB")
+    database_url: str = _build_database_url()
+
+    airflow_url: str = _get_env("AIRFLOW_URL")
+    airflow_user: str = _get_env("AIRFLOW_USER")
+    airflow_pass: str = _get_env("AIRFLOW_PASS")
+
+
+config = Config()

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  Alert,
+  CircularProgress,
   MenuItem,
   Paper,
   Stack,
@@ -15,42 +17,54 @@ import {
 } from "@mui/material";
 import { datagateColors, panelSx } from "~/theme";
 
-function DataSample({ assetSample, onChangeSampleLimit, sampleLimit }) {
-  const sampleData = assetSample?.sample_data || {};
-  const columns = sampleData?.columns || [];
-  const rows = sampleData?.rows || [];
+function BoxText() {
+  return (
+    <Stack spacing={0.5}>
+      <Typography variant="h6" fontWeight={800}>
+        Data sample
+      </Typography>
+      <Typography color="text.secondary">
+        Review live records from the selected lakehouse table.
+      </Typography>
+    </Stack>
+  );
+}
 
+function DataSample({ assetSample, sampleStatus, sampleError, onChangeSampleLimit, sampleLimit }) {
+  const sampleData = assetSample?.sample_data || assetSample || {};
+  const columns = sampleData.columns || [];
+  const rows = sampleData.rows || [];
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  // Tính toán dữ liệu hiển thị cho trang hiện tại
-  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const visibleRows = useMemo(
+    () => rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [page, rows, rowsPerPage]
+  );
 
   return (
     <Stack spacing={3}>
-      <Paper sx={{ p: 3, borderRadius: 2, boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="center" justifyContent="space-between">
+      <Paper sx={{ ...panelSx, p: 3 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", md: "center" }}
+          justifyContent="space-between"
+        >
           <BoxText />
           <Stack direction="row" spacing={2} alignItems="center">
-            <Typography variant="body2" color="text.secondary">Fetch limit:</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Sample size
+            </Typography>
             <TextField
               select
               size="small"
               value={sampleLimit}
               onChange={(event) => {
                 onChangeSampleLimit(Number(event.target.value));
-                setPage(0); // Reset page when limit changes
+                setPage(0);
               }}
-              sx={{ minWidth: 100 }}
+              sx={{ minWidth: 120 }}
             >
               {[10, 25, 50, 100, 200, 500].map((value) => (
                 <MenuItem key={value} value={value}>
@@ -62,101 +76,105 @@ function DataSample({ assetSample, onChangeSampleLimit, sampleLimit }) {
         </Stack>
       </Paper>
 
-      <Paper sx={{ ...panelSx, overflow: "hidden", borderRadius: 2, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
-        <TableContainer sx={{ maxHeight: 600 }}>
-          <Table size="small" stickyHeader>
-            <TableHead>
-              <TableRow>
-                {/* Cột số thứ tự nổi bật */}
-                <TableCell 
-                  sx={{ 
-                    bgcolor: "#f8f9fa", 
-                    fontWeight: 800, 
-                    color: datagateColors.primary,
-                    width: 60,
-                    borderBottom: `2px solid ${datagateColors.primary}`,
-                    zIndex: 10
-                  }}
-                >
-                  No.
-                </TableCell>
-                {columns.map((column) => (
-                  <TableCell 
-                    key={column} 
-                    sx={{ 
-                      bgcolor: "#f8f9fa",
-                      fontWeight: 800,
-                      whiteSpace: "nowrap",
-                      borderBottom: `2px solid ${datagateColors.primary}`,
-                      minWidth: 150
-                    }}
-                  >
-                    {column}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length + 1} align="center" sx={{ py: 10 }}>
-                    <Typography color="text.secondary" variant="body1">
-                      No sample rows available for this asset.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                visibleRows.map((row, rowIndex) => (
-                  <TableRow key={rowIndex} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#fafafa' } }}>
-                    <TableCell sx={{ fontWeight: 600, color: "text.secondary", borderRight: "1px solid #eee" }}>
-                      {page * rowsPerPage + rowIndex + 1}
+      {sampleError ? <Alert severity="warning">{sampleError}</Alert> : null}
+
+      <Paper sx={{ ...panelSx, overflow: "hidden" }}>
+        {sampleStatus === "loading" && !assetSample ? (
+          <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
+            <CircularProgress size={28} />
+          </Stack>
+        ) : (
+          <>
+            <TableContainer sx={{ maxHeight: 640 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      sx={{
+                        bgcolor: datagateColors.tableHeadBackground,
+                        color: datagateColors.textPrimary,
+                        fontWeight: 800,
+                        width: 72,
+                        borderBottom: `2px solid ${datagateColors.selectedBorder}`,
+                      }}
+                    >
+                      Row
                     </TableCell>
-                    {columns.map((column, columnIndex) => (
-                      <TableCell 
-                        key={`${rowIndex}-${column}`}
-                        sx={{ 
-                          maxWidth: 300, 
-                          overflow: "hidden", 
-                          textOverflow: "ellipsis", 
-                          whiteSpace: "nowrap" 
+                    {columns.map((column) => (
+                      <TableCell
+                        key={column}
+                        sx={{
+                          bgcolor: datagateColors.tableHeadBackground,
+                          color: datagateColors.textPrimary,
+                          fontWeight: 800,
+                          minWidth: 160,
+                          borderBottom: `2px solid ${datagateColors.selectedBorder}`,
                         }}
                       >
-                        {row?.[columnIndex] === null || row?.[columnIndex] === undefined 
-                          ? <Typography component="span" sx={{ color: "#ccc", fontStyle: "italic", fontSize: "0.8rem" }}>NULL</Typography>
-                          : String(row[columnIndex])
-                        }
+                        {column}
                       </TableCell>
                     ))}
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[10, 25, 50]}
-          component="div"
-          count={rows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          sx={{ borderTop: "1px solid #eee" }}
-        />
+                </TableHead>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={columns.length + 1} align="center" sx={{ py: 10 }}>
+                        <Typography color="text.secondary">
+                          No sample rows available for this asset.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    visibleRows.map((row, rowIndex) => (
+                      <TableRow key={`${page}-${rowIndex}`} hover>
+                        <TableCell sx={{ fontWeight: 700, color: "text.secondary" }}>
+                          {page * rowsPerPage + rowIndex + 1}
+                        </TableCell>
+                        {columns.map((column, columnIndex) => {
+                          const value = row?.[columnIndex];
+                          return (
+                            <TableCell
+                              key={`${rowIndex}-${column}`}
+                              sx={{
+                                maxWidth: 320,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {value === null || value === undefined ? (
+                                <Typography component="span" sx={{ color: datagateColors.textSecondary, fontStyle: "italic" }}>
+                                  NULL
+                                </Typography>
+                              ) : (
+                                String(value)
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50]}
+              component="div"
+              count={rows.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+              sx={{ borderTop: "1px solid", borderColor: "divider" }}
+            />
+          </>
+        )}
       </Paper>
-    </Stack>
-  );
-}
-
-function BoxText() {
-  return (
-    <Stack spacing={0.5}>
-      <Typography variant="h6" fontWeight={700}>
-        Data Sample
-      </Typography>
-      <Typography color="text.secondary">
-        Review raw records returned from the selected asset.
-      </Typography>
     </Stack>
   );
 }

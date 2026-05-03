@@ -11,6 +11,7 @@ from pyspark.sql.functions import (
     max as spark_max,
     min as spark_min,
     sum as spark_sum,
+    to_timestamp,
     unix_timestamp,
     when,
 )
@@ -27,7 +28,7 @@ class JobConfig:
     location_hourly_metrics_table: str
     payment_hourly_metrics_table: str
     vendor_hourly_metrics_table: str
-    date_hour: str
+    processing_date_hour: str
 
 
 def parse_args() -> JobConfig:
@@ -72,9 +73,9 @@ def parse_args() -> JobConfig:
     )
 
     parser.add_argument(
-        "--date_hour",
+        "--processing_date_hour",
         required=True,
-        help="Processing date_hour, format: yyyy-MM-dd HH:mm:ss",
+        help="Processing batch partition, format: yyyy-MM-dd HH:mm:ss",
     )
 
     args = parser.parse_args()
@@ -86,7 +87,7 @@ def parse_args() -> JobConfig:
         location_hourly_metrics_table=args.location_hourly_metrics_table,
         payment_hourly_metrics_table=args.payment_hourly_metrics_table,
         vendor_hourly_metrics_table=args.vendor_hourly_metrics_table,
-        date_hour=args.date_hour,
+        processing_date_hour=args.processing_date_hour,
     )
 
 
@@ -101,13 +102,13 @@ def build_spark_session() -> SparkSession:
 def read_from_iceberg(
     spark: SparkSession,
     source_table: str,
-    date_hour: str,
+    processing_date_hour: str,
 ) -> DataFrame:
     return (
         spark.read
         .format("iceberg")
         .load(f"iceberg.{source_table}")
-        .filter(col("date_hour") == date_hour)
+        .filter(col("processing_date_hour") == to_timestamp(lit(processing_date_hour)))
     )
 
 
@@ -146,12 +147,12 @@ def build_enriched_trip_data(df: DataFrame) -> DataFrame:
             ).otherwise(lit(None).cast("double")),
         )
         .select(
-            col("vendorid"),
+            col("vendor_id"),
             col("tpep_pickup_datetime"),
             col("tpep_dropoff_datetime"),
             col("passenger_count"),
             col("trip_distance"),
-            col("ratecodeid"),
+            col("ratecode_id"),
             col("store_and_fwd_flag"),
             col("pulocationid"),
             col("dolocationid"),
@@ -170,6 +171,7 @@ def build_enriched_trip_data(df: DataFrame) -> DataFrame:
             col("trip_duration_minutes"),
             col("amount_per_mile"),
             col("tip_rate"),
+            col("processing_date_hour"),
         )
     )
 
@@ -196,6 +198,7 @@ def build_trip_hourly_metrics(enriched_df: DataFrame) -> DataFrame:
             spark_max(col("tpep_pickup_datetime")).alias("max_pickup_datetime"),
             spark_min(col("tpep_dropoff_datetime")).alias("min_dropoff_datetime"),
             spark_max(col("tpep_dropoff_datetime")).alias("max_dropoff_datetime"),
+            spark_max(col("processing_date_hour")).alias("processing_date_hour"),
         )
     )
 
@@ -219,6 +222,7 @@ def build_location_hourly_metrics(enriched_df: DataFrame) -> DataFrame:
             spark_sum(col("tip_amount")).alias("total_tip_amount"),
             spark_sum(col("total_amount")).alias("total_total_amount"),
             avg(col("total_amount")).alias("avg_total_amount"),
+            spark_max(col("processing_date_hour")).alias("processing_date_hour"),
         )
     )
 
@@ -240,6 +244,7 @@ def build_payment_hourly_metrics(enriched_df: DataFrame) -> DataFrame:
             avg(col("total_amount")).alias("avg_total_amount"),
 
             avg(col("tip_rate")).alias("avg_tip_rate"),
+            spark_max(col("processing_date_hour")).alias("processing_date_hour"),
         )
     )
 
@@ -249,7 +254,7 @@ def build_vendor_hourly_metrics(enriched_df: DataFrame) -> DataFrame:
         enriched_df
         .groupBy(
             col("date_hour"),
-            col("vendorid"),
+            col("vendor_id"),
         )
         .agg(
             count(lit(1)).cast("bigint").alias("trip_count"),
@@ -262,6 +267,7 @@ def build_vendor_hourly_metrics(enriched_df: DataFrame) -> DataFrame:
             spark_sum(col("tip_amount")).alias("total_tip_amount"),
             spark_sum(col("total_amount")).alias("total_total_amount"),
             avg(col("total_amount")).alias("avg_total_amount"),
+            spark_max(col("processing_date_hour")).alias("processing_date_hour"),
         )
     )
 
@@ -273,10 +279,15 @@ def main() -> None:
     spark = build_spark_session()
 
     try:
+        print(
+            f"[{JOB_NAME}] Loading silver partition "
+            f"processing_date_hour={job_config.processing_date_hour}"
+        )
+
         silver_df = read_from_iceberg(
             spark=spark,
             source_table=job_config.source_table,
-            date_hour=job_config.date_hour,
+            processing_date_hour=job_config.processing_date_hour,
         )
 
         enriched_df = build_enriched_trip_data(silver_df)

@@ -9,7 +9,6 @@ services:
     ports:
       - "8080:8080"
       - "7077:7077"
-      - "6066:6066"
     volumes:
       - ./conf:/opt/spark/conf
       - ./logs:/opt/spark/work
@@ -45,12 +44,13 @@ services:
       - ./conf:/opt/spark/conf
       - ./logs:/opt/spark/work
       - ../../shared/jobs:/opt/spark/jobs
+      - ../../notebook/jupiter_notebook/workspace:/opt/spark/workspace
     command: >
       /opt/spark/bin/spark-class
       org.apache.spark.deploy.worker.Worker
       spark://spark-master:7077
-      --cores 5
-      --memory 10G
+      --cores 6
+      --memory 14G
       --webui-port 8081
     networks:
       - datagate-net
@@ -78,12 +78,13 @@ services:
       - ./conf:/opt/spark/conf
       - ./logs:/opt/spark/work
       - ../../shared/jobs:/opt/spark/jobs
+      - ../../notebook/jupiter_notebook/workspace:/opt/spark/workspace
     command: >
       /opt/spark/bin/spark-class
       org.apache.spark.deploy.worker.Worker
       spark://spark-master:7077
-      --cores 5
-      --memory 10G
+      --cores 6
+      --memory 14G
       --webui-port 8081
     networks:
       - datagate-net

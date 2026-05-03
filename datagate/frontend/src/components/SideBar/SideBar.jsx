@@ -1,30 +1,26 @@
 import React from "react";
 import {
   Box,
-  Typography,
+  Divider,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
   Tooltip,
-  Badge,
-  Divider,
+  Typography,
 } from "@mui/material";
 import {
   DashboardOutlined as DashboardIcon,
-  TableChartOutlined as TablesIcon,
-  PowerOutlined as ConnectionsIcon,
-  RuleOutlined as RulesIcon,
-  NotificationsNoneOutlined as AlertsIcon,
-  WorkHistoryOutlined as JobsIcon,
   SettingsOutlined as SettingsIcon,
+  TableChartOutlined as TablesIcon,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import DataGateLogo from "~/assets/images/datagate.svg";
+import { datagateColors } from "~/theme";
 
-const getNavItems = (openAlertCount) => [
+const getNavItems = () => [
   {
     text: "Home",
     icon: <DashboardIcon />,
@@ -32,39 +28,11 @@ const getNavItems = (openAlertCount) => [
     permission: "dashboard:view",
   },
   {
-    text: "Tables",
+    text: "Explore",
     icon: <TablesIcon />,
-    path: "/tables",
+    path: "/explore",
     permission: "table:view",
-  },
-
-  {
-    text: "Rules",
-    icon: <RulesIcon />,
-    path: "/rules",
-    permission: "rule:view",
-  },
-  {
-    text: "Alerts",
-    icon: (
-      <Badge
-        badgeContent={openAlertCount}
-        color="error"
-        max={99}
-        sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", minWidth: 16, height: 16 } }}
-      >
-        <AlertsIcon />
-      </Badge>
-    ),
-    path: "/alerts",
-    permission: "alert:view",
-  },
-  {
-    text: "Jobs",
-    icon: <JobsIcon />,
-    path: "/jobs",
-    permission: "job:view",
-  },
+  }
 ];
 
 const SideBar = ({ isCollapsed }) => {
@@ -74,9 +42,7 @@ const SideBar = ({ isCollapsed }) => {
   const { user } = useSelector((state) => state.auth);
   const permissions = user?.permissions || [];
 
-  // TODO: get real open alert count from Redux store
-  const openAlertCount = 0;
-  const navItems = getNavItems(openAlertCount);
+  const navItems = getNavItems();
 
   const hasPermission = (permCode) => {
     if (!permCode) return true;
@@ -91,9 +57,9 @@ const SideBar = ({ isCollapsed }) => {
   const visibleItems = navItems.filter((item) => hasPermission(item.permission));
 
   return (
-    <Box
-      sx={{
-        width: isCollapsed ? "72px" : theme.datagate.sidebarWidth,
+      <Box
+        sx={{
+          width: isCollapsed ? "72px" : theme.datagate.sidebarWidth,
         minWidth: isCollapsed ? "72px" : theme.datagate.sidebarWidth,
         flexShrink: 0,
         height: "100%",
@@ -101,10 +67,11 @@ const SideBar = ({ isCollapsed }) => {
         flexDirection: "column",
         bgcolor: "background.paper",
         transition: "width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s cubic-bezier(0.4,0,0.2,1)",
-        overflowX: "hidden",
-        borderRight: "1px solid",
-        borderColor: "divider",
-      }}
+          overflowX: "hidden",
+          borderRight: `1px solid ${datagateColors.cardBorderSoft}`,
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)",
+        }}
     >
       {/* Logo */}
       <Box
@@ -151,7 +118,7 @@ const SideBar = ({ isCollapsed }) => {
               onClick={() => navigate(item.path)}
               sx={{
                 mb: 0.5,
-                borderRadius: 1,
+                borderRadius: `${theme.datagate.radii.md}px`,
                 justifyContent: isCollapsed ? "center" : "flex-start",
                 px: isCollapsed ? 0 : 1.5,
                 minHeight: 42,
@@ -199,7 +166,7 @@ const SideBar = ({ isCollapsed }) => {
             selected={location.pathname.startsWith("/settings")}
             onClick={() => navigate("/settings")}
             sx={{
-              borderRadius: 1,
+              borderRadius: `${theme.datagate.radii.md}px`,
               justifyContent: isCollapsed ? "center" : "flex-start",
               px: isCollapsed ? 0 : 1.5,
               minHeight: 42,

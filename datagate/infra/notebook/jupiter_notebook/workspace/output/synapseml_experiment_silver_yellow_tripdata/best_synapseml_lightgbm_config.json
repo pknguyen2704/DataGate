@@ -1,0 +1,177 @@
+{
+  "model": "SynapseML LightGBM",
+  "task": "current_batch_vs_historical_batches",
+  "target_processing_date_hour": "2025-01-15 12:00:00",
+  "comparison_processing_date_hours": [
+    "2025-01-01 12:00:00",
+    "2025-01-08 12:00:00",
+    "2025-01-14 12:00:00",
+    "2025-01-15 00:00:00"
+  ],
+  "metric": "auc",
+  "baseline": {
+    "valid_auc": 0.6984680555555556,
+    "test_auc": 0.7033878333333332,
+    "params": {
+      "learningRate": 0.05,
+      "numLeaves": 31,
+      "maxDepth": -1,
+      "minDataInLeaf": 20,
+      "baggingFraction": 1.0,
+      "baggingFreq": 0,
+      "featureFraction": 1.0,
+      "lambdaL1": 1e-08,
+      "lambdaL2": 1e-08,
+      "minGainToSplit": 0.0,
+      "maxBin": 255
+    }
+  },
+  "optuna_best": {
+    "valid_auc": 0.7009858888888889,
+    "test_auc": 0.7062120555555556,
+    "best_iteration": null,
+    "fit_seconds": 10.456836938858032,
+    "params": {
+      "learningRate": 0.010259395566444143,
+      "numLeaves": 63,
+      "maxDepth": 10,
+      "minDataInLeaf": 10,
+      "baggingFraction": 0.7965161151921767,
+      "baggingFreq": 5,
+      "featureFraction": 0.9562031053637944,
+      "lambdaL1": 4.971067802769688,
+      "lambdaL2": 0.002484856335700491,
+      "minGainToSplit": 0.5373076515009603,
+      "maxBin": 127
+    }
+  },
+  "final_selected": {
+    "selected_param_source": "optuna",
+    "selected_valid_auc": 0.7009858888888889,
+    "selected_tunable_params": {
+      "learningRate": 0.010259395566444143,
+      "numLeaves": 63,
+      "maxDepth": 10,
+      "minDataInLeaf": 10,
+      "baggingFraction": 0.7965161151921767,
+      "baggingFreq": 5,
+      "featureFraction": 0.9562031053637944,
+      "lambdaL1": 4.971067802769688,
+      "lambdaL2": 0.002484856335700491,
+      "minGainToSplit": 0.5373076515009603,
+      "maxBin": 127
+    },
+    "selected_full_lgbm_params": {
+      "objective": "binary",
+      "metric": "auc",
+      "featuresCol": "features",
+      "labelCol": "label",
+      "validationIndicatorCol": "is_validation",
+      "learningRate": 0.010259395566444143,
+      "numLeaves": 63,
+      "maxDepth": 10,
+      "minDataInLeaf": 10,
+      "baggingFraction": 0.7965161151921767,
+      "baggingFreq": 5,
+      "featureFraction": 0.9562031053637944,
+      "lambdaL1": 4.971067802769688,
+      "lambdaL2": 0.002484856335700491,
+      "minGainToSplit": 0.5373076515009603,
+      "maxBin": 127,
+      "numIterations": 2000,
+      "earlyStoppingRound": 100,
+      "numTasks": 4,
+      "numThreads": 3,
+      "maxStreamingOMPThreads": 3,
+      "timeout": 600,
+      "useBarrierExecutionMode": true,
+      "useSingleDatasetMode": true,
+      "dataTransferMode": "streaming",
+      "verbosity": -1
+    },
+    "final_valid_auc": 0.7009984444444446,
+    "final_test_auc": 0.7062029444444446,
+    "final_best_iteration": null
+  },
+  "features": {
+    "numeric_feature_cols": [
+      "passenger_count",
+      "trip_distance",
+      "fare_amount",
+      "pulocationid",
+      "dolocationid",
+      "extra",
+      "mta_tax",
+      "tip_amount",
+      "tolls_amount",
+      "improvement_surcharge",
+      "total_amount",
+      "congestion_surcharge",
+      "airport_fee",
+      "cbd_congestion_fee"
+    ],
+    "categorical_numeric_cols": [
+      "vendorid",
+      "ratecodeid",
+      "payment_type"
+    ],
+    "categorical_string_cols": [
+      "store_and_fwd_flag"
+    ],
+    "string_indexed_cols": [
+      "store_and_fwd_flag__idx"
+    ],
+    "final_feature_cols": [
+      "passenger_count",
+      "trip_distance",
+      "fare_amount",
+      "pulocationid",
+      "dolocationid",
+      "extra",
+      "mta_tax",
+      "tip_amount",
+      "tolls_amount",
+      "improvement_surcharge",
+      "total_amount",
+      "congestion_surcharge",
+      "airport_fee",
+      "cbd_congestion_fee",
+      "vendorid",
+      "ratecodeid",
+      "payment_type",
+      "store_and_fwd_flag__idx"
+    ],
+    "categorical_feature_cols": [
+      "vendorid",
+      "ratecodeid",
+      "payment_type",
+      "store_and_fwd_flag__idx"
+    ],
+    "categorical_slot_indexes": [
+      14,
+      15,
+      16,
+      17
+    ]
+  },
+  "fixed_training_config": {
+    "random_state": 42,
+    "target_sample_per_group": 10000,
+    "min_rows_per_group": 100,
+    "previous_batch_offset": "0 days 12:00:00",
+    "history_offsets": [
+      "1 days 00:00:00",
+      "7 days 00:00:00",
+      "14 days 00:00:00"
+    ],
+    "n_estimators_max": 2000,
+    "early_stopping_rounds": 100,
+    "lgbm_num_tasks": 4,
+    "lgbm_num_threads": 3,
+    "spark_sql_shuffle_partitions": 12,
+    "run_optuna": true,
+    "n_trials": 100,
+    "run_final_shap": true,
+    "use_fixed_ports": false
+  }
+}

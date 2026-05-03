@@ -21,7 +21,7 @@ import {
   MenuOpen as MenuOpenIcon,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
-import { logout as logoutAction } from "../../stores/slices/authSlice";
+import { logout as logoutAction } from "../../stores/slices/authSlice/authSlice";
 import { useNavigate } from "react-router-dom";
 
 const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
@@ -66,20 +66,6 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Tooltip title="Documentation">
-            <IconButton size="small">
-              <HelpIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          
-          <Tooltip title="Notifications">
-            <IconButton size="small">
-              <NotificationsIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-
-          <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 24, alignSelf: "center" }} />
-
           <Box
             sx={{
               display: "flex",

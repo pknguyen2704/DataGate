@@ -1,126 +1,122 @@
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  Alert,
   Box,
   Breadcrumbs,
   Button,
   Chip,
+  CircularProgress,
   Link,
+  Paper,
   Stack,
   Tab,
   Tabs,
   Typography,
-  Alert,
-  CircularProgress,
-  Paper,
 } from "@mui/material";
 import {
   ArticleOutlined as DescriptionIcon,
-  TableChartOutlined as SampleIcon,
-  InsightsOutlined as ObservabilityIcon,
-  ErrorOutline as IncidentIcon,
+  InsightsOutlined as AnomalyIcon,
   LockOutlined as LockIcon,
+  RuleOutlined as RuleIcon,
+  TableChartOutlined as SampleIcon,
 } from "@mui/icons-material";
-import {
-  fetchAssetOverview,
-  fetchAssetSample,
-} from "~/stores/slices/exploreSlice/index";
-import Overview from "./Overview/Overview";
+import { fetchAssetOverview, fetchAssetSample } from "~/stores/slices/tableSlice";
+import { datagateColors, pageShellSx, panelSx } from "~/theme";
 import DataSample from "./DataSample/DataSample";
-import DataObservability from "./Observability/Observability";
-import Incidents from "./Incidents/Incidents";
-import { pageShellSx } from "~/theme";
-
-const getOwnerLabel = (owner) =>
-  owner?.full_name || owner?.username || owner?.email || "Unassigned owner";
+import Overview from "./Overview/Overview";
+import RulesManagement from "./Rule/Rule";
+import AnomalyDetection from "./AnomalyDetection/AnomalyDetection";
 
 const SECTION_TO_TAB = {
   overview: 0,
   sample: 1,
-  observability: 2,
-  incidents: 3,
+  rules: 2,
+  anomaly: 3,
 };
 
+const getAssetKey = ({ tableName, schemaName, catalogName }) =>
+  `${catalogName || "default"}:${schemaName || "public"}:${tableName}`;
+
+const getSampleKey = ({ tableName, schemaName, catalogName, sampleLimit }) =>
+  `${getAssetKey({ tableName, schemaName, catalogName })}:${sampleLimit}`;
+
+const getOwnerLabel = (owner) =>
+  owner?.full_name || owner?.username || owner?.email || "Unassigned owner";
+
 function TableDetail({
+  tableId,
   tableName,
   schemaName,
-  connectionId,
+  catalogName,
   onBack,
   onChangeSection,
+  onNavigateCrumb,
   section = "overview",
-  observabilityTab = "metadata",
 }) {
   const dispatch = useDispatch();
   const [sampleLimit, setSampleLimit] = useState(50);
-
-  // RBAC state
   const currentUser = useSelector((state) => state.auth.user);
   const isSuperuser = currentUser?.is_superuser;
   const accessibleTables = currentUser?.accessible_tables || [];
-
   const {
     assetOverviewsByKey,
     assetOverviewStatusByKey,
     assetOverviewErrorByKey,
     assetSamplesByKey,
+    assetSampleStatusByKey,
+    assetSampleErrorByKey,
   } = useSelector((state) => state.explore.overview);
 
-  const {
-    snapshotsByTable,
-    volumeTSByTable,
-    schemasByTable,
-  } = useSelector((state) => state.explore.observability);
-
-  // Check Access
-  const fullTableName = schemaName ? `${schemaName}.${tableName}` : tableName;
+  const fullTableName = catalogName ? `${catalogName}.${schemaName}.${tableName}` : `${schemaName}.${tableName}`;
   const hasAccess = useMemo(() => {
     if (isSuperuser) return true;
+    if (accessibleTables.length === 0 && !isSuperuser) return true;
     return accessibleTables.includes(fullTableName);
-  }, [isSuperuser, accessibleTables, fullTableName]);
+  }, [accessibleTables, fullTableName, isSuperuser]);
 
-  const assetKey = `${connectionId}:${schemaName || 'public'}:${tableName}`;
-  const sampleKey = `${connectionId}:${schemaName || 'public'}:${tableName}:${sampleLimit}`;
-
+  const assetKey = getAssetKey({ tableName, schemaName, catalogName });
+  const sampleKey = getSampleKey({ tableName, schemaName, catalogName, sampleLimit });
   const assetDetail = assetOverviewsByKey[assetKey];
   const assetSample = assetSamplesByKey[sampleKey];
   const status = assetOverviewStatusByKey[assetKey];
   const error = assetOverviewErrorByKey[assetKey];
+  const sampleStatus = assetSampleStatusByKey[sampleKey];
+  const sampleError = assetSampleErrorByKey[sampleKey];
 
-  // Fetch overview
   useEffect(() => {
-    if (!tableName || !connectionId || !hasAccess) return;
-    dispatch(fetchAssetOverview({ tableName, schemaName, connectionId }));
-  }, [dispatch, tableName, schemaName, connectionId, hasAccess]);
+    if (!tableName || !schemaName || !catalogName || !hasAccess) return;
+    dispatch(fetchAssetOverview({ tableName, schemaName, catalogName }));
+  }, [catalogName, dispatch, hasAccess, schemaName, tableName]);
 
-  // Fetch sample
   useEffect(() => {
-    if (!tableName || !connectionId || !hasAccess) return;
-    dispatch(fetchAssetSample({ tableName, schemaName, connectionId, sampleLimit }));
-  }, [dispatch, tableName, schemaName, connectionId, sampleLimit, hasAccess]);
+    if (!tableName || !schemaName || !catalogName || !hasAccess) return;
+    dispatch(fetchAssetSample({ tableName, schemaName, catalogName, sampleLimit }));
+  }, [catalogName, dispatch, hasAccess, sampleLimit, schemaName, tableName]);
 
   const ownerLabel = useMemo(() => getOwnerLabel(assetDetail?.owner), [assetDetail?.owner]);
   const activeTab = SECTION_TO_TAB[section] ?? 0;
 
-  // --- ACCESS DENIED UI ---
   if (!hasAccess) {
     return (
-      <Box sx={{ ...pageShellSx, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '1px solid #fee2e2', bgcolor: '#fff' }}>
-          <LockIcon sx={{ fontSize: 64, color: 'error.main', mb: 2, opacity: 0.8 }} />
-          <Typography variant="h5" fontWeight={900} gutterBottom>Access Denied</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400 }}>
-            You do not have permission to view the data for <b>{fullTableName}</b>. 
-            Please contact your administrator to request access.
+      <Box sx={{ ...pageShellSx, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <Paper sx={{ ...panelSx, p: 6, textAlign: "center", maxWidth: 480 }}>
+          <LockIcon sx={{ fontSize: 64, color: "error.main", mb: 2, opacity: 0.85 }} />
+          <Typography variant="h5" fontWeight={900} gutterBottom>
+            Access denied
           </Typography>
-          <Button variant="contained" onClick={onBack} sx={{ borderRadius: 2, px: 4 }}>
-            Go Back
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+            You do not have permission to view <strong>{fullTableName}</strong>.
+          </Typography>
+          <Button variant="contained" onClick={onBack}>
+            Back to Explore
           </Button>
         </Paper>
       </Box>
     );
   }
 
-  if (status === "loading") {
+  if (status === "loading" && !assetDetail) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
         <CircularProgress size={32} />
@@ -136,83 +132,136 @@ function TableDetail({
     return <Alert severity="warning" sx={{ m: 3 }}>Asset not found.</Alert>;
   }
 
-  const normalizedObsKey = `${schemaName || 'public'}.${tableName}`;
-  const assetObservability = {
-    schema: schemasByTable[normalizedObsKey] || [],
-    snapshots: snapshotsByTable[normalizedObsKey] || [],
-    volume: volumeTSByTable[normalizedObsKey] || [],
+  const detail = assetDetail || {
+    id: tableId,
+    asset_name: tableName,
+    catalog_name: catalogName,
+    schema_name: schemaName,
+    table_name: tableName,
+    full_name: fullTableName,
+    columns: [],
   };
 
   return (
     <Box sx={pageShellSx}>
-      <Box sx={{ mb: 3 }}>
-        <Breadcrumbs sx={{ mb: 1 }}>
-          <Link underline="hover" color="inherit" onClick={onBack} sx={{ cursor: "pointer" }}>
-            Explore
-          </Link>
-          <Typography color="inherit">{assetDetail?.schema_name}</Typography>
-          <Typography color="text.primary" sx={{ fontWeight: 600 }}>{assetDetail?.asset_name}</Typography>
-        </Breadcrumbs>
-
-        <Stack
-          direction={{ xs: "column", lg: "row" }}
-          spacing={2}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", lg: "center" }}
+      <Stack spacing={3}>
+        <Paper
+          sx={{
+            ...panelSx,
+            p: 3,
+            background:
+              "linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(255, 255, 255, 0.92) 60%, rgba(248, 250, 252, 1) 100%)",
+          }}
         >
-          <Stack spacing={1.5}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ xs: "flex-start", sm: "center" }}>
-              <Typography variant="h4" fontWeight={800}>
-                {assetDetail?.asset_name}
+          <Stack spacing={2}>
+            <Breadcrumbs>
+              <Link
+                underline="hover"
+                color="inherit"
+                onClick={() => onNavigateCrumb?.({}) ?? onBack?.()}
+                sx={{ cursor: "pointer", fontWeight: 700 }}
+              >
+                Explore
+              </Link>
+              <Link
+                underline="hover"
+                color="inherit"
+                onClick={() => onNavigateCrumb?.({ catalogName: detail.catalog_name })}
+                sx={{ cursor: "pointer", fontWeight: 700 }}
+              >
+                {detail.catalog_name}
+              </Link>
+              <Link
+                underline="hover"
+                color="inherit"
+                onClick={() =>
+                  onNavigateCrumb?.({
+                    catalogName: detail.catalog_name,
+                    schemaName: detail.schema_name,
+                  })
+                }
+                sx={{ cursor: "pointer", fontWeight: 700 }}
+              >
+                {detail.schema_name}
+              </Link>
+              <Typography color="text.primary" sx={{ fontWeight: 800 }}>
+                {detail.asset_name}
               </Typography>
-              <Chip size="small" color="primary" variant="outlined" label={`Permitted to: ${ownerLabel}`} />
-            </Stack>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }}>
-              <Typography variant="body2" color="text.secondary">
-                {assetDetail?.table_name}
-              </Typography>
-              {assetDetail?.connection_name ? <Chip size="small" label={`Source: ${assetDetail.connection_name}`} variant="outlined" /> : null}
+            </Breadcrumbs>
+
+            <Stack
+              direction={{ xs: "column", lg: "row" }}
+              spacing={2}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", lg: "center" }}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ xs: "flex-start", sm: "center" }}>
+                  <Typography variant="h4" fontWeight={800}>
+                    {detail.asset_name}
+                  </Typography>
+                  <Chip size="small" label={detail.connection_name || "Managed source"} color="primary" variant="outlined" />
+                  <Chip size="small" color="primary" variant="outlined" label={ownerLabel} />
+                </Stack>
+                <Typography
+                  variant="body2"
+                  sx={{ color: "text.secondary", fontFamily: "monospace" }}
+                >
+                  {detail.full_name || [detail.catalog_name, detail.schema_name, detail.table_name].filter(Boolean).join(".")}
+                </Typography>
+              </Stack>
+
+              <Button variant="outlined" onClick={onBack}>
+                Back to Explore
+              </Button>
             </Stack>
           </Stack>
+        </Paper>
 
-          <Button variant="outlined" onClick={onBack}>
-            Back to Explore
-          </Button>
-        </Stack>
-      </Box>
+        <Paper sx={{ ...panelSx, p: 1, borderColor: datagateColors.cardBorder }}>
+          <Tabs
+            value={activeTab}
+            onChange={(_, nextTab) => {
+              const nextSection =
+                Object.keys(SECTION_TO_TAB).find((key) => SECTION_TO_TAB[key] === nextTab) || "overview";
+              onChangeSection?.(nextSection);
+            }}
+          >
+            <Tab icon={<DescriptionIcon fontSize="small" />} iconPosition="start" label="Overview" />
+            <Tab icon={<SampleIcon fontSize="small" />} iconPosition="start" label="Data Sample" />
+            <Tab icon={<RuleIcon fontSize="small" />} iconPosition="start" label="Rules" />
+            <Tab icon={<AnomalyIcon fontSize="small" />} iconPosition="start" label="Anomaly" />
+          </Tabs>
+        </Paper>
 
-      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={(_, nextTab) => {
-          const nextSection = Object.keys(SECTION_TO_TAB).find((key) => SECTION_TO_TAB[key] === nextTab) || "overview";
-          onChangeSection?.(nextSection);
-        }}>
-          <Tab icon={<DescriptionIcon fontSize="small" />} iconPosition="start" label="Overview" />
-          <Tab icon={<SampleIcon fontSize="small" />} iconPosition="start" label="Data Sample" />
-          <Tab icon={<ObservabilityIcon fontSize="small" />} iconPosition="start" label="Observability" />
-          <Tab icon={<IncidentIcon fontSize="small" />} iconPosition="start" label="Incidents" />
-        </Tabs>
-      </Box>
+        {section === "overview" ? (
+          <Overview assetDetail={detail} tableId={detail.id || tableId} />
+        ) : null}
 
-      <Box sx={{ py: 1 }}>
-        {section === "overview" && <Overview assetDetail={assetDetail} assetObservability={assetObservability} />}
-        {section === "sample" && (
+        {section === "sample" ? (
           <DataSample
             assetSample={assetSample}
+            sampleStatus={sampleStatus}
+            sampleError={sampleError}
             onChangeSampleLimit={(limit) => setSampleLimit(limit)}
             sampleLimit={sampleLimit}
           />
-        )}
-        {section === "observability" && (
-          <DataObservability
-            assetDetail={assetDetail}
-            initialTab={observabilityTab}
-            onTabChange={(nextTab) => onChangeSection?.("observability", nextTab)}
+        ) : null}
+
+        {section === "rules" ? (
+          <RulesManagement
+            tableId={detail.id || tableId}
+            columns={detail.columns || []}
           />
-        )}
-        {section === "incidents" && (
-          <Incidents assetDetail={assetDetail} />
-        )}
-      </Box>
+        ) : null}
+
+        {section === "anomaly" ? (
+          <AnomalyDetection
+            tableId={detail.id || tableId}
+            assetDetail={detail}
+          />
+        ) : null}
+      </Stack>
     </Box>
   );
 }

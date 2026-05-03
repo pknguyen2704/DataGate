@@ -2,23 +2,34 @@ import { createTheme } from "@mui/material/styles";
 
 const APP_BAR_HEIGHT = 64;
 const SIDEBAR_WIDTH = 260;
-const BASE_RADIUS = 8;
+const BASE_RADIUS = 12;
 
 export const datagateColors = {
-  pageBackground: "#0B1120", // Deep midnight blue
-  cardBorder: "#334155", // Slate 700
-  cardBorderSoft: "#1E293B", // Slate 800
-  cardBackground: "#0F172A", // Slate 900
-  cardBackgroundMuted: "#1E293B", // Slate 800
-  selectedBackground: "rgba(59, 130, 246, 0.15)", // Translucent blue
-  selectedBorder: "#3B82F6", // Blue 500
-  tableHeadBackground: "#131E35", // Slightly lighter than card
+  pageBackground: "#F8FAFC",
+  pageBackgroundSoft: "#F1F5F9",
+  pageGradient:
+    "radial-gradient(circle at top left, rgba(37,99,235,0.08), transparent 30%), linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+  cardBorder: "#E2E8F0",
+  cardBorderSoft: "#F1F5F9",
+  cardBackground: "#FFFFFF",
+  cardBackgroundMuted: "#F8FAFC",
+  selectedBackground: "rgba(37, 99, 235, 0.08)",
+  selectedBorder: "#2563EB",
+  tableHeadBackground: "#F1F5F9",
+  textPrimary: "#0F172A",
+  textSecondary: "#475569",
+  accentAmber: "#F59E0B",
+  accentBlue: "#3B82F6",
+  accentBlueDeep: "#1E40AF",
+  success: "#10B981",
+  warning: "#F59E0B",
+  error: "#EF4444",
 };
 
 export const datagateLayout = {
   pagePadding: { xs: 2, md: 3 },
   sectionGap: 3,
-  panelRadius: 1,
+  panelRadius: 1.5,
 };
 
 export const pageShellSx = {
@@ -26,12 +37,13 @@ export const pageShellSx = {
   height: "100%",
   overflow: "auto",
   bgcolor: datagateColors.pageBackground,
+  backgroundImage: datagateColors.pageGradient,
 };
 
 export const panelSx = {
   borderRadius: datagateLayout.panelRadius,
   border: `1px solid ${datagateColors.cardBorderSoft}`,
-  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.4)",
+  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
   backgroundColor: datagateColors.cardBackground,
 };
 
@@ -43,7 +55,7 @@ export const sectionHeaderSx = {
 };
 
 export const subtlePanelSx = {
-  borderRadius: 1,
+  borderRadius: datagateLayout.panelRadius,
   border: `1px solid ${datagateColors.cardBorder}`,
   bgcolor: datagateColors.cardBackgroundMuted,
 };
@@ -51,40 +63,40 @@ export const subtlePanelSx = {
 const theme = createTheme({
   spacing: 8,
   palette: {
-    mode: 'dark',
+    mode: 'light',
     primary: {
-      main: "#3B82F6", // Blue 500
-      light: "#60A5FA", // Blue 400
-      dark: "#1E40AF", // Blue 800
+      main: "#1E40AF",
+      light: "#3B82F6",
+      dark: "#1E3A8A",
       contrastText: "#FFFFFF",
     },
     secondary: {
-      main: "#F59E0B", // Amber 500 for CTA
+      main: "#F59E0B",
     },
     error: {
-      main: "#EF4444",
+      main: datagateColors.error,
     },
     warning: {
-      main: "#F59E0B",
+      main: datagateColors.warning,
     },
     info: {
       main: "#3B82F6",
     },
     success: {
-      main: "#10B981",
+      main: datagateColors.success,
     },
     background: {
       default: datagateColors.pageBackground,
       paper: datagateColors.cardBackground,
     },
     text: {
-      primary: "#F8FAFC", // Slate 50
-      secondary: "#94A3B8", // Slate 400
+      primary: datagateColors.textPrimary,
+      secondary: datagateColors.textSecondary,
     },
     divider: datagateColors.cardBorderSoft,
   },
   typography: {
-    fontFamily: '"Outfit", "system-ui", "-apple-system", "Segoe UI", sans-serif',
+    fontFamily: '"Fira Sans", "Outfit", "system-ui", "-apple-system", "Segoe UI", sans-serif',
     h1: {
       fontSize: "4.5rem",
       lineHeight: 1.02,
@@ -173,8 +185,9 @@ const theme = createTheme({
         },
         body: {
           backgroundColor: datagateColors.pageBackground,
-          color: "#F8FAFC",
-          fontFamily: '"Outfit", "system-ui", "-apple-system", "Segoe UI", sans-serif',
+          backgroundImage: datagateColors.pageGradient,
+          color: datagateColors.textPrimary,
+          fontFamily: '"Fira Sans", "Outfit", "system-ui", "-apple-system", "Segoe UI", sans-serif',
           margin: 0,
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
@@ -186,16 +199,16 @@ const theme = createTheme({
             background: "transparent",
           },
           "&::-webkit-scrollbar-thumb": {
-            background: "#475569",
+            background: datagateColors.cardBorder,
             borderRadius: "999px",
           },
         },
         ".glass-card": {
-          background: "rgba(15, 23, 42, 0.7)",
+          background: "rgba(255, 255, 255, 0.82)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(51, 65, 85, 0.5)",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+          border: "1px solid rgba(226, 232, 240, 0.9)",
+          boxShadow: "0 14px 32px rgba(2, 6, 23, 0.08)",
         },
       },
     },
@@ -219,6 +232,7 @@ const theme = createTheme({
           boxShadow: "none",
           border: `1px solid ${datagateColors.cardBorderSoft}`,
           borderRadius: BASE_RADIUS,
+          color: datagateColors.textPrimary,
         },
       },
     },
@@ -230,7 +244,7 @@ const theme = createTheme({
         root: {
           minHeight: 40,
           padding: "10px 18px",
-          borderRadius: 1,
+          borderRadius: `${BASE_RADIUS}px`,
           boxShadow: "none",
         },
         sizeSmall: {
@@ -244,8 +258,17 @@ const theme = createTheme({
           fontSize: "1rem",
         },
         contained: {
+          background: "linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)",
           "&:hover": {
-            boxShadow: "0 10px 24px rgba(37, 99, 235, 0.18)",
+            boxShadow: "0 16px 30px rgba(30, 64, 175, 0.35)",
+            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+          },
+        },
+        outlined: {
+          borderColor: datagateColors.cardBorder,
+          "&:hover": {
+            borderColor: datagateColors.selectedBorder,
+            backgroundColor: "rgba(59, 130, 246, 0.08)",
           },
         },
       },
@@ -253,7 +276,7 @@ const theme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: {
-          borderRadius: 1,
+          borderRadius: `${BASE_RADIUS}px`,
         },
         sizeSmall: {
           padding: 6,
@@ -269,13 +292,13 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           minHeight: 44,
-          borderRadius: 1,
-          backgroundColor: datagateColors.cardBackground,
+          borderRadius: `${BASE_RADIUS}px`,
+          backgroundColor: datagateColors.cardBackgroundMuted,
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: datagateColors.cardBorder,
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#64748B",
+            borderColor: datagateColors.selectedBorder,
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
             borderWidth: 1,
@@ -307,7 +330,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           height: 30,
-          borderRadius: 1,
+          borderRadius: `${BASE_RADIUS}px`,
           fontSize: "0.8125rem",
           fontWeight: 600,
         },
@@ -322,9 +345,10 @@ const theme = createTheme({
         head: {
           fontSize: "0.8125rem",
           fontWeight: 700,
-          color: "#94A3B8",
+          color: datagateColors.textSecondary,
           paddingTop: 14,
           paddingBottom: 14,
+          backgroundColor: datagateColors.tableHeadBackground,
         },
         body: {
           fontSize: "0.9375rem",
@@ -348,6 +372,10 @@ const theme = createTheme({
           fontSize: "0.9375rem",
           fontWeight: 600,
           textTransform: "none",
+          color: datagateColors.textSecondary,
+          "&.Mui-selected": {
+            color: datagateColors.textPrimary,
+          },
         },
       },
     },
@@ -363,15 +391,15 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           minHeight: 44,
-          borderRadius: 1,
+          borderRadius: `${BASE_RADIUS}px`,
           "&.Mui-selected": {
-            backgroundColor: "rgba(59, 130, 246, 0.15)",
-            color: "#60A5FA",
+            backgroundColor: "rgba(37, 99, 235, 0.18)",
+            color: "#93C5FD",
             "& .MuiListItemIcon-root": {
-              color: "#60A5FA",
+              color: "#93C5FD",
             },
             "&:hover": {
-              backgroundColor: "rgba(59, 130, 246, 0.25)",
+              backgroundColor: "rgba(59, 130, 246, 0.22)",
             },
           },
         },
@@ -380,16 +408,18 @@ const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 1.5,
+          borderRadius: `${BASE_RADIUS}px`,
+          backgroundColor: datagateColors.cardBackground,
         },
       },
     },
     MuiMenu: {
       styleOverrides: {
         paper: {
-          borderRadius: 1,
+          borderRadius: `${BASE_RADIUS}px`,
           border: `1px solid ${datagateColors.cardBorderSoft}`,
-          boxShadow: "0 18px 40px rgba(0, 0, 0, 0.5)",
+          backgroundColor: datagateColors.cardBackground,
+          boxShadow: "0 18px 40px rgba(2, 6, 23, 0.08)",
         },
       },
     },
@@ -397,7 +427,7 @@ const theme = createTheme({
       styleOverrides: {
         tooltip: {
           fontSize: "0.75rem",
-          borderRadius: 8,
+          borderRadius: `${BASE_RADIUS}px`,
         },
       },
     },

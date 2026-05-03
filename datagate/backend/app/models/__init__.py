@@ -1,31 +1,11 @@
-"""
-Models __init__ — import all models for Alembic auto-discovery
-"""
-from .auth import User, Role, Permission, user_roles, role_permissions
-from .connection import Connection, TableInfo, UserTableAccess
-from .quality import (
-    TableBatchMetadata,
-    TableSchemaMetadata,
-    SchemaChangeEvent,
-    ColumnProfileMetric,
-    QualityRule,
-    RuleValidationRun,
-    RuleValidationResult,
-    QualityThreshold,
-    AnomalyDetectionRun,
-    AnomalyFeatureImportance,
-    Alert,
-    JobRun,
-)
-
-__all__ = [
-    "User", "Role", "Permission", "user_roles", "role_permissions",
-    "Connection", "TableInfo", "UserTableAccess",
-    "TableBatchMetadata", "TableSchemaMetadata", "SchemaChangeEvent",
-    "ColumnProfileMetric",
-    "QualityRule", "RuleValidationRun", "RuleValidationResult",
-    "QualityThreshold",
-    "AnomalyDetectionRun", "AnomalyFeatureImportance",
-    "Alert",
-    "JobRun",
-]
+from .connection_model import Connection
+from .table_model import Table
+from .table_batch_metadata_model import BatchTableMetadata
+from .anomaly_result import AnomalyResult
+from .rule import Rule
+from .rule_verification_result import RuleVerificationResult
+from .role import Role
+from .user import User
+from .user_table_access import UserTableAccess
+from .lightgbm_parameter import LightGBMParameter
+from .lightgbm_result import LightGBMResult

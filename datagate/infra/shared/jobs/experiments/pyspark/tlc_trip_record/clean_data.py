@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from time import perf_counter
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col, trim
+from pyspark.sql.functions import col, lit, to_timestamp, trim
 
 
 JOB_NAME = "clean_data"
@@ -13,7 +13,7 @@ JOB_NAME = "clean_data"
 class JobConfig:
     source_table: str
     target_table: str
-    date_hour: str
+    processing_date_hour: str
 
 
 def parse_args() -> JobConfig:
@@ -34,9 +34,9 @@ def parse_args() -> JobConfig:
     )
 
     parser.add_argument(
-        "--date_hour",
+        "--processing_date_hour",
         required=True,
-        help="Processing date_hour, format: yyyy-MM-dd HH:mm:ss",
+        help="Processing batch partition, format: yyyy-MM-dd HH:mm:ss",
     )
 
     args = parser.parse_args()
@@ -44,7 +44,7 @@ def parse_args() -> JobConfig:
     return JobConfig(
         source_table=args.source_table,
         target_table=args.target_table,
-        date_hour=args.date_hour,
+        processing_date_hour=args.processing_date_hour,
     )
 
 
@@ -59,13 +59,13 @@ def build_spark_session() -> SparkSession:
 def read_from_iceberg(
     spark: SparkSession,
     source_table: str,
-    date_hour: str,
+    processing_date_hour: str,
 ) -> DataFrame:
     return (
         spark.read
         .format("iceberg")
         .load(f"iceberg.{source_table}")
-        .filter(col("date_hour") == date_hour)
+        .filter(col("processing_date_hour") == to_timestamp(lit(processing_date_hour)))
     )
 
 
@@ -83,7 +83,7 @@ def clean_data(df: DataFrame) -> DataFrame:
     return (
         df
         # Required fields
-        .filter(col("vendorid").isNotNull())
+        .filter(col("vendor_id").isNotNull())
         .filter(col("tpep_pickup_datetime").isNotNull())
         .filter(col("tpep_dropoff_datetime").isNotNull())
         .filter(col("trip_distance").isNotNull())
@@ -99,29 +99,39 @@ def clean_data(df: DataFrame) -> DataFrame:
         .filter(col("passenger_count").isNull() | (col("passenger_count") <= 8))
 
         # Trip distance validation
-        .filter(col("trip_distance") > 0)
+        .filter(col("trip_distance").isNull() | (col("trip_distance") > 0))
 
         # Location validation
         .filter(col("pulocationid").isNull() | (col("pulocationid") > 0))
         .filter(col("dolocationid").isNull() | (col("dolocationid") > 0))
 
         # Amount validation
-        .filter(col("fare_amount") >= 0)
+        .filter(col("fare_amount").isNull() | (col("fare_amount") >= 0))
+        
         .filter(col("extra").isNull() | (col("extra") >= 0))
         .filter(col("mta_tax").isNull() | (col("mta_tax") >= 0))
         .filter(col("tip_amount").isNull() | (col("tip_amount") >= 0))
         .filter(col("tolls_amount").isNull() | (col("tolls_amount") >= 0))
         .filter(col("improvement_surcharge").isNull() | (col("improvement_surcharge") >= 0))
-        .filter(col("total_amount") >= 0)
+        .filter(col("total_amount").isNull() | (col("total_amount") >= 0))
         .filter(col("congestion_surcharge").isNull() | (col("congestion_surcharge") >= 0))
         .filter(col("airport_fee").isNull() | (col("airport_fee") >= 0))
         .filter(col("cbd_congestion_fee").isNull() | (col("cbd_congestion_fee") >= 0))
 
         # Normalize string flag, keep the same schema
         .withColumn("store_and_fwd_flag", trim(col("store_and_fwd_flag")))
+        .withColumn("passenger_count", col("passenger_count").cast("bigint"))
+        .withColumn("ratecode_id", col("ratecode_id").cast("bigint"))
 
         # Remove fully duplicated rows
         .dropDuplicates()
+    )
+
+
+def attach_processing_date_hour(df: DataFrame, processing_date_hour: str) -> DataFrame:
+    return df.withColumn(
+        "processing_date_hour",
+        to_timestamp(lit(processing_date_hour)),
     )
 
 
@@ -132,13 +142,21 @@ def main() -> None:
     spark = build_spark_session()
 
     try:
+        print(
+            f"[{JOB_NAME}] Loading bronze partition "
+            f"processing_date_hour={job_config.processing_date_hour}"
+        )
+
         bronze_df = read_from_iceberg(
             spark=spark,
             source_table=job_config.source_table,
-            date_hour=job_config.date_hour,
+            processing_date_hour=job_config.processing_date_hour,
         )
 
-        cleaned_df = clean_data(bronze_df)
+        cleaned_df = attach_processing_date_hour(
+            df=clean_data(bronze_df),
+            processing_date_hour=job_config.processing_date_hour,
+        )
 
         write_to_iceberg(
             df=cleaned_df,

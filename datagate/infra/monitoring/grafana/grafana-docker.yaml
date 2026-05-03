@@ -1,0 +1,31 @@
+services:
+  grafana:
+    image: grafana/grafana:13.0
+    container_name: grafana
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_SECURITY_COOKIE_SAMESITE: "lax"
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana_storage:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - datagate-net
+volumes:
+  grafana_storage:
+networks:
+  datagate-net:
+    external: true

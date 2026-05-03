@@ -1,0 +1,87 @@
+{
+  "model": "LightGBM",
+  "task": "tlc_yellow_taxi_current_batch_vs_existing_batches",
+  "target_processing_date_hour": "2025-01-16 00:00:00",
+  "comparison_processing_date_hours": [
+    "2025-01-15 12:00:00",
+    "2025-01-15 00:00:00",
+    "2025-01-09 00:00:00",
+    "2025-01-02 00:00:00"
+  ],
+  "metric": "auc",
+  "baseline_valid_auc": 0.6757777777777778,
+  "baseline_test_auc": 0.6884172777777777,
+  "optuna_best_valid_auc": 0.6827801111111111,
+  "optuna_best_params": {
+    "max_depth": -1,
+    "learning_rate": 0.014249290143434958,
+    "num_leaves": 86,
+    "min_child_samples": 12,
+    "subsample": 0.7500075885659785,
+    "subsample_freq": 0,
+    "colsample_bytree": 0.714656349647666,
+    "reg_alpha": 1.4016826323317048e-08,
+    "reg_lambda": 6.371719691147116e-05,
+    "min_split_gain": 0.2140831669746472,
+    "max_bin": 255
+  },
+  "selected_param_source": "optuna",
+  "selected_valid_auc": 0.6827801111111111,
+  "selected_params": {
+    "max_depth": -1,
+    "learning_rate": 0.014249290143434958,
+    "num_leaves": 86,
+    "min_child_samples": 12,
+    "subsample": 0.7500075885659785,
+    "subsample_freq": 0,
+    "colsample_bytree": 0.714656349647666,
+    "reg_alpha": 1.4016826323317048e-08,
+    "reg_lambda": 6.371719691147116e-05,
+    "min_split_gain": 0.2140831669746472,
+    "max_bin": 255
+  },
+  "final_valid_auc": 0.6827801111111111,
+  "final_test_auc": 0.6934733888888889,
+  "final_best_iteration": 46,
+  "fixed_training_config": {
+    "n_estimators_max": 2000,
+    "early_stopping_rounds": 100,
+    "random_state": 42,
+    "target_sample_per_group": 10000,
+    "min_rows_per_group": 100,
+    "previous_batch_offset": "0 days 12:00:00",
+    "history_offsets": [
+      "1 days 00:00:00",
+      "7 days 00:00:00",
+      "14 days 00:00:00"
+    ],
+    "use_missing": true,
+    "zero_as_missing": false,
+    "no_isnull_features": true,
+    "no_trip_duration_min": true
+  },
+  "tuned_parameter_groups": {
+    "tree_complexity": [
+      "num_leaves",
+      "max_depth",
+      "min_child_samples"
+    ],
+    "learning_process": [
+      "learning_rate",
+      "n_estimators_with_early_stopping"
+    ],
+    "sampling": [
+      "subsample",
+      "subsample_freq",
+      "colsample_bytree"
+    ],
+    "regularization": [
+      "reg_alpha",
+      "reg_lambda",
+      "min_split_gain"
+    ],
+    "binning": [
+      "max_bin"
+    ]
+  }
+}

@@ -1,296 +1,439 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Alert,
-  Avatar,
   Box,
+  Breadcrumbs,
   Button,
   Chip,
-  CircularProgress,
-  IconButton,
+  FormControl,
   InputAdornment,
+  InputLabel,
   List,
   ListItemButton,
   ListItemText,
+  MenuItem,
   Paper,
-  Divider,
+  Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
 import {
-  AccountCircleOutlined as OwnerIcon,
-  ChevronRight as ChevronRightIcon,
-  ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
-  Search as SearchIcon,
-  StorageOutlined as ConnectionIcon,
+  RefreshOutlined as RefreshIcon,
   SchemaOutlined as SchemaIcon,
+  SearchOutlined as SearchIcon,
+  StorageOutlined as CatalogIcon,
   TableChartOutlined as TableIcon,
-  LightbulbOutlined as DataAssetsIcon,
 } from "@mui/icons-material";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { pageShellSx, panelSx } from "~/theme";
-import {
-  fetchExploreData,
-} from "~/stores/slices/exploreSlice/index";
+import { fetchExploreData } from "~/stores/slices/tableSlice";
+import { datagateColors, pageShellSx, panelSx } from "~/theme";
 import TableDetail from "./Tables/TableDetail/TableDetail";
 
-const normalizeTable = (table, connection = null) => {
-  if (typeof table === "string") {
-    const [schemaName, ...rest] = table.split(".");
-    const assetName = rest.join(".") || table;
-    return {
-      full_name: table,
-      table_name: assetName,
-      schema_name: rest.length ? schemaName : "",
-      connectionName: connection?.name,
-      connectionOwner: connection?.owner,
-      connectionId: connection?.id,
-    };
-  }
+const ALL_CATALOGS = "__all_catalogs__";
+const ALL_SCHEMAS = "__all_schemas__";
 
-  const conn = table.connection || connection;
-  return {
-    full_name: table.full_name || table.table_name || "",
-    table_name: table.table_name || "",
-    schema_name: table.schema_name || "",
-    connectionName: conn?.name,
-    connectionOwner: conn?.owner,
-    connectionId: conn?.id,
-  };
-};
-
-const getOwnerLabel = (owner) => owner?.full_name || owner?.username || owner?.email || "System";
-
-const Explore = () => {
+function Explore() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  
-  let tableParam = searchParams.get("table");
-  let schemaParam = searchParams.get("schema");
-  const connectionParam = searchParams.get("connection") || searchParams.get("service");
-  const sectionParam = searchParams.get("section") || "overview";
-  const observabilityTabParam = searchParams.get("obsTab") || "metadata";
-
-  if (tableParam && tableParam.includes(".")) {
-    const parts = tableParam.split(".");
-    if (!schemaParam) schemaParam = parts[0];
-    tableParam = parts.slice(1).join(".");
-  }
-
-  const connections = useSelector((state) => state.explore.discovery.connections) || [];
-  const connectionsStatus = useSelector((state) => state.explore.discovery.connectionsStatus);
-  const connectionsError = useSelector((state) => state.explore.discovery.connectionsError);
-  const exploreDataLoaded = useSelector((state) => state.explore.discovery.exploreDataLoaded);
-  const schemasMap = useSelector((state) => state.explore.discovery.schemasByConnection) || {};
-  const tablesMap = useSelector((state) => state.explore.discovery.tablesByConnection) || {};
-
-  const [selectedConnectionId, setSelectedConnectionId] = useState(null);
-  const [selectedSchemaByConnection, setSelectedSchemaByConnection] = useState({});
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isDatabasesExpanded, setIsDatabasesExpanded] = useState(true);
-  const [expandedConnections, setExpandedConnections] = useState({});
-
-  useEffect(() => {
-    if (!exploreDataLoaded && connectionsStatus !== "loading") {
-      dispatch(fetchExploreData());
-    }
-  }, [dispatch, exploreDataLoaded, connectionsStatus]);
-
-  const loading = connectionsStatus === "loading" && !exploreDataLoaded;
-  const error = connectionsStatus === "failed" ? connectionsError : null;
-
-  const resolvedSelectedConnectionId =
-    selectedConnectionId && connections.some((c) => c.id === selectedConnectionId)
-      ? selectedConnectionId
-      : null;
-
-  const selectedConnection =
-    connections.find((c) => c.id === resolvedSelectedConnectionId) || null;
-
-  const selectedSchema = resolvedSelectedConnectionId
-    ? selectedSchemaByConnection[resolvedSelectedConnectionId] || "all"
-    : "all";
-
-  const allNormalizedTables = useMemo(() => {
-    if (!resolvedSelectedConnectionId) {
-      return Object.entries(tablesMap).flatMap(([connId, tables]) => {
-        const conn = connections.find(c => String(c.id) === connId);
-        return (tables || []).map(t => normalizeTable(t, conn));
-      });
-    }
-    const conn = connections.find(c => c.id === resolvedSelectedConnectionId);
-    return (tablesMap[resolvedSelectedConnectionId] || []).map(t => normalizeTable(t, conn));
-  }, [resolvedSelectedConnectionId, tablesMap, connections]);
-
-  const visibleTables = allNormalizedTables.filter((table) => {
-    const matchesSchema = selectedSchema === "all" || table.schema_name === selectedSchema;
-    if (!matchesSchema) return false;
-    if (!searchQuery.trim()) return true;
-
-    const normQuery = searchQuery.trim().toLowerCase();
-    const haystack = [table.table_name, table.schema_name, table.full_name].filter(Boolean).join(" ").toLowerCase();
-    return haystack.includes(normQuery);
-  });
-
-  const updateExploreQuery = useCallback(
-    ({ connectionId = connectionParam, schemaName = schemaParam, tableName = tableParam, section = sectionParam, obsTab = observabilityTabParam } = {}) => {
-      const params = new URLSearchParams();
-      if (connectionId) params.set("connection", connectionId);
-      if (schemaName) params.set("schema", schemaName);
-      if (tableName) {
-        // Ensure we only store the table name part if it's qualified
-        const cleanTable = tableName.includes('.') ? tableName.split('.').pop() : tableName;
-        params.set("table", cleanTable);
-      }
-      if (section && section !== "overview") params.set("section", section);
-      if (obsTab && obsTab !== "metadata") params.set("obsTab", obsTab);
-      navigate(`/explore${params.toString() ? `?${params.toString()}` : ""}`);
-    },
-    [navigate, observabilityTabParam, sectionParam, connectionParam, schemaParam, tableParam]
+  const [query, setQuery] = React.useState("");
+  const [selectedTable, setSelectedTable] = React.useState(null);
+  const [selectedCatalog, setSelectedCatalog] = React.useState(ALL_CATALOGS);
+  const [selectedSchema, setSelectedSchema] = React.useState(ALL_SCHEMAS);
+  const [section, setSection] = React.useState("overview");
+  const { catalogs, discoveryStatus, discoveryError } = useSelector(
+    (state) => state.explore.discovery
   );
 
-  const openAssetDetail = (connectionId, schemaName, tableName) => {
-    updateExploreQuery({ connectionId, schemaName, tableName, section: "overview", obsTab: "metadata" });
+  React.useEffect(() => {
+    if (discoveryStatus === "idle") {
+      dispatch(fetchExploreData());
+    }
+  }, [discoveryStatus, dispatch]);
+
+  const catalogOptions = React.useMemo(
+    () => catalogs.map((catalog) => catalog.catalog_name),
+    [catalogs]
+  );
+
+  const activeCatalog = React.useMemo(() => {
+    if (selectedCatalog === ALL_CATALOGS) return null;
+    return catalogs.find((catalog) => catalog.catalog_name === selectedCatalog) || null;
+  }, [catalogs, selectedCatalog]);
+
+  const schemaOptions = React.useMemo(() => {
+    if (!activeCatalog) {
+      return Array.from(
+        new Set(
+          catalogs.flatMap((catalog) =>
+            (catalog.schemas || []).map((schema) => schema.schema_name)
+          )
+        )
+      ).sort();
+    }
+    return (activeCatalog.schemas || []).map((schema) => schema.schema_name);
+  }, [activeCatalog, catalogs]);
+
+  const groupedSchemas = React.useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return catalogs
+      .filter((catalog) => selectedCatalog === ALL_CATALOGS || catalog.catalog_name === selectedCatalog)
+      .map((catalog) => ({
+        ...catalog,
+        schemas: (catalog.schemas || [])
+          .filter((schema) => selectedSchema === ALL_SCHEMAS || schema.schema_name === selectedSchema)
+          .map((schema) => ({
+            ...schema,
+            tables: (schema.tables || []).filter((table) => {
+              if (!normalizedQuery) return true;
+              return [
+                table.full_name,
+                table.table_name,
+                table.schema_name,
+                table.catalog_name,
+                table.connection_name,
+              ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase()
+                .includes(normalizedQuery);
+            }),
+          }))
+          .filter((schema) => schema.tables.length > 0),
+      }))
+      .filter((catalog) => catalog.schemas.length > 0);
+  }, [catalogs, query, selectedCatalog, selectedSchema]);
+
+  const visibleTables = React.useMemo(
+    () => groupedSchemas.flatMap((catalog) =>
+      catalog.schemas.flatMap((schema) => schema.tables)
+    ),
+    [groupedSchemas]
+  );
+
+  const handleCatalogChange = (catalogName) => {
+    setSelectedCatalog(catalogName);
+    setSelectedSchema(ALL_SCHEMAS);
   };
 
-  if (loading) {
-    return <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}><CircularProgress size={32} /></Box>;
-  }
-
-  if (tableParam && connectionParam) {
+  if (selectedTable) {
     return (
       <TableDetail
-        tableName={tableParam}
-        schemaName={schemaParam}
-        connectionId={Number(connectionParam)}
-        onBack={() => navigate("/explore")}
-        onChangeSection={(nextSection, nextObsTab = observabilityTabParam) =>
-          updateExploreQuery({ connectionId: connectionParam, schemaName: schemaParam, tableName: tableParam, section: nextSection, obsTab: nextObsTab })
-        }
-        observabilityTab={observabilityTabParam}
-        section={sectionParam}
+        tableId={selectedTable.id}
+        tableName={selectedTable.table_name}
+        schemaName={selectedTable.schema_name}
+        catalogName={selectedTable.catalog_name}
+        section={section}
+        onBack={() => {
+          setSelectedTable(null);
+          setSection("overview");
+        }}
+        onChangeSection={setSection}
+        onNavigateCrumb={({ catalogName, schemaName }) => {
+          setSelectedCatalog(catalogName || ALL_CATALOGS);
+          setSelectedSchema(schemaName || ALL_SCHEMAS);
+          setSelectedTable(null);
+          setSection("overview");
+        }}
       />
     );
   }
 
   return (
     <Box sx={pageShellSx}>
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={2.5} alignItems="stretch">
-        {/* Left Sidebar */}
-        <Paper sx={{ width: { xs: "100%", lg: 300 }, minWidth: { lg: 300 }, p: 2, ...panelSx, borderRadius: 3 }}>
-          <Stack spacing={2} sx={{ height: "100%" }}>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ cursor: "pointer" }} onClick={() => { setSelectedConnectionId(null); setSearchQuery(""); }}>
-              <DataAssetsIcon sx={{ fontSize: 20, color: "primary.main" }} />
-              <Typography sx={{ fontSize: 16, fontWeight: 900 }}>Data Infrastructure</Typography>
-            </Stack>
-
-            <TextField
-              size="small"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tables..."
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-                sx: { borderRadius: 2, bgcolor: '#f8fafc' }
-              }}
+      <Stack spacing={3}>
+        <Stack
+          direction={{ xs: "column", xl: "row" }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", xl: "center" }}
+        >
+          <Box>
+            <Typography variant="overline" color="primary.main">
+              Lakehouse Explorer
+            </Typography>
+            <Typography variant="h4" fontWeight={800}>
+              Explore
+            </Typography>
+            <Typography color="text.secondary">
+              Browse managed assets by catalog and schema, then open metadata, samples, and rules.
+            </Typography>
+          </Box>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Chip
+              icon={<CatalogIcon />}
+              label={`${catalogs.length} catalogs`}
+              variant="outlined"
+              sx={{ bgcolor: "background.paper" }}
             />
+            <Chip
+              icon={<TableIcon />}
+              label={`${visibleTables.length} tables`}
+              variant="outlined"
+              sx={{ bgcolor: "background.paper" }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<RefreshIcon />}
+              onClick={() => dispatch(fetchExploreData())}
+            >
+              Refresh
+            </Button>
+          </Stack>
+        </Stack>
 
-            <Box sx={{ overflow: "auto", flexGrow: 1 }}>
-              <List disablePadding>
-                <ListItemButton onClick={() => setIsDatabasesExpanded(!isDatabasesExpanded)} sx={{ borderRadius: 2 }}>
-                  {isDatabasesExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-                  <ConnectionIcon sx={{ ml: 1, mr: 1 }} />
-                  <ListItemText primary="Connections" slotProps={{ primary: { fontWeight: 800, fontSize: 14 } }} />
-                </ListItemButton>
+        <Paper sx={{ ...panelSx, p: 2.5 }}>
+          <Stack spacing={2}>
+            <Breadcrumbs>
+              <Typography
+                color={selectedCatalog === ALL_CATALOGS ? "text.primary" : "text.secondary"}
+                sx={{ fontWeight: 700 }}
+              >
+                My lakehouse
+              </Typography>
+              <Typography
+                color={selectedCatalog === ALL_CATALOGS ? "text.secondary" : "text.primary"}
+                sx={{ fontWeight: 700 }}
+              >
+                {selectedCatalog === ALL_CATALOGS ? "All catalogs" : selectedCatalog}
+              </Typography>
+              <Typography color="text.secondary">
+                {selectedSchema === ALL_SCHEMAS ? "All schemas" : selectedSchema}
+              </Typography>
+            </Breadcrumbs>
 
-                {isDatabasesExpanded && connections.map((conn) => {
-                  const isExpanded = expandedConnections[conn.id] ?? (conn.id === resolvedSelectedConnectionId);
-                  const schemas = schemasMap[conn.id] || [];
-                  
-                  return (
-                    <Box key={conn.id} sx={{ ml: 2 }}>
-                      <ListItemButton onClick={() => setExpandedConnections({ ...expandedConnections, [conn.id]: !isExpanded })} sx={{ borderRadius: 2 }}>
-                        {schemas.length > 0 ? (isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />) : <Box sx={{ width: 20 }} />}
-                        <ConnectionIcon sx={{ fontSize: 16, mx: 1 }} />
-                        <ListItemText primary={conn.name} slotProps={{ primary: { fontWeight: 600, fontSize: 13 } }} />
-                      </ListItemButton>
-
-                      {isExpanded && schemas.map((schema) => (
-                        <ListItemButton 
-                          key={schema} 
-                          selected={selectedConnectionId === conn.id && selectedSchema === schema}
-                          onClick={() => {
-                            setSelectedConnectionId(conn.id);
-                            setSelectedSchemaByConnection({ ...selectedSchemaByConnection, [conn.id]: schema });
-                          }}
-                          sx={{ ml: 3, borderRadius: 2, my: 0.25 }}
-                        >
-                          <SchemaIcon sx={{ fontSize: 14, mr: 1, color: 'text.secondary' }} />
-                          <ListItemText primary={schema} slotProps={{ primary: { fontSize: 12, fontWeight: (selectedSchema === schema) ? 800 : 400 } }} />
-                        </ListItemButton>
-                      ))}
-                    </Box>
-                  );
-                })}
-              </List>
-            </Box>
+            <Stack direction={{ xs: "column", lg: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search catalog, schema, table, or source"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <FormControl sx={{ minWidth: { xs: "100%", lg: 220 } }}>
+                <InputLabel id="catalog-filter-label">Catalog</InputLabel>
+                <Select
+                  labelId="catalog-filter-label"
+                  value={selectedCatalog}
+                  label="Catalog"
+                  onChange={(event) => handleCatalogChange(event.target.value)}
+                >
+                  <MenuItem value={ALL_CATALOGS}>All catalogs</MenuItem>
+                  {catalogOptions.map((catalogName) => (
+                    <MenuItem key={catalogName} value={catalogName}>
+                      {catalogName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl sx={{ minWidth: { xs: "100%", lg: 220 } }}>
+                <InputLabel id="schema-filter-label">Schema</InputLabel>
+                <Select
+                  labelId="schema-filter-label"
+                  value={selectedSchema}
+                  label="Schema"
+                  onChange={(event) => setSelectedSchema(event.target.value)}
+                >
+                  <MenuItem value={ALL_SCHEMAS}>All schemas</MenuItem>
+                  {schemaOptions.map((schemaName) => (
+                    <MenuItem key={schemaName} value={schemaName}>
+                      {schemaName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Stack>
           </Stack>
         </Paper>
 
-        {/* Right Content */}
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+        {discoveryStatus === "failed" ? (
+          <Alert severity="error">{discoveryError}</Alert>
+        ) : null}
 
-          <Paper sx={{ p: 3, ...panelSx, borderRadius: 3 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-              <Box>
-                <Typography variant="h5" fontWeight="900">{selectedConnection?.name || "All Data Assets"}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {selectedSchema === "all" ? `${visibleTables.length} tables integrated` : `Viewing ${visibleTables.length} tables in ${selectedSchema}`}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", lg: "280px minmax(0, 1fr)" },
+            gap: 3,
+            alignItems: "start",
+          }}
+        >
+          <Paper sx={{ ...panelSx, p: 1.5, position: { lg: "sticky" }, top: 16 }}>
+            <Stack spacing={1.5}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 1 }}>
+                <CatalogIcon color="primary" />
+                <Typography variant="subtitle1" fontWeight={800}>
+                  Catalogs
                 </Typography>
-              </Box>
-              <Button size="small" startIcon={<RefreshIcon />} onClick={() => dispatch(fetchExploreData())} variant="outlined" sx={{ borderRadius: 2 }}>Refresh</Button>
-            </Stack>
-            <Divider sx={{ mb: 3 }} />
-
-            <Stack spacing={2}>
-              {visibleTables.map((table) => (
-                <Paper
-                  key={table.full_name}
-                  onClick={() => openAssetDetail(table.connectionId || resolvedSelectedConnectionId, table.schema_name, table.table_name)}
-                  sx={{
-                    p: 2.5, borderRadius: 3, border: '1px solid #f1f5f9', cursor: 'pointer',
-                    '&:hover': { bgcolor: '#f8fafc', transform: 'translateX(4px)', transition: 'all 0.2s' }
-                  }}
+              </Stack>
+              <List sx={{ p: 0 }}>
+                <ListItemButton
+                  selected={selectedCatalog === ALL_CATALOGS}
+                  onClick={() => handleCatalogChange(ALL_CATALOGS)}
                 >
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Avatar sx={{ bgcolor: 'primary.50', color: 'primary.main' }}><TableIcon /></Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{table.connectionName} / {table.schema_name}</Typography>
-                      <Typography variant="h6" fontWeight="900" color="primary.dark">{table.table_name}</Typography>
-                      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                        <Chip icon={<OwnerIcon sx={{ fontSize: '14px !important' }} />} label={getOwnerLabel(table.connectionOwner)} size="small" variant="outlined" />
-                      </Stack>
-                    </Box>
-                    <ChevronRightIcon color="disabled" />
-                  </Stack>
-                </Paper>
-              ))}
-              {visibleTables.length === 0 && (
-                <Box sx={{ py: 10, textAlign: 'center' }}>
-                  <Typography color="text.secondary">No tables found. Adjust filters or contact Admin for access.</Typography>
-                </Box>
-              )}
+                  <ListItemText
+                    primary="All catalogs"
+                    secondary={`${catalogs.reduce((count, catalog) => count + (catalog.table_count || 0), 0)} tables`}
+                  />
+                </ListItemButton>
+                {catalogs.map((catalog) => (
+                  <Box key={catalog.catalog_name}>
+                    <ListItemButton
+                      selected={selectedCatalog === catalog.catalog_name}
+                      onClick={() => handleCatalogChange(catalog.catalog_name)}
+                    >
+                      <ListItemText
+                        primary={catalog.catalog_name}
+                        secondary={`${catalog.table_count || 0} tables`}
+                      />
+                    </ListItemButton>
+                    {selectedCatalog === catalog.catalog_name ? (
+                      <List disablePadding sx={{ pl: 1 }}>
+                        {(catalog.schemas || []).map((schema) => (
+                          <ListItemButton
+                            key={schema.schema_name}
+                            selected={selectedSchema === schema.schema_name}
+                            onClick={() => setSelectedSchema(schema.schema_name)}
+                            sx={{ minHeight: 38 }}
+                          >
+                            <ListItemText
+                              primary={schema.schema_name}
+                              secondary={`${schema.table_count || 0} tables`}
+                            />
+                          </ListItemButton>
+                        ))}
+                      </List>
+                    ) : null}
+                  </Box>
+                ))}
+              </List>
             </Stack>
           </Paper>
+
+          <Stack spacing={3}>
+            {groupedSchemas.length === 0 ? (
+              <Paper sx={{ ...panelSx, p: 6, textAlign: "center" }}>
+                <Typography variant="h6" fontWeight={800}>
+                  No tables found
+                </Typography>
+                <Typography color="text.secondary" sx={{ mt: 1 }}>
+                  Adjust the catalog, schema, or search filters to see managed assets.
+                </Typography>
+              </Paper>
+            ) : null}
+
+            {groupedSchemas.map((catalog) => (
+              <Paper key={catalog.catalog_name} sx={{ ...panelSx, overflow: "hidden" }}>
+                <Box
+                  sx={{
+                    px: 3,
+                    py: 2.25,
+                    borderBottom: `1px solid ${datagateColors.cardBorderSoft}`,
+                    background:
+                      "linear-gradient(135deg, rgba(30, 64, 175, 0.08) 0%, rgba(248, 250, 252, 1) 65%)",
+                  }}
+                >
+                  <Stack
+                    direction={{ xs: "column", md: "row" }}
+                    spacing={1.5}
+                    justifyContent="space-between"
+                  >
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <CatalogIcon color="primary" />
+                        <Typography variant="h6" fontWeight={800}>
+                          {catalog.catalog_name}
+                        </Typography>
+                      </Stack>
+                      <Typography color="text.secondary">
+                        {(catalog.schemas || []).length} schemas • {catalog.table_count || 0} tables
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </Box>
+
+                <Stack spacing={2} sx={{ p: 2 }}>
+                  {(catalog.schemas || []).map((schema) => (
+                    <Paper
+                      key={`${catalog.catalog_name}-${schema.schema_name}`}
+                      sx={{
+                        borderRadius: 2,
+                        border: `1px solid ${datagateColors.cardBorderSoft}`,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={1.5}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", md: "center" }}
+                        sx={{ px: 2.5, py: 2, bgcolor: "#F8FAFC" }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <SchemaIcon sx={{ color: "primary.main" }} />
+                          <Typography fontWeight={800}>{schema.schema_name}</Typography>
+                          <Chip size="small" label={`${schema.table_count || 0} tables`} />
+                        </Stack>
+                      </Stack>
+
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ bgcolor: "#E2E8F0", color: "#0F172A" }}>Table</TableCell>
+                              <TableCell sx={{ bgcolor: "#E2E8F0", color: "#0F172A" }}>Path</TableCell>
+                              <TableCell sx={{ bgcolor: "#E2E8F0", color: "#0F172A" }}>Source</TableCell>
+                              <TableCell sx={{ bgcolor: "#E2E8F0", color: "#0F172A" }}>Action</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {schema.tables.map((table) => (
+                              <TableRow key={table.id} hover>
+                                <TableCell sx={{ fontWeight: 800 }}>{table.table_name}</TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary" }}>
+                                    {table.full_name}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>{table.connection_name}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    onClick={() => {
+                                      setSelectedTable(table);
+                                      setSection("overview");
+                                    }}
+                                  >
+                                    Open
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Paper>
+                  ))}
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
         </Box>
       </Stack>
     </Box>
   );
-};
+}
 
 export default Explore;
