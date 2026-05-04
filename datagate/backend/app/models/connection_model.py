@@ -17,7 +17,7 @@ class Connection(Base):
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
 
-    name = Column(String(255), unique=True, index=True, nullable=False)
+    connection_name = Column(String(255), unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
 
     trino_host = Column(String(255), nullable=False)
@@ -31,7 +31,6 @@ class Connection(Base):
     minio_endpoint_url = Column(String(255), nullable=False)
     minio_access_key = Column(String(255), nullable=False)
     minio_secret_key = Column(String(255), nullable=False)
-    minio_region = Column(String(50), default="us-east-1", nullable=False)
 
     is_active = Column(Boolean, default=True, nullable=False)
 
@@ -49,7 +48,7 @@ class Connection(Base):
         nullable=False,
     )
 
-    tables = relationship(
+    table = relationship(
         "Table",
         back_populates="connection",
     )

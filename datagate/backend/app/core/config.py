@@ -55,9 +55,6 @@ class Config:
     database_db: str = _get_env("DATABASE_DB")
     database_url: str = _build_database_url()
 
-    airflow_url: str = _get_env("AIRFLOW_URL")
-    airflow_user: str = _get_env("AIRFLOW_USER")
-    airflow_pass: str = _get_env("AIRFLOW_PASS")
 
 
 config = Config()

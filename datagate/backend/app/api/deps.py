@@ -9,7 +9,6 @@ from app.core.exceptions import UnauthorizedError, ForbiddenError, NotFoundError
 from app.db.session import get_db
 from app.models.user import User
 from app.models.role import Role
-from app.models.user_table_access import UserTableAccess
 from app.models.table import Table
 from app.services.auth_service import AuthService
 

@@ -28,12 +28,6 @@ class Table(Base):
     schema_name = Column(String(255), nullable=False)
     table_name = Column(String(255), nullable=False)
 
-    owner_user_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-
     is_active = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -46,7 +40,7 @@ class Table(Base):
 
     connection = relationship(
         "Connection",
-        back_populates="tables",
+        back_populates="table",
     )
 
     owner = relationship(
@@ -54,24 +48,18 @@ class Table(Base):
         foreign_keys=[owner_user_id],
     )
 
-    user_accesses = relationship(
-        "UserTableAccess",
-        back_populates="table",
-        cascade="all, delete-orphan",
-    )
-
-    batch_metadata = relationship(
+    batch_table_metadata = relationship(
         "BatchTableMetadata",
         back_populates="table",
         cascade="all, delete-orphan",
     )
-    batch_profiling = relationship(
+    batch_table_profiling = relationship(
         "BatchTableProfiling",
         back_populates="table",
         cascade="all, delete-orphan",
     )
 
-    rules = relationship(
+    rule = relationship(
         "Rule",
         back_populates="table",
         cascade="all, delete-orphan",
@@ -84,7 +72,7 @@ class Table(Base):
     )
 
     
-    anomaly_results = relationship(
+    anomaly_result = relationship(
         "AnomalyResult",
         back_populates="table",
         cascade="all, delete-orphan",
@@ -96,12 +84,12 @@ class Table(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
-    lightgbm_results = relationship(
+    lightgbm_result = relationship(
         "LightGBMResult",
         back_populates="table",
         cascade="all, delete-orphan",
     )
-    shap_results = relationship(
+    shap_result = relationship(
         "SHAPResult",
         back_populates="table",
         cascade="all, delete-orphan",
@@ -112,6 +100,6 @@ class Table(Base):
             "catalog_name",
             "schema_name",
             "table_name",
-            name="uq_tables_connection_catalog_schema_table",
+            name="uq_table_connection_id_catalog_name_schema_name_table_name",
         ),
     )

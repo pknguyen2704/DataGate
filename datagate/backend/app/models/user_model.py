@@ -39,13 +39,6 @@ class User(Base):
         back_populates="users",
     )
 
-    table_accesses = relationship(
-        "UserTableAccess",
-        foreign_keys="UserTableAccess.user_id",
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
-
     created_rules = relationship(
         "Rule",
         foreign_keys="Rule.created_by",

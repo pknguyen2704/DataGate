@@ -1,5 +1,3 @@
-"""Reset and seed the DataGate database."""
-
 import argparse
 import os
 

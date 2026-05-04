@@ -6,6 +6,5 @@ from .rule import Rule
 from .rule_verification_result import RuleVerificationResult
 from .role import Role
 from .user import User
-from .user_table_access import UserTableAccess
 from .lightgbm_parameter import LightGBMParameter
 from .lightgbm_result import LightGBMResult
