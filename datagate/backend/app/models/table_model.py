@@ -31,6 +31,7 @@ class Table(Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -40,12 +41,7 @@ class Table(Base):
 
     connection = relationship(
         "Connection",
-        back_populates="table",
-    )
-
-    owner = relationship(
-        "User",
-        foreign_keys=[owner_user_id],
+        back_populates="tables",
     )
 
     batch_table_metadata = relationship(
@@ -53,47 +49,37 @@ class Table(Base):
         back_populates="table",
         cascade="all, delete-orphan",
     )
+
     batch_table_profiling = relationship(
         "BatchTableProfiling",
         back_populates="table",
         cascade="all, delete-orphan",
     )
 
-    rule = relationship(
+    metric_manual_thresholds = relationship(
+        "MetricManualThreshold",
+        back_populates="table",
+        cascade="all, delete-orphan",
+    )
+
+    rules = relationship(
         "Rule",
         back_populates="table",
         cascade="all, delete-orphan",
     )
 
-    rule_verification_results = relationship(
-        "RuleVerificationResult",
-        back_populates="table",
-        cascade="all, delete-orphan",
-    )
-
-    
-    anomaly_result = relationship(
+    anomaly_results = relationship(
         "AnomalyResult",
         back_populates="table",
         cascade="all, delete-orphan",
     )
-    
+
     lightgbm_parameters = relationship(
         "LightGBMParameter",
         back_populates="table",
         cascade="all, delete-orphan",
-        uselist=False,
     )
-    lightgbm_result = relationship(
-        "LightGBMResult",
-        back_populates="table",
-        cascade="all, delete-orphan",
-    )
-    shap_result = relationship(
-        "SHAPResult",
-        back_populates="table",
-        cascade="all, delete-orphan",
-    )
+
     __table_args__ = (
         UniqueConstraint(
             "connection_id",

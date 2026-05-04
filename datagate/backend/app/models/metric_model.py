@@ -35,9 +35,6 @@ class MetricManualThreshold(Base):
         index=True,
     )
 
-    # Phân loại metric:
-    # - metadata: metric cấp bảng, ví dụ batch_added_rows, table_total_rows
-    # - profiling: metric cấp cột, ví dụ mean, completeness, distinctness
     metric_group = Column(
         Enum(
             "metadata",
@@ -48,42 +45,12 @@ class MetricManualThreshold(Base):
         index=True,
     )
 
-    # Với metadata/table-level metric, set column_name = "__table__"
-    # Với profiling/column-level metric, set column_name = tên cột thật
-    #
-    # Ví dụ:
-    # metadata  | __table__     | batch_added_rows
-    # profiling | trip_distance | mean
-    # profiling | passenger_cnt | completeness
+    # Metadata metric: column_name = "__table__"
+    # Profiling metric: column_name = real column name
     column_name = Column(String(255), nullable=False, default="__table__")
 
-    # Tên metric cần đặt ngưỡng
-    #
-    # Metadata examples:
-    # - batch_added_rows
-    # - batch_added_files
-    # - deleted_rows
-    # - deleted_files
-    # - table_total_rows
-    # - table_total_files
-    # - table_total_size_bytes
-    #
-    # Profiling examples:
-    # - completeness
-    # - mean
-    # - standard_deviation
-    # - minimum
-    # - maximum
-    # - min_length
-    # - max_length
-    # - distinctness
-    # - approx_count_distinct
     metric_name = Column(String(255), nullable=False, index=True)
 
-    # Nếu actual_value < min_threshold thì cảnh báo.
-    # Nếu actual_value > max_threshold thì cảnh báo.
-    #
-    # Dùng Float để hỗ trợ cả metric dạng số nguyên và số thực.
     min_threshold = Column(Float, nullable=True)
     max_threshold = Column(Float, nullable=True)
 
@@ -116,6 +83,12 @@ class MetricManualThreshold(Base):
         back_populates="metric_manual_thresholds",
     )
 
+    results = relationship(
+        "MetricResult",
+        back_populates="metric_manual_threshold",
+        cascade="all, delete-orphan",
+    )
+
     __table_args__ = (
         UniqueConstraint(
             "table_id",
@@ -134,26 +107,19 @@ class MetricManualThreshold(Base):
         ),
     )
 
+
 class MetricResult(Base):
     __tablename__ = "metric_results"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
 
-    table_id = Column(
+    metric_manual_threshold_id = Column(
         UUID(as_uuid=False),
-        ForeignKey("tables.id", ondelete="CASCADE"),
+        ForeignKey("metric_manual_thresholds.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-
-    # Với metric cấp bảng: column_name = "__table__"
-    # Với metric profiling theo cột: column_name = tên cột thật
-    column_name = Column(String(255), nullable=False, default="__table__")
-
-    # Ví dụ:
-    # batch_added_rows, table_total_rows, completeness, mean, distinctness
-    metric_name = Column(String(255), nullable=False, index=True)
-
+    actual_value = Column(Float, nullable=True)
     status = Column(
         Enum(
             "pass",
@@ -164,10 +130,6 @@ class MetricResult(Base):
         index=True,
     )
 
-    # Giá trị thực tế đo được tại batch đó
-    actual_value = Column(Float, nullable=True)
-
-    # Ngưỡng được dùng tại thời điểm kiểm tra
     min_threshold = Column(Float, nullable=True)
     max_threshold = Column(Float, nullable=True)
 
@@ -181,35 +143,27 @@ class MetricResult(Base):
         index=True,
     )
 
-    message = Column(Text, nullable=True)
-
     processing_date_hour = Column(DateTime, nullable=False, index=True)
-
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    table = relationship(
-        "Table",
-        back_populates="metric_results",
+    metric_manual_threshold = relationship(
+        "MetricManualThreshold",
+        back_populates="results",
     )
 
     __table_args__ = (
         UniqueConstraint(
-            "table_id",
-            "column_name",
-            "metric_name",
+            "metric_manual_threshold_id",
             "processing_date_hour",
-            name="uq_metric_result_table_column_metric_hour",
+            name="uq_metric_result_threshold_hour",
         ),
         Index(
-            "ix_metric_result_lookup",
-            "table_id",
-            "column_name",
-            "metric_name",
+            "ix_metric_result_threshold_hour",
+            "metric_manual_threshold_id",
             "processing_date_hour",
         ),
         Index(
-            "ix_metric_result_status",
-            "table_id",
+            "ix_metric_result_status_hour",
             "status",
             "processing_date_hour",
         ),

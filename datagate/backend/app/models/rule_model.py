@@ -2,16 +2,15 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean,
     Column,
     DateTime,
     Enum,
-    Float,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -37,36 +36,61 @@ class Rule(Base):
     )
 
     source = Column(
-        Enum("system", "manual", name="rule_source"),
+        Enum(
+            "system",
+            "manual",
+            name="rule_source",
+        ),
         nullable=False,
         default="manual",
+        index=True,
     )
 
+    # pending  : rule do hệ thống gợi ý, chờ người dùng duyệt
+    # active   : rule đang được dùng để verify
+    # inactive : rule đã bị tắt
     status = Column(
-        Enum("pending", "active", "inactive", name="rule_status"),
+        Enum(
+            "pending",
+            "active",
+            "inactive",
+            name="rule_status",
+        ),
         nullable=False,
         default="pending",
+        index=True,
     )
 
+    # Mức độ cảnh báo nếu rule fail
     severity_level = Column(
         Enum(
             "warning",
             "critical",
-            name="rule_importance_level",
+            name="rule_severity_level",
         ),
         nullable=False,
+        default="warning",
+        index=True,
     )
 
     column_name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
+
     constraint_name = Column(String(512), nullable=True)
+    description = Column(Text, nullable=True)
+
+    # Số lần hệ thống gợi ý lại cùng một rule
     frequency = Column(Integer, nullable=False, default=1)
 
     current_value = Column(String(255), nullable=True)
     suggesting_rule = Column(String(255), nullable=True)
+
+    # Ví dụ:
+    # .isComplete("vendorid")
+    # .isNonNegative("trip_distance")
+    # .isContainedIn("payment_type", ["1", "2"])
     code_for_constraint = Column(String(512), nullable=True)
 
-    rule_description = Column(String, nullable=True)
+    rule_description = Column(Text, nullable=True)
 
     created_by = Column(
         UUID(as_uuid=False),
@@ -81,6 +105,7 @@ class Rule(Base):
     )
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -111,19 +136,33 @@ class Rule(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint(
+            "table_id",
+            "source",
+            "column_name",
+            "code_for_constraint",
+            name="uq_rules_table_source_column_code",
+        ),
         Index(
             "ix_rules_table_column",
             "table_id",
             "column_name",
         ),
         Index(
-            "uq_rules_table_source_column_code",
+            "ix_rules_table_status",
+            "table_id",
+            "status",
+        ),
+        Index(
+            "ix_rules_table_severity",
+            "table_id",
+            "severity_level",
+        ),
+        Index(
+            "ix_rules_table_source_status",
             "table_id",
             "source",
-            "column_name",
-            "code_for_constraint",
-            unique=True,
-            postgresql_where=text("code_for_constraint IS NOT NULL"),
+            "status",
         ),
     )
 
@@ -133,13 +172,6 @@ class RuleVerificationResult(Base):
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
 
-    table_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("tables.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
     rule_id = Column(
         UUID(as_uuid=False),
         ForeignKey("rules.id", ondelete="CASCADE"),
@@ -147,51 +179,19 @@ class RuleVerificationResult(Base):
         index=True,
     )
 
-    source = Column(
-        Enum("system", "manual", name="rule_source"),
-        nullable=False,
-    )
-
-    severity_level = Column(
-        Enum(
-            "warning",
-            "critical",
-            name="rule_importance_level",
-        ),
-        nullable=False,
-    )
-
-    column_name = Column(String(255), nullable=False)
-
-    constraint_name = Column(String(512), nullable=True)
-    description = Column(Text, nullable=True)
-
-    current_value = Column(String(255), nullable=True)
-    suggesting_rule = Column(String(255), nullable=True)
-    code_for_constraint = Column(String(512), nullable=True)
-    rule_description = Column(String, nullable=True)
-
-    constraint_status = Column(
-        Enum(
-            "success",
-            "failed",
-            "error",
-            "skipped",
-            name="constraint_status",
-        ),
-        nullable=False,
-        index=True,
-    )
+    constraint_status = Column(Text, nullable=True)
 
     constraint_message = Column(Text, nullable=True)
-    checked_rows = Column(Integer, nullable=True)
+
     processing_date_hour = Column(DateTime, nullable=False, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    table = relationship(
-        "Table",
-        back_populates="rule_verification_results",
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
     )
 
     rule = relationship(
@@ -201,15 +201,9 @@ class RuleVerificationResult(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "table_id",
             "rule_id",
             "processing_date_hour",
-            name="uq_rule_verification_table_rule_hour",
-        ),
-        Index(
-            "ix_rule_verification_table_hour",
-            "table_id",
-            "processing_date_hour",
+            name="uq_rule_verification_rule_hour",
         ),
         Index(
             "ix_rule_verification_rule_hour",
@@ -217,8 +211,8 @@ class RuleVerificationResult(Base):
             "processing_date_hour",
         ),
         Index(
-            "ix_rule_verification_table_status",
-            "table_id",
+            "ix_rule_verification_status_hour",
             "constraint_status",
+            "processing_date_hour",
         ),
     )
