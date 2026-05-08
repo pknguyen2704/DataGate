@@ -7,45 +7,57 @@ from airflow.exceptions import AirflowSkipException
 from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
-
+from airflow.providers.slack.notifications.slack_webhook import send_slack_webhook_notification
 sys.path.append("/opt/spark/jobs/datagate")
 
 from batch_metadata_collection_job import collect_metadata
-from data_quality_gate_bronze_layer import check_data_quality_gate_bronze_layer
-from data_quality_gate_silver_layer import check_data_quality_gate_silver_layer
-from data_quality_gate_gold_layer import check_data_quality_gate_gold_layer
 from batch_metadata_metrics_verify import evaluate_metadata_metrics
 from batch_profiling_metrics_verify import evaluate_profiling_metrics
-
+from data_quality_gate import check_data_quality_gate
 LOCAL_TZ = pendulum.timezone("Asia/Ho_Chi_Minh")
 
-default_args = {
-    "owner": "datagate",
-    "depends_on_past": False,
-    "start_date": pendulum.datetime(2024, 1, 1, tz=LOCAL_TZ),
-    "retries": 1,
-    "retry_delay": timedelta(minutes=5),
-}
 
 SIM_START = "2025-01-02 00:00:00"
 SIM_END = "2025-01-16 00:00:00"
 SIM_STEP_HOURS = 12
 SIM_VAR_NAME = "yellow_tripdata_next_processing_date_hour"
 
-PROCESSING_DATE_HOUR = "{{ ti.xcom_pull(task_ids='get_processing_date_hour') }}"
-
-CONNECTION_NAME = "my_lakehouse"
-TRINO_CONN_ID = "trino_default"
-DATAGATE_DB_CONN_ID = "datagate_db_default"
 
 PYSPARK_JOB_PATH = "/opt/spark/jobs/experiments/tlc_trip_record"
 DATAGATE_JOB_PATH = "/opt/spark/jobs/datagate"
+PROCESSING_DATE_HOUR = "{{ ti.xcom_pull(task_ids='get_processing_date_hour') }}"
 
-SOURCE_TABLE = "yellow_tripdata"
-BRONZE_TABLE = "yellow_tripdata"
-SILVER_TABLE = "cleaned_yellow_tripdata"
-GOLD_TRIP_HOURLY_METRICS_TABLE = "trip_hourly_metrics"
-GOLD_LOCATION_HOURLY_METRICS_TABLE = "location_hourly_metrics"
+CONNECTION_NAME = "my lakehouse"
+TRINO_CONN_ID = "trino_default"
+DATAGATE_DB_CONN_ID = "datagate_db_default"
+SLACK_AIRFLOW_FAILURES_CONN_ID = "slack_airflow_failures"
+SLACK_DQ_CONN_ID = "slack_dq"
+
+task_fail_slack_alert = send_slack_webhook_notification(
+    slack_webhook_conn_id=SLACK_AIRFLOW_FAILURES_CONN_ID,
+    text="\n".join([
+        ":red_circle: *Data Pipeline Failed*",
+        "",
+        "*Status*: `FAILED`",
+        "*DAG*: `{{ dag.dag_id }}`",
+        "*Task*: `{{ ti.task_id }}`",
+        "*Run ID*: `{{ run_id }}`",
+        "*Try*: `{{ ti.try_number }}`",
+        "*Execution Time*: `{{ ts }}`",
+        "*Processing Date Hour*: `{{ dag_run.conf.get('processing_date_hour', params.processing_date_hour) if dag_run else params.processing_date_hour }}`",
+        "",
+        "*Log*: <{{ ti.log_url }}|Open task log>",
+    ]),
+)
+
+default_args = {
+    "owner": "datagate",
+    "depends_on_past": False,
+    "start_date": pendulum.datetime(2024, 1, 1, tz=LOCAL_TZ),
+    "retries": 1,
+    "retry_delay": timedelta(minutes=2),
+    "on_failure_callback": [task_fail_slack_alert],
+}
 
 
 def get_processing_date_hour():
@@ -93,8 +105,6 @@ with DAG(
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--source_table", SOURCE_TABLE,
-            "--target_table", BRONZE_TABLE,
             "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
     )
@@ -148,12 +158,14 @@ with DAG(
 
     bronze_data_quality_gate = PythonOperator(
         task_id="bronze_data_quality_gate",
-        python_callable=check_data_quality_gate_bronze_layer,
+        python_callable=check_data_quality_gate,
+        retries=0,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
             "schema_name": "bronze",
             "processing_date_hour": PROCESSING_DATE_HOUR,
+            "slack_webhook_conn_id": SLACK_DQ_CONN_ID,
         },
     )
 
@@ -163,8 +175,6 @@ with DAG(
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--source_table", BRONZE_TABLE,
-            "--target_table", SILVER_TABLE,
             "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
     )
@@ -244,12 +254,14 @@ with DAG(
 
     silver_data_quality_gate = PythonOperator(
         task_id="silver_data_quality_gate",
-        python_callable=check_data_quality_gate_silver_layer,
+        python_callable=check_data_quality_gate,
+        retries=0,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
             "schema_name": "silver",
             "processing_date_hour": PROCESSING_DATE_HOUR,
+            "slack_webhook_conn_id": SLACK_DQ_CONN_ID,
         },
     )
 
@@ -259,9 +271,6 @@ with DAG(
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--source_table", SILVER_TABLE,
-            "--trip_hourly_metrics_table", GOLD_TRIP_HOURLY_METRICS_TABLE,
-            "--location_hourly_metrics_table", GOLD_LOCATION_HOURLY_METRICS_TABLE,
             "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
     )
@@ -328,12 +337,14 @@ with DAG(
 
     gold_data_quality_gate = PythonOperator(
         task_id="gold_data_quality_gate",
-        python_callable=check_data_quality_gate_gold_layer,
+        python_callable=check_data_quality_gate,
+        retries=0,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
             "schema_name": "gold",
             "processing_date_hour": PROCESSING_DATE_HOUR,
+            "slack_webhook_conn_id": SLACK_DQ_CONN_ID,
         },
     )
 
@@ -349,6 +360,7 @@ with DAG(
             "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
     )
+
 
     get_processing_date_hour_task >> ingest_data
 
