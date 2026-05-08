@@ -13,7 +13,7 @@ const Home = React.lazy(() => import("~/pages/Home/Home"));
 const Explore = React.lazy(() => import("~/pages/Explore/Explore"));
 
 const Settings = React.lazy(() => import("~/pages/Settings/Settings"));
-const NotFound = React.lazy(() => import("~/pages/NotFound/NotFound"));
+const NotFound = React.lazy(() => import("~/pages/Other/NotFound/NotFound"));
 
 function App() {
   const dispatch = useDispatch();
@@ -32,14 +32,14 @@ function App() {
         </Route>
 
         {/* Protected App Routes */}
-        <Route element={<ProtectedRoute />}>
+        {/* <Route element={<ProtectedRoute />}> */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<Home />} />
             <Route path="/explore/*" element={<Explore />} />
             <Route path="/settings/*" element={<Settings />} />
           </Route>
-        </Route>
+        {/* </Route> */}
 
         {/* 404 */}
         <Route path="*" element={<NotFound />} />

@@ -1,29 +1,21 @@
 import os
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 def _get_env(key: str, default: str | None = None) -> str:
     value = os.getenv(key, default)
-
     if value is None or value.strip() == "":
         raise RuntimeError(f"Missing required environment variable: {key}")
-
     return value.strip()
-
 
 def _get_int_env(key: str, default: int | None = None) -> int:
     value = os.getenv(key)
-
     if value is None or value.strip() == "":
         if default is not None:
             return default
         raise RuntimeError(f"Missing required environment variable: {key}")
-
     return int(value)
-
 
 def _build_database_url() -> str:
     user = _get_env("DATABASE_USER")
@@ -54,7 +46,5 @@ class Config:
     database_password: str = _get_env("DATABASE_PASSWORD")
     database_db: str = _get_env("DATABASE_DB")
     database_url: str = _build_database_url()
-
-
 
 config = Config()

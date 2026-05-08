@@ -9,6 +9,6 @@ export default defineConfig({
     alias: [{ find: "~", replacement: "/src" }],
   },
   server: {
-    allowedHosts: ["andrewphung.id.vn"],
+    allowedHosts: ["datagate.io.vn"],
   },
 })

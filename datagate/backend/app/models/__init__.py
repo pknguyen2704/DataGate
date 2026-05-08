@@ -15,7 +15,7 @@ from .batch_table_profiling_model import (
     BatchTableProfilingMetricsVerify,
 )
 
-from .lightgbm_shap_model import (
+from .batch_anomaly_detection_model import (
     LightGBMParameter,
     LightGBMAUCManualThreshold,
     LightGBMAUC,

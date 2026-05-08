@@ -10,7 +10,7 @@ from app.core.exceptions import AppError
 app = FastAPI(
     title=config.app_name,
     version=config.app_version,
-    description="DataGate — Data Quality Management Platform.",
+    description="DataGate - Data Quality Management Platform",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -42,7 +42,7 @@ app.include_router(
     prefix=config.api_v1_str,
 )
 
-
+# Health check endpoint
 @app.get("/health", tags=["Health"])
 def health_check():
     return {
