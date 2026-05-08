@@ -1,115 +1,135 @@
 from datetime import timedelta
-
+import sys
+from textwrap import dedent
 import pendulum
 from airflow import DAG
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.operators.python import PythonOperator
-import sys
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from airflow.providers.slack.notifications.slack_webhook import send_slack_webhook_notification
 
-sys.path.append("/opt/spark/jobs/datagate/pyspark")
-from metadata_collection import collect_metadata
-
+sys.path.append("/opt/spark/jobs/datagate")
+from batch_metadata_collection_job import collect_metadata
+from batch_metadata_metrics_verify import evaluate_metadata_metrics
+from batch_profiling_metrics_verify import evaluate_profiling_metrics
+from data_quality_gate import check_data_quality_gate
 LOCAL_TZ = pendulum.timezone("Asia/Ho_Chi_Minh")
+
+SLACK_AIRFLOW_FAILURES_CONN_ID = "slack_airflow_failures"
+SLACK_DQ_CONN_ID = "slack_dq"
+task_fail_slack_alert = send_slack_webhook_notification(
+    slack_webhook_conn_id=SLACK_AIRFLOW_FAILURES_CONN_ID,
+    text="\n".join([
+        ":red_circle: *Data Pipeline Failed*",
+        "",
+        "*Status*: `FAILED`",
+        "*DAG*: `{{ dag.dag_id }}`",
+        "*Task*: `{{ ti.task_id }}`",
+        "*Run ID*: `{{ run_id }}`",
+        "*Try*: `{{ ti.try_number }}`",
+        "*Execution Time*: `{{ ts }}`",
+        "*Processing Date Hour*: `{{ dag_run.conf.get('processing_date_hour', params.processing_date_hour) if dag_run else params.processing_date_hour }}`",
+        "",
+        "*Log*: <{{ ti.log_url }}|Open task log>",
+    ]),
+)
 
 default_args = {
     "owner": "datagate",
     "depends_on_past": False,
     "start_date": pendulum.datetime(2024, 1, 1, tz=LOCAL_TZ),
     "retries": 1,
-    "retry_delay": timedelta(minutes=5),
+    "retry_delay": timedelta(minutes=2),
+    "on_failure_callback": [task_fail_slack_alert],
 }
 
+PROCESSING_DATE_HOUR = "{{ dag_run.conf.get('processing_date_hour', params.processing_date_hour) }}"
 
-PROCESSING_DATE_HOUR = "2025-01-03 12:00:00"
-
-JDBC_URL = "jdbc:postgresql://datasource_postgres:5432/postgres"
-SOURCE_DB_USER = "admin"
-SOURCE_DB_PASSWORD = "postgrespassword"
-
-SOURCE_TABLE = "public.yellow_tripdata"
-
-BRONZE_TABLE = "bronze.yellow_tripdata"
-SILVER_TABLE = "silver.cleaned_yellow_tripdata"
-
-GOLD_ENRICHED_TABLE = "gold.yellow_tripdata_enriched"
-GOLD_TRIP_HOURLY_METRICS_TABLE = "gold.trip_hourly_metrics"
-GOLD_LOCATION_HOURLY_METRICS_TABLE = "gold.location_hourly_metrics"
-GOLD_PAYMENT_HOURLY_METRICS_TABLE = "gold.payment_hourly_metrics"
-GOLD_VENDOR_HOURLY_METRICS_TABLE = "gold.vendor_hourly_metrics"
-
-PYSPARK_JOB_PATH = "/opt/spark/jobs/experiments/pyspark/tlc_trip_record"
-DATEGATE_JOB_PATH = "/opt/spark/jobs/datagate/pyspark"
-
+CONNECTION_NAME = "my lakehouse"
 TRINO_CONN_ID = "trino_default"
 DATAGATE_DB_CONN_ID = "datagate_db_default"
-DATAGATE_DB_JDBC_URL = (
-    f"jdbc:postgresql://{{{{ conn.{DATAGATE_DB_CONN_ID}.host }}}}:"
-    f"{{{{ conn.{DATAGATE_DB_CONN_ID}.port or 5432 }}}}/"
-    f"{{{{ conn.{DATAGATE_DB_CONN_ID}.schema or 'datagate' }}}}"
-)
-DATAGATE_DB_USER = f"{{{{ conn.{DATAGATE_DB_CONN_ID}.login }}}}"
-DATAGATE_DB_PASSWORD = f"{{{{ conn.{DATAGATE_DB_CONN_ID}.password }}}}"
 
-METADATA_TABLES = [
-    BRONZE_TABLE,
-    SILVER_TABLE,
-    GOLD_ENRICHED_TABLE,
-    GOLD_TRIP_HOURLY_METRICS_TABLE,
-    GOLD_LOCATION_HOURLY_METRICS_TABLE,
-    GOLD_PAYMENT_HOURLY_METRICS_TABLE,
-    GOLD_VENDOR_HOURLY_METRICS_TABLE,
-]
+PYSPARK_JOB_PATH = "/opt/spark/jobs/experiments/tlc_trip_record"
+DATAGATE_JOB_PATH = "/opt/spark/jobs/datagate"
 
-RULE_SUGGESTION_TABLES = [
-    BRONZE_TABLE,
-    SILVER_TABLE,
-    GOLD_ENRICHED_TABLE,
-    GOLD_TRIP_HOURLY_METRICS_TABLE,
-    GOLD_LOCATION_HOURLY_METRICS_TABLE,
-    GOLD_PAYMENT_HOURLY_METRICS_TABLE,
-    GOLD_VENDOR_HOURLY_METRICS_TABLE,
-]
-RULE_VERIFICATION_TABLES = RULE_SUGGESTION_TABLES
-ANOMALY_TABLES = [
-    BRONZE_TABLE,
-    SILVER_TABLE,
-    GOLD_ENRICHED_TABLE,
-    GOLD_TRIP_HOURLY_METRICS_TABLE,
-    GOLD_LOCATION_HOURLY_METRICS_TABLE,
-    GOLD_PAYMENT_HOURLY_METRICS_TABLE,
-    GOLD_VENDOR_HOURLY_METRICS_TABLE,
-]
-ANOMALY_TABLE_DATE_COLUMNS = {
-    BRONZE_TABLE: "tpep_pickup_datetime",
-    SILVER_TABLE: "tpep_pickup_datetime",
-    GOLD_ENRICHED_TABLE: "tpep_pickup_datetime",
-    GOLD_TRIP_HOURLY_METRICS_TABLE: "date_hour",
-    GOLD_LOCATION_HOURLY_METRICS_TABLE: "date_hour",
-    GOLD_PAYMENT_HOURLY_METRICS_TABLE: "date_hour",
-    GOLD_VENDOR_HOURLY_METRICS_TABLE: "date_hour",
-}
 
 with DAG(
     dag_id="yellow_tripdata_pipeline",
     default_args=default_args,
     schedule=None,
     catchup=False,
-    tags=["spark", "data_pipeline", "iceberg", "manual"],
+    tags=["datagate", "iceberg", "yellow_tripdata"],
+    params={
+        "processing_date_hour": "2025-01-17 12:00:00",
+    },
 ) as dag:
-
     ingest_data = SparkSubmitOperator(
         task_id="ingest_data",
         application=f"{PYSPARK_JOB_PATH}/ingest_data.py",
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--jdbc_url", JDBC_URL,
-            "--source_db_user", SOURCE_DB_USER,
-            "--source_db_password", SOURCE_DB_PASSWORD,
-            "--source_table", SOURCE_TABLE,
-            "--target_table", BRONZE_TABLE,
             "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
+    )
+
+    bronze_tables_metadata_collection = PythonOperator(
+        task_id="bronze_tables_metadata_collection",
+        python_callable=collect_metadata,
+        op_kwargs={
+            "trino_conn_id": TRINO_CONN_ID,
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "bronze",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
+    bronze_tables_profiling_collection = SparkSubmitOperator(
+        task_id="bronze_tables_profiling_collection",
+        application=f"{DATAGATE_JOB_PATH}/batch_profiling_collection_job.py",
+        conn_id="spark_default",
+        deploy_mode="client",
+        application_args=[
+            "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
+            "--connection_name", CONNECTION_NAME,
+            "--schema_name", "bronze",
+            "--processing_date_hour", PROCESSING_DATE_HOUR,
+        ],
+    )
+
+    bronze_tables_metadata_metrics_verify = PythonOperator(
+        task_id="bronze_tables_metadata_metrics_verify",
+        python_callable=evaluate_metadata_metrics,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "bronze",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+    
+    bronze_tables_profiling_metrics_verify = PythonOperator(
+        task_id="bronze_tables_profiling_metrics_verify",
+        python_callable=evaluate_profiling_metrics,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "bronze",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
+    bronze_data_quality_gate = PythonOperator(
+        task_id="bronze_data_quality_gate",
+        python_callable=check_data_quality_gate,
+        retries=0,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "bronze",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+            "slack_webhook_conn_id": SLACK_DQ_CONN_ID,
+        },
     )
 
     clean_data = SparkSubmitOperator(
@@ -118,10 +138,94 @@ with DAG(
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--source_table", BRONZE_TABLE,
-            "--target_table", SILVER_TABLE,
             "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
+    )
+
+    silver_tables_metadata_collection = PythonOperator(
+        task_id="silver_tables_metadata_collection",
+        python_callable=collect_metadata,
+        op_kwargs={
+            "trino_conn_id": TRINO_CONN_ID,
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "silver",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
+    silver_tables_profiling_collection = SparkSubmitOperator(
+        task_id="silver_tables_profiling_collection",
+        application=f"{DATAGATE_JOB_PATH}/batch_profiling_collection_job.py",
+        conn_id="spark_default",
+        deploy_mode="client",
+        application_args=[
+            "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
+            "--connection_name", CONNECTION_NAME,
+            "--schema_name", "silver",
+            "--processing_date_hour", PROCESSING_DATE_HOUR,
+        ],
+    )
+
+    silver_tables_metadata_metrics_verify = PythonOperator(
+        task_id="silver_tables_metadata_metrics_verify",
+        python_callable=evaluate_metadata_metrics,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "silver",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
+    silver_tables_profiling_metrics_verify = PythonOperator(
+        task_id="silver_tables_profiling_metrics_verify",
+        python_callable=evaluate_profiling_metrics,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "silver",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
+    silver_batch_rule_verification = SparkSubmitOperator(
+        task_id="silver_batch_rule_verification",
+        application=f"{DATAGATE_JOB_PATH}/batch_rule_verification.py",
+        conn_id="spark_default",
+        deploy_mode="client",
+        application_args=[
+            "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
+            "--connection_name", CONNECTION_NAME,
+            "--schema_name", "silver",
+            "--processing_date_hour", PROCESSING_DATE_HOUR,
+        ],
+    )
+
+    silver_batch_anomaly_detection_tlc_trip_record = SparkSubmitOperator(
+        task_id="silver_batch_anomaly_detection_tlc_trip_record",
+        application=f"{DATAGATE_JOB_PATH}/batch_anomaly_detection_tlc_trip_record.py",
+        conn_id="spark_default",
+        deploy_mode="client",
+        application_args=[
+            "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
+            "--connection_name", CONNECTION_NAME,
+            "--schema_name", "silver",
+            "--processing_date_hour", PROCESSING_DATE_HOUR,
+        ],
+    )
+
+    silver_data_quality_gate = PythonOperator(
+        task_id="silver_data_quality_gate",
+        python_callable=check_data_quality_gate,
+        retries=0,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "silver",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+            "slack_webhook_conn_id": SLACK_DQ_CONN_ID,
+        },
     )
 
     transform_data = SparkSubmitOperator(
@@ -130,76 +234,137 @@ with DAG(
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--source_table", SILVER_TABLE,
-            "--enriched_table", GOLD_ENRICHED_TABLE,
-            "--trip_hourly_metrics_table", GOLD_TRIP_HOURLY_METRICS_TABLE,
-            "--location_hourly_metrics_table", GOLD_LOCATION_HOURLY_METRICS_TABLE,
-            "--payment_hourly_metrics_table", GOLD_PAYMENT_HOURLY_METRICS_TABLE,
-            "--vendor_hourly_metrics_table", GOLD_VENDOR_HOURLY_METRICS_TABLE,
             "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
     )
 
-    metadata_collection = PythonOperator(
-        task_id="metadata_collection",
+    gold_tables_metadata_collection = PythonOperator(
+        task_id="gold_tables_metadata_collection",
         python_callable=collect_metadata,
         op_kwargs={
             "trino_conn_id": TRINO_CONN_ID,
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
-            "table_names": METADATA_TABLES,
-            "date_hour": PROCESSING_DATE_HOUR,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "gold",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
         },
     )
 
-    rule_suggestion = SparkSubmitOperator(
-        task_id="rule_suggestion",
-        application=f"{DATEGATE_JOB_PATH}/rule_suggestion.py",
+    gold_tables_profiling_collection = SparkSubmitOperator(
+        task_id="gold_tables_profiling_collection",
+        application=f"{DATAGATE_JOB_PATH}/batch_profiling_collection_job.py",
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--source_tables", ",".join(RULE_SUGGESTION_TABLES),
-            "--date_hour", PROCESSING_DATE_HOUR,
-            "--output_format", "json",
             "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
-            "--datagate_jdbc_url", DATAGATE_DB_JDBC_URL,
-            "--datagate_db_user", DATAGATE_DB_USER,
-            "--datagate_db_password", DATAGATE_DB_PASSWORD,
+            "--connection_name", CONNECTION_NAME,
+            "--schema_name", "gold",
+            "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
     )
-    # rule_verification = SparkSubmitOperator(
-    #     task_id="rule_verification",
-    #     application=f"{DATEGATE_JOB_PATH}/rule_verification.py",
-    #     conn_id="spark_default",
-    #     deploy_mode="client",
-    #     application_args=[
-    #         "--source_tables", ",".join(RULE_VERIFICATION_TABLES),
-    #         "--date_hour", PROCESSING_DATE_HOUR,
-    #         "--output_format", "json",
-    #         "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
-    #         "--datagate_jdbc_url", DATAGATE_DB_JDBC_URL,
-    #         "--datagate_db_user", DATAGATE_DB_USER,
-    #         "--datagate_db_password", DATAGATE_DB_PASSWORD,
-    #     ],
-    # )
 
-    anomaly_detection = SparkSubmitOperator(
-        task_id="anomaly_detection",
-        application=f"{DATEGATE_JOB_PATH}/anomaly_detection.py",
+    gold_tables_metadata_metrics_verify = PythonOperator(
+        task_id="gold_tables_metadata_metrics_verify",
+        python_callable=evaluate_metadata_metrics,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "gold",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
+    gold_tables_profiling_metrics_verify = PythonOperator(
+        task_id="gold_tables_profiling_metrics_verify",
+        python_callable=evaluate_profiling_metrics,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "gold",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
+    gold_batch_rule_verification = SparkSubmitOperator(
+        task_id="gold_batch_rule_verification",
+        application=f"{DATAGATE_JOB_PATH}/batch_rule_verification.py",
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
-            "--source_tables", ",".join(ANOMALY_TABLES),
-            "--table_date_columns", ",".join(
-                f"{table_name}={date_column}"
-                for table_name, date_column in ANOMALY_TABLE_DATE_COLUMNS.items()
-            ),
-            "--date_hour", PROCESSING_DATE_HOUR,
-            "--output_format", "json",
             "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
-            "--datagate_jdbc_url", DATAGATE_DB_JDBC_URL,
-            "--datagate_db_user", DATAGATE_DB_USER,
-            "--datagate_db_password", DATAGATE_DB_PASSWORD,
+            "--connection_name", CONNECTION_NAME,
+            "--schema_name", "gold",
+            "--processing_date_hour", PROCESSING_DATE_HOUR,
         ],
     )
 
-    ingest_data >> clean_data >> transform_data >> metadata_collection >> rule_suggestion >> anomaly_detection
+    gold_data_quality_gate = PythonOperator(
+        task_id="gold_data_quality_gate",
+        python_callable=check_data_quality_gate,
+        retries=0,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "gold",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+            "slack_webhook_conn_id": SLACK_DQ_CONN_ID,
+        },
+    )
+
+    batch_rule_suggestion = SparkSubmitOperator(
+        task_id="batch_rule_suggestion",
+        application=f"{DATAGATE_JOB_PATH}/batch_rule_suggestion.py",
+        conn_id="spark_default",
+        deploy_mode="client",
+        application_args=[
+            "--datagate_db_conn_id", DATAGATE_DB_CONN_ID,
+            "--connection_name", CONNECTION_NAME,
+            "--schema_names", "silver", "gold",
+            "--processing_date_hour", PROCESSING_DATE_HOUR,
+        ],
+    )
+
+
+    # ----------------------------
+    # Bronze layer
+    # ----------------------------
+    ingest_data >> [
+        bronze_tables_metadata_collection,
+        bronze_tables_profiling_collection
+    ]
+    bronze_tables_metadata_collection >>  bronze_tables_metadata_metrics_verify
+    bronze_tables_profiling_collection >> bronze_tables_profiling_metrics_verify
+    [
+        bronze_tables_metadata_metrics_verify,
+        bronze_tables_profiling_metrics_verify
+    ] >> bronze_data_quality_gate >> clean_data
+
+    # ----------------------------
+    # Silver layer
+    # ----------------------------
+    clean_data >> [
+        silver_tables_metadata_collection,
+        silver_tables_profiling_collection,
+    ] 
+
+    silver_tables_metadata_collection >> silver_tables_metadata_metrics_verify
+    silver_tables_profiling_collection >> silver_tables_profiling_metrics_verify
+
+    [
+        silver_tables_metadata_metrics_verify,
+        silver_tables_profiling_metrics_verify,
+    ] >> silver_batch_rule_verification >> silver_batch_anomaly_detection_tlc_trip_record >> silver_data_quality_gate >> transform_data
+
+    # ----------------------------
+    # Gold layer
+    # ----------------------------
+    transform_data >> [
+        gold_tables_metadata_collection,
+        gold_tables_profiling_collection,
+    ] 
+    gold_tables_metadata_collection >> gold_tables_metadata_metrics_verify
+    gold_tables_profiling_collection >> gold_tables_profiling_metrics_verify
+    [
+        gold_tables_metadata_metrics_verify,
+        gold_tables_profiling_metrics_verify,
+    ] >> gold_batch_rule_verification >> gold_data_quality_gate >> batch_rule_suggestion

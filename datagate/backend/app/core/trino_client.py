@@ -1,100 +1,61 @@
 from typing import Any
-from urllib.parse import urlparse
 
 from trino.dbapi import connect
+from trino.auth import BasicAuthentication
 
-from app.models.connection import Connection
-
-
-def quote_identifier(identifier: str) -> str:
-    return f'"{identifier.replace(chr(34), chr(34) + chr(34))}"'
-
-
-def quote_literal(value: str) -> str:
-    return f"'{value.replace(chr(39), chr(39) + chr(39))}'"
+from app.models import Connection
 
 
 class TrinoClient:
     def __init__(self, connection: Connection):
-        self.connection_config = connection
-        host, port, http_scheme = self._normalize_host(
-            connection.trino_host,
-            connection.trino_port,
-        )
-        self.connection = connect(
-            host=host,
-            port=port,
-            user=connection.trino_user,
-            catalog=connection.iceberg_catalog_name,
-            http_scheme=http_scheme,
-        )
+        self.connection = connection
+        self.conn = None
 
-    def _normalize_host(self, host: str, port: int) -> tuple[str, int, str]:
-        raw_host = host.strip()
-        if "://" not in raw_host:
-            return raw_host, port, "http"
+    def _connect(self):
+        if self.conn:
+            return self.conn
 
-        parsed = urlparse(raw_host)
-        return (
-            parsed.hostname or raw_host,
-            parsed.port or port,
-            parsed.scheme or "http",
+        auth = None
+        if self.connection.trino_password:
+            auth = BasicAuthentication(
+                self.connection.trino_user,
+                self.connection.trino_password,
+            )
+
+        self.conn = connect(
+            host=self.connection.trino_host,
+            port=self.connection.trino_port,
+            user=self.connection.trino_user,
+            catalog=self.connection.iceberg_catalog_name,
+            http_scheme="http",
+            auth=auth,
         )
+        return self.conn
 
-    def close(self) -> None:
-        self.connection.close()
+    def execute(self, sql: str) -> list[dict[str, Any]]:
+        conn = self._connect()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(sql)
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+            return [dict(zip(columns, row)) for row in rows]
+        finally:
+            cursor.close()
 
     def test(self) -> None:
-        cursor = self.connection.cursor()
-        cursor.execute("SELECT 1")
-        cursor.fetchone()
-
-    def list_catalogs(self) -> list[str]:
-        cursor = self.connection.cursor()
-        cursor.execute("SHOW CATALOGS")
-        return [row[0] for row in cursor.fetchall()]
+        self.execute("SELECT 1 AS ok")
 
     def list_schemas(self, catalog: str) -> list[str]:
-        cursor = self.connection.cursor()
-        cursor.execute(f"SHOW SCHEMAS FROM {quote_identifier(catalog)}")
-        return [row[0] for row in cursor.fetchall()]
+        rows = self.execute(f"SHOW SCHEMAS FROM {catalog}")
+        return [list(row.values())[0] for row in rows]
 
     def list_tables(self, catalog: str, schema: str) -> list[str]:
-        cursor = self.connection.cursor()
-        cursor.execute(f"SHOW TABLES FROM {quote_identifier(catalog)}.{quote_identifier(schema)}")
-        return [row[0] for row in cursor.fetchall()]
+        rows = self.execute(f"SHOW TABLES FROM {catalog}.{schema}")
+        return [list(row.values())[0] for row in rows]
 
-    def get_columns(self, catalog: str, schema: str, table: str) -> list[dict[str, Any]]:
-        cursor = self.connection.cursor()
-        cursor.execute(
-            "SELECT column_name, data_type, is_nullable "
-            f"FROM {quote_identifier(catalog)}.information_schema.columns "
-            f"WHERE table_catalog = {quote_literal(catalog)} "
-            f"AND table_schema = {quote_literal(schema)} "
-            f"AND table_name = {quote_literal(table)} "
-            "ORDER BY ordinal_position"
-        )
-        return [
-            {
-                "column_name": row[0],
-                "data_type": row[1],
-                "is_nullable": row[2],
-            }
-            for row in cursor.fetchall()
-        ]
-
-    def get_sample_data(self, catalog: str, schema: str, table: str, limit: int = 50) -> dict[str, Any]:
-        safe_limit = max(1, min(limit, 1000))
-        cursor = self.connection.cursor()
-        cursor.execute(
-            "SELECT * FROM "
-            f"{quote_identifier(catalog)}.{quote_identifier(schema)}.{quote_identifier(table)} "
-            f"LIMIT {safe_limit}"
-        )
-        rows = cursor.fetchall()
-        columns = [column[0] for column in cursor.description] if cursor.description else []
-        return {
-            "columns": columns,
-            "rows": [list(row) for row in rows],
-            "row_count": len(rows),
-        }
+    def close(self) -> None:
+        if self.conn:
+            self.conn.close()
+            self.conn = None

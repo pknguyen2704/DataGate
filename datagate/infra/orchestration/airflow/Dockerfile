@@ -8,6 +8,7 @@ RUN apt-get update \
         curl \
         ca-certificates \
         tar \
+        libgomp1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -43,4 +44,5 @@ RUN chown -R airflow:root /opt/spark
 COPY requirements.txt /requirements.txt
 
 USER airflow
+
 RUN pip install --no-cache-dir -r /requirements.txt

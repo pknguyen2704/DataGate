@@ -6,7 +6,7 @@ import MainLayout from "~/components/Layout/MainLayout";
 import ProtectedRoute from "~/components/Auth/ProtectedRoute";
 import "react-toastify/dist/ReactToastify.css";
 import { useDispatch } from "react-redux";
-import { initializeAuth } from "~/stores/slices/authSlice/authSlice";
+import { initializeAuth } from "~/stores/slices/authSlice";
 
 // Pages — lazy loaded for performance
 const Home = React.lazy(() => import("~/pages/Home/Home"));

@@ -60,8 +60,12 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     TZ: Asia/Ho_Chi_Minh
-    AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Ho_Chi_Minh
-    AIRFLOW_CONN_SPARK_DEFAULT: 'spark://spark-master:7077'
+    AIRFLOW_CONN_SPARK_DEFAULT: ${AIRFLOW_CONN_SPARK_DEFAULT}
+    AIRFLOW_CONN_DATAGATE_DB_DEFAULT: ${AIRFLOW_CONN_DATAGATE_DB_DEFAULT}
+    AIRFLOW_CONN_TRINO_DEFAULT: ${AIRFLOW_CONN_TRINO_DEFAULT}
+    AIRFLOW_CONN_SLACKWEBHOOK: ${AIRFLOW_CONN_SLACKWEBHOOK}
+    AIRFLOW_CONN_SLACK_AIRFLOW_FAILURES: ${AIRFLOW_CONN_SLACK_AIRFLOW_FAILURES}
+    AIRFLOW_CONN_SLACK_DQ: ${AIRFLOW_CONN_SLACK_DQ}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server

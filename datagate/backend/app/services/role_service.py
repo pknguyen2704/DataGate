@@ -1,9 +1,8 @@
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFoundError, BadRequestError
-from app.models.permission import Permission
-from app.models.role import Role
-from app.schemas.role import RoleCreate, RoleUpdate
+from app.models import Role, Permission
+from app.schemas import RoleCreate, RoleUpdate
 
 
 class RoleService:

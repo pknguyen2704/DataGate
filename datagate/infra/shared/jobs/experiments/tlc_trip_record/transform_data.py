@@ -1,111 +1,106 @@
 import argparse
 import logging
 from datetime import datetime
+from pathlib import Path
 from time import perf_counter
 
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+from pyspark.sql import SparkSession, functions as F
 
 
-logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-JOB_NAME = "transform_silver_to_gold"
+JOB_NAME = "transform_data"
+
+ICEBERG_CATALOG = "iceberg"
+SOURCE_SCHEMA = "silver"
+SOURCE_TABLE = "cleaned_yellow_tripdata"
+TARGET_SCHEMA = "gold"
+TRIP_HOURLY_METRICS_TABLE = "trip_hourly_metrics"
+LOCATION_HOURLY_METRICS_TABLE = "location_hourly_metrics"
+
+ICEBERG_REST_URI = "http://iceberg-rest:8181"
+ICEBERG_WAREHOUSE = "s3://lakehouse/"
+MINIO_ENDPOINT = "http://minio:9000"
+MINIO_ACCESS_KEY = "admin"
+MINIO_SECRET_KEY = "miniopassword"
+
+SPARK_DRIVER_CORES = "2"
+SPARK_DRIVER_MEMORY = "4g"
+SPARK_EXECUTOR_INSTANCES = "2"
+SPARK_EXECUTOR_CORES = "6"
+SPARK_EXECUTOR_MEMORY = "10g"
+SPARK_SQL_SHUFFLE_PARTITIONS = "24"
+SPARK_DEFAULT_PARALLELISM = "24"
+SPARK_TIMEZONE = "Asia/Ho_Chi_Minh"
+
+SEED_PATH = str(Path(__file__).resolve().parent / "seed" / "taxi_zone_lookup.csv")
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Transform one silver batch into two gold tables"
-    )
-
-    parser.add_argument("--source_table", required=True)
-    parser.add_argument("--trip_hourly_metrics_table", required=True)
-    parser.add_argument("--location_hourly_metrics_table", required=True)
-    parser.add_argument("--taxi_zone_seed_path", required=True)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--processing_date_hour", required=True)
-
     return parser.parse_args()
 
 
-def build_spark_session():
+def normalize_datetime(value):
+    value = str(value or "").strip().replace("T", " ")
+    if not value:
+        raise ValueError("processing_date_hour must not be empty.")
+    return datetime.fromisoformat(value).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def validate_table_name(value, field_name):
+    value = str(value or "").strip()
+    if not value:
+        raise ValueError(f"{field_name} must not be empty.")
+    for char in value:
+        if not (char.isalnum() or char == "_" or char == " "):
+            raise ValueError(f"Invalid {field_name}: {value}. Only letters, numbers, and underscore are allowed.")
+    return value
+
+
+def create_spark_session():
     return (
         SparkSession.builder
         .appName(JOB_NAME)
+        .config("spark.driver.cores", SPARK_DRIVER_CORES)
+        .config("spark.driver.memory", SPARK_DRIVER_MEMORY)
+        .config("spark.executor.instances", SPARK_EXECUTOR_INSTANCES)
+        .config("spark.executor.cores", SPARK_EXECUTOR_CORES)
+        .config("spark.executor.memory", SPARK_EXECUTOR_MEMORY)
+        .config("spark.sql.session.timeZone", SPARK_TIMEZONE)
+        .config("spark.sql.shuffle.partitions", SPARK_SQL_SHUFFLE_PARTITIONS)
+        .config("spark.default.parallelism", SPARK_DEFAULT_PARALLELISM)
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}", "org.apache.iceberg.spark.SparkCatalog")
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.type", "rest")
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.uri", ICEBERG_REST_URI)
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.warehouse", ICEBERG_WAREHOUSE)
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.endpoint", MINIO_ENDPOINT)
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.access-key-id", MINIO_ACCESS_KEY)
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.secret-access-key", MINIO_SECRET_KEY)
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.path-style-access", "true")
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.region", "us-east-1")
         .getOrCreate()
     )
 
 
-def normalize_datetime_string(value):
-    value = str(value).strip().replace("T", " ")
-
-    if value == "":
-        raise ValueError("processing_date_hour must not be empty.")
-
-    dt = datetime.fromisoformat(value)
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-
-def validate_identifier_part(value, field_name):
-    value = str(value).strip()
-
-    if value == "":
-        raise ValueError(f"{field_name} must not be empty.")
-
-    for char in value:
-        if not (char.isalnum() or char == "_"):
-            raise ValueError(
-                f"Invalid {field_name}: {value}. "
-                "Only letters, numbers, and underscore (_) are allowed."
-            )
-
-    return value
-
-
-def validate_table_identifier(table_name, field_name):
-    table_name = str(table_name).strip()
-    parts = table_name.split(".")
-
-    if len(parts) not in (2, 3):
-        raise ValueError(
-            f"Invalid {field_name}: {table_name}. "
-            "Expected format: schema.table or catalog.schema.table."
-        )
-
-    for part in parts:
-        validate_identifier_part(part, field_name)
-
-    return table_name
-
-
-def get_spark_conf(spark, key, default_value=None):
-    return spark.conf.get(key, default_value)
-
-
-def resolve_table_name(table_name, iceberg_catalog):
-    table_name = validate_table_identifier(table_name, "table_name")
-
-    if len(table_name.split(".")) == 3:
-        return table_name
-
-    return f"{iceberg_catalog}.{table_name}"
-
-
 def read_silver_batch(spark, source_table, processing_date_hour):
-    return spark.sql(
-        f"""
+    table = f"{ICEBERG_CATALOG}.{SOURCE_SCHEMA}.{source_table}"
+    logger.info("Reading silver table=%s | processing_date_hour=%s", table, processing_date_hour)
+    return spark.sql(f"""
         SELECT *
-        FROM {source_table}
+        FROM {table}
         WHERE processing_date_hour = TIMESTAMP '{processing_date_hour}'
-        """
-    )
+    """)
 
 
-def read_taxi_zone_seed(spark, seed_path):
+def read_zone_seed(spark):
     return (
-        spark.read
-        .option("header", "true")
-        .option("inferSchema", "true")
-        .csv(seed_path)
+        spark.read.option("header", "true").csv(SEED_PATH)
         .select(
             F.col("LocationID").cast("bigint").alias("location_id"),
             F.col("Borough").alias("borough"),
@@ -115,53 +110,31 @@ def read_taxi_zone_seed(spark, seed_path):
     )
 
 
-def add_basic_features(df):
+def add_features(df):
+    duration = (F.unix_timestamp("tpep_dropoff_datetime") - F.unix_timestamp("tpep_pickup_datetime")) / F.lit(60.0)
+
     return (
-        df
-        .withColumn(
-            "trip_duration_minutes",
-            (
-                F.unix_timestamp(F.col("tpep_dropoff_datetime"))
-                - F.unix_timestamp(F.col("tpep_pickup_datetime"))
-            ) / F.lit(60.0),
-        )
-        .withColumn(
-            "amount_per_mile",
-            F.when(
-                F.col("trip_distance") > 0,
-                F.col("total_amount") / F.col("trip_distance"),
-            ).otherwise(F.lit(None).cast("double")),
-        )
-        .withColumn(
-            "tip_rate",
-            F.when(
-                F.col("fare_amount") > 0,
-                F.col("tip_amount") / F.col("fare_amount"),
-            ).otherwise(F.lit(None).cast("double")),
-        )
+        df.withColumn("trip_duration_minutes", duration)
+        .withColumn("amount_per_mile", F.when(F.col("trip_distance") > 0, F.col("total_amount") / F.col("trip_distance")))
+        .withColumn("tip_rate", F.when(F.col("fare_amount") > 0, F.col("tip_amount") / F.col("fare_amount")))
     )
 
 
 def build_trip_hourly_metrics(df):
     return (
-        df
-        .groupBy("date_hour")
+        df.groupBy("date_hour")
         .agg(
-            F.count(F.lit(1)).cast("bigint").alias("trip_count"),
+            F.count("*").cast("bigint").alias("trip_count"),
             F.sum("passenger_count").cast("bigint").alias("total_passenger_count"),
-
             F.sum("trip_distance").alias("total_trip_distance"),
             F.avg("trip_distance").alias("avg_trip_distance"),
-
             F.sum("fare_amount").alias("total_fare_amount"),
             F.sum("tip_amount").alias("total_tip_amount"),
             F.sum("total_amount").alias("total_amount"),
             F.avg("total_amount").alias("avg_total_amount"),
-
             F.avg("trip_duration_minutes").alias("avg_trip_duration_minutes"),
             F.avg("amount_per_mile").alias("avg_amount_per_mile"),
             F.avg("tip_rate").alias("avg_tip_rate"),
-
             F.min("tpep_pickup_datetime").alias("min_pickup_datetime"),
             F.max("tpep_pickup_datetime").alias("max_pickup_datetime"),
             F.max("processing_date_hour").alias("processing_date_hour"),
@@ -170,124 +143,75 @@ def build_trip_hourly_metrics(df):
 
 
 def build_location_hourly_metrics(df, zone_df):
-    pickup_zone_df = (
-        zone_df
-        .select(
-            F.col("location_id").alias("pulocationid"),
-            F.col("borough").alias("pickup_borough"),
-            F.col("zone").alias("pickup_zone"),
-            F.col("service_zone").alias("pickup_service_zone"),
-        )
+    pickup_zone = zone_df.select(
+        F.col("location_id").alias("pu_location_id"),
+        F.col("borough").alias("pickup_borough"),
+        F.col("zone").alias("pickup_zone"),
+        F.col("service_zone").alias("pickup_service_zone"),
     )
 
-    dropoff_zone_df = (
-        zone_df
-        .select(
-            F.col("location_id").alias("dolocationid"),
-            F.col("borough").alias("dropoff_borough"),
-            F.col("zone").alias("dropoff_zone"),
-            F.col("service_zone").alias("dropoff_service_zone"),
-        )
-    )
-
-    enriched_df = (
-        df
-        .join(F.broadcast(pickup_zone_df), on="pulocationid", how="left")
-        .join(F.broadcast(dropoff_zone_df), on="dolocationid", how="left")
+    dropoff_zone = zone_df.select(
+        F.col("location_id").alias("do_location_id"),
+        F.col("borough").alias("dropoff_borough"),
+        F.col("zone").alias("dropoff_zone"),
+        F.col("service_zone").alias("dropoff_service_zone"),
     )
 
     return (
-        enriched_df
+        df.join(F.broadcast(pickup_zone), on="pu_location_id", how="left")
+        .join(F.broadcast(dropoff_zone), on="do_location_id", how="left")
         .groupBy(
             "date_hour",
-            "pulocationid",
+            "pu_location_id",
             "pickup_borough",
             "pickup_zone",
             "pickup_service_zone",
-            "dolocationid",
+            "do_location_id",
             "dropoff_borough",
             "dropoff_zone",
             "dropoff_service_zone",
         )
         .agg(
-            F.count(F.lit(1)).cast("bigint").alias("trip_count"),
+            F.count("*").cast("bigint").alias("trip_count"),
             F.sum("passenger_count").cast("bigint").alias("total_passenger_count"),
-
             F.sum("trip_distance").alias("total_trip_distance"),
             F.avg("trip_distance").alias("avg_trip_distance"),
-
             F.sum("fare_amount").alias("total_fare_amount"),
             F.sum("tip_amount").alias("total_tip_amount"),
             F.sum("total_amount").alias("total_amount"),
             F.avg("total_amount").alias("avg_total_amount"),
-
             F.avg("trip_duration_minutes").alias("avg_trip_duration_minutes"),
             F.max("processing_date_hour").alias("processing_date_hour"),
         )
     )
 
 
-def write_to_iceberg(df, target_table):
-    (
-        df.writeTo(target_table)
-        .overwritePartitions()
-    )
+def write_to_gold(df, table_name):
+    table = f"{ICEBERG_CATALOG}.{TARGET_SCHEMA}.{table_name}"
+    logger.info("Writing gold table=%s", table)
+    df.writeTo(table).overwritePartitions()
 
 
 def main():
-    start_time = perf_counter()
-
+    start = perf_counter()
     args = parse_args()
-    args.processing_date_hour = normalize_datetime_string(
-        args.processing_date_hour
-    )
 
-    spark = build_spark_session()
+    source_table = validate_table_name(SOURCE_TABLE, "SOURCE_TABLE")
+    trip_table = validate_table_name(TRIP_HOURLY_METRICS_TABLE, "TRIP_HOURLY_METRICS_TABLE")
+    location_table = validate_table_name(LOCATION_HOURLY_METRICS_TABLE, "LOCATION_HOURLY_METRICS_TABLE")
+    processing_date_hour = normalize_datetime(args.processing_date_hour)
+
+    spark = create_spark_session()
 
     try:
-        iceberg_catalog = get_spark_conf(
-            spark=spark,
-            key="datagate.iceberg.catalog",
-            default_value="iceberg",
-        )
+        silver_df = read_silver_batch(spark, source_table, processing_date_hour)
+        base_df = add_features(silver_df)
+        zone_df = read_zone_seed(spark)
 
-        source_table = resolve_table_name(args.source_table, iceberg_catalog)
-        trip_table = resolve_table_name(args.trip_hourly_metrics_table, iceberg_catalog)
-        location_table = resolve_table_name(args.location_hourly_metrics_table, iceberg_catalog)
+        write_to_gold(build_trip_hourly_metrics(base_df), trip_table)
+        write_to_gold(build_location_hourly_metrics(base_df, zone_df), location_table)
 
-        logger.info(
-            "Reading silver table=%s | processing_date_hour=%s",
-            source_table,
-            args.processing_date_hour,
-        )
-
-        silver_df = read_silver_batch(
-            spark=spark,
-            source_table=source_table,
-            processing_date_hour=args.processing_date_hour,
-        )
-
-        base_df = add_basic_features(silver_df)
-        zone_df = read_taxi_zone_seed(
-            spark=spark,
-            seed_path=args.taxi_zone_seed_path,
-        )
-
-        trip_hourly_df = build_trip_hourly_metrics(base_df)
-        location_hourly_df = build_location_hourly_metrics(base_df, zone_df)
-
-        logger.info("Writing gold table=%s", trip_table)
-        write_to_iceberg(trip_hourly_df, trip_table)
-
-        logger.info("Writing gold table=%s", location_table)
-        write_to_iceberg(location_hourly_df, location_table)
-
-        total_seconds = perf_counter() - start_time
-        logger.info(
-            "[Job Completed] %s finished in %.3f seconds",
-            JOB_NAME,
-            total_seconds,
-        )
+        logger.info("[Job Completed] %s finished in %.3f seconds", JOB_NAME, perf_counter() - start)
 
     finally:
         spark.stop()

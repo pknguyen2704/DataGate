@@ -1,21 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Enum,
-    Float,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-    text,
-)
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -29,282 +16,126 @@ class LightGBMParameter(Base):
     __tablename__ = "lightgbm_parameters"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
 
-    table_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("tables.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    learning_rate = Column(Float, nullable=False)
+    num_leaves = Column(Integer, nullable=False)
+    max_depth = Column(Integer, nullable=False)
+    min_data_in_leaf = Column(Integer, nullable=False)
+    bagging_fraction = Column(Float, nullable=False)
+    bagging_freq = Column(Integer, nullable=False)
+    feature_fraction = Column(Float, nullable=False)
+    lambda_l1 = Column(Float, nullable=False)
+    lambda_l2 = Column(Float, nullable=False)
+    min_gain_to_split = Column(Float, nullable=False)
+    max_bin = Column(Integer, nullable=False)
 
-    # Tunable params
-    learningRate = Column(Float, default=0.05, nullable=False)
-    numLeaves = Column(Integer, default=31, nullable=False)
-    maxDepth = Column(Integer, default=-1, nullable=False)
-    minDataInLeaf = Column(Integer, default=20, nullable=False)
+    num_iterations = Column(Integer, nullable=False)
 
-    baggingFraction = Column(Float, default=1.0, nullable=False)
-    baggingFreq = Column(Integer, default=0, nullable=False)
-    featureFraction = Column(Float, default=1.0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    lambdaL1 = Column(Float, default=1e-8, nullable=False)
-    lambdaL2 = Column(Float, default=1e-8, nullable=False)
-    minGainToSplit = Column(Float, default=0.0, nullable=False)
-    maxBin = Column(Integer, default=255, nullable=False)
+    created_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    last_modified_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    # Runtime params
-    numIterations = Column(Integer, default=300, nullable=False)
-    earlyStoppingRound = Column(Integer, default=30, nullable=False)
-    useBarrierExecutionMode = Column(Boolean, default=True, nullable=False)
-
-    # Job sẽ lấy parameter active của từng table để chạy
-    is_active = Column(Boolean, default=True, nullable=False, index=True)
-
-    description = Column(Text, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    updated_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False,
-    )
-
-    table = relationship(
-        "Table",
-        back_populates="lightgbm_parameters",
-    )
-
-    manual_thresholds = relationship(
-        "LightGBMManualThreshold",
-        back_populates="lightgbm_parameter",
-        cascade="all, delete-orphan",
-    )
-
-    results = relationship(
-        "LightGBMResult",
-        back_populates="lightgbm_parameter",
-        cascade="all, delete-orphan",
-    )
+    table = relationship("Table", back_populates="lightgbm_parameter")
+    results = relationship("LightGBMAUC", back_populates="lightgbm_parameter", cascade="all, delete-orphan")
+    manual_thresholds = relationship("LightGBMAUCManualThreshold", back_populates="lightgbm_parameter", cascade="all, delete-orphan")
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    last_modified_by_user = relationship("User", foreign_keys=[last_modified_by])
 
     __table_args__ = (
-        Index(
-            "ix_lgbm_param_table_active",
-            "table_id",
-            "is_active",
-        ),
-
-        # Mỗi table chỉ nên có 1 bộ parameter active.
-        Index(
-            "uq_lgbm_param_one_active_per_table",
-            "table_id",
-            unique=True,
-            postgresql_where=text("is_active = true"),
-        ),
+        Index("ix_lgbm_params__table_id", "table_id", unique=True),
     )
 
-
-class LightGBMManualThreshold(Base):
-    __tablename__ = "lightgbm_manual_thresholds"
+class LightGBMAUC(Base):
+    __tablename__ = "lightgbm_auc"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
+    lightgbm_parameter_id = Column(UUID(as_uuid=False), ForeignKey("lightgbm_parameters.id", ondelete="RESTRICT"), nullable=False)
 
-    lightgbm_parameter_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("lightgbm_parameters.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    # Với AUC drift detection, thường dùng auc_max_threshold.
-    # Ví dụ auc_score > 0.70 => fail.
-    auc_min_threshold = Column(Float, nullable=True)
-    auc_max_threshold = Column(Float, nullable=True)
-
-    severity_level = Column(
-        Enum(
-            "warning",
-            "critical",
-            name="manual_threshold_severity_level",
-        ),
-        nullable=False,
-        default="warning",
-        index=True,
-    )
-
-    is_active = Column(Boolean, default=True, nullable=False, index=True)
-
-    description = Column(Text, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    updated_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False,
-    )
-
-    lightgbm_parameter = relationship(
-        "LightGBMParameter",
-        back_populates="manual_thresholds",
-    )
-
-    results = relationship(
-        "LightGBMResult",
-        back_populates="manual_threshold",
-    )
-
-    __table_args__ = (
-        Index(
-            "ix_lgbm_manual_threshold_param_active",
-            "lightgbm_parameter_id",
-            "is_active",
-        ),
-
-        # Mỗi parameter chỉ nên có 1 threshold active.
-        Index(
-            "uq_lgbm_manual_threshold_one_active_per_param",
-            "lightgbm_parameter_id",
-            unique=True,
-            postgresql_where=text("is_active = true"),
-        ),
-    )
-
-
-class LightGBMResult(Base):
-    __tablename__ = "lightgbm_results"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-
-    lightgbm_parameter_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("lightgbm_parameters.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    manual_threshold_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("lightgbm_manual_thresholds.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-
-    processing_date_hour = Column(DateTime, nullable=False, index=True)
+    processing_date_hour = Column(DateTime, nullable=False)
 
     auc_score = Column(Float, nullable=True)
+    p_value = Column(Float, nullable=True)
+    parameter_snapshot = Column(JSONB, nullable=True)
 
-    status = Column(
-        Enum(
-            "pass",
-            "fail",
-            "not_checked",
-            name="lightgbm_result_status",
-        ),
-        nullable=False,
-        default="not_checked",
-        index=True,
-    )
-
-    # Snapshot threshold tại thời điểm chạy.
-    # Nếu user sửa threshold sau này, lịch sử vẫn giữ đúng ngưỡng đã dùng.
-    auc_min_threshold = Column(Float, nullable=True)
-    auc_max_threshold = Column(Float, nullable=True)
-
-    severity_level = Column(
-        Enum(
-            "warning",
-            "critical",
-            name="manual_threshold_severity_level",
-        ),
-        nullable=True,
-        index=True,
-    )
-
-    message = Column(Text, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    updated_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False,
-    )
-
-    lightgbm_parameter = relationship(
-        "LightGBMParameter",
-        back_populates="results",
-    )
-
-    manual_threshold = relationship(
-        "LightGBMManualThreshold",
-        back_populates="results",
-    )
-
-    shap_results = relationship(
-        "SHAPResult",
-        back_populates="lightgbm_result",
-        cascade="all, delete-orphan",
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    table = relationship("Table", back_populates="lightgbm_auc")
+    lightgbm_parameter = relationship("LightGBMParameter", back_populates="results")
+    shap_results = relationship("SHAPResult", back_populates="lightgbm_result", cascade="all, delete-orphan")
+    auc_verify = relationship("LightGBMAUCVerify", back_populates="lightgbm_result", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
-        UniqueConstraint(
-            "lightgbm_parameter_id",
-            "processing_date_hour",
-            name="uq_lgbm_result_param_hour",
-        ),
-        Index(
-            "ix_lgbm_result_param_hour",
-            "lightgbm_parameter_id",
-            "processing_date_hour",
-        ),
-        Index(
-            "ix_lgbm_result_status_hour",
-            "status",
-            "processing_date_hour",
-        ),
+        Index("ix_lgbm_results__table_hour_unique", "table_id", "processing_date_hour", unique=True),
+        Index("ix_lgbm_results__param_hour", "lightgbm_parameter_id", "processing_date_hour"),
+        Index("ix_lgbm_results__table_hour", "table_id", "processing_date_hour"),
     )
-
 
 class SHAPResult(Base):
     __tablename__ = "shap_results"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-
-    lightgbm_result_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("lightgbm_results.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    lightgbm_result_id = Column(UUID(as_uuid=False), ForeignKey("lightgbm_auc.id", ondelete="CASCADE"), nullable=False)
 
     feature_name = Column(String(255), nullable=False)
     shap_score = Column(Float, nullable=False)
-    shap_rank = Column(Integer, nullable=True)
+    shap_rank = Column(Integer, nullable=False)
+    processing_date_hour = Column(DateTime, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    lightgbm_result = relationship(
-        "LightGBMResult",
-        back_populates="shap_results",
-    )
+    lightgbm_result = relationship("LightGBMAUC", back_populates="shap_results")
 
     __table_args__ = (
-        UniqueConstraint(
-            "lightgbm_result_id",
-            "feature_name",
-            name="uq_shap_result_lgbm_result_feature",
-        ),
-        Index(
-            "ix_shap_result_lgbm_result_rank",
-            "lightgbm_result_id",
-            "shap_rank",
-        ),
-        Index(
-            "ix_shap_result_feature_name",
-            "feature_name",
-        ),
+        Index("ix_shap_results__result_feature", "lightgbm_result_id", "feature_name", unique=True),
+    )
+
+class LightGBMAUCManualThreshold(Base):
+    __tablename__ = "lightgbm_auc_manual_thresholds"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    lightgbm_parameter_id = Column(UUID(as_uuid=False), ForeignKey("lightgbm_parameters.id", ondelete="CASCADE"), nullable=False)
+
+    auc_threshold = Column(Float, nullable=False)
+    severity_level = Column(Enum("warning", "critical", name="manual_threshold_severity_level"), nullable=False)
+    description = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    created_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    last_modified_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    last_modified_by_user = relationship("User", foreign_keys=[last_modified_by])
+    lightgbm_parameter = relationship("LightGBMParameter", back_populates="manual_thresholds")
+    auc_verifies = relationship("LightGBMAUCVerify", back_populates="manual_threshold")
+
+class LightGBMAUCVerify(Base):
+    __tablename__ = "lightgbm_auc_verify"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    lightgbm_result_id = Column(UUID(as_uuid=False), ForeignKey("lightgbm_auc.id", ondelete="CASCADE"), nullable=False)
+    manual_threshold_id = Column(UUID(as_uuid=False), ForeignKey("lightgbm_auc_manual_thresholds.id", ondelete="SET NULL"), nullable=True)
+
+    status = Column(Enum("pass", "fail", name="lightgbm_verify_status"), nullable=False)
+    auc_score = Column(Float, nullable=True)
+    auc_threshold = Column(Float, nullable=True)
+    severity_level = Column(Enum("warning", "critical", name="manual_threshold_severity_level"), nullable=True)
+    is_resolved = Column(Boolean, default=False, nullable=False)
+
+    processing_date_hour = Column(DateTime, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    lightgbm_result = relationship("LightGBMAUC", back_populates="auc_verify")
+    manual_threshold = relationship("LightGBMAUCManualThreshold", back_populates="auc_verifies")
+
+    __table_args__ = (
+        Index("ix_lgbm_verify__result_id", "lightgbm_result_id", unique=True),
+        Index("ix_lgbm_verify__status", "status"),
     )

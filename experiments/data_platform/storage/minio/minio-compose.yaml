@@ -6,7 +6,6 @@ services:
     env_file:
       - .env
     ports:
-      - "9000:9000"
       - "9001:9001"
     volumes:
       - storage_minio_data:/data

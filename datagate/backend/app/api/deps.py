@@ -1,101 +1,72 @@
-from typing import Annotated, Callable
-from fastapi import Depends, status
+from collections.abc import Callable
+
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.core.config import config
-from app.core.exceptions import UnauthorizedError, ForbiddenError, NotFoundError
+from app.core.security import decode_access_token
 from app.db.session import get_db
-from app.models.user import User
-from app.models.role import Role
-from app.models.table import Table
-from app.services.auth_service import AuthService
+from app.models import User
+from app.services import AuthService
 
 
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{config.api_v1_str}/auth/login"
+    tokenUrl=f"{config.api_v1_str}/auth/login",
 )
 
 
 def get_current_user(
-    db: Annotated[Session, Depends(get_db)],
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ) -> User:
-    try:
-        payload = jwt.decode(
-            token,
-            config.secret_key,
-            algorithms=[config.algorithm],
+    payload = decode_access_token(token)
+
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
         )
-        user_id = payload.get("sub")
 
-        if user_id is None:
-            raise UnauthorizedError("Could not validate credentials")
+    user_id = payload.get("sub")
 
-    except JWTError:
-        raise UnauthorizedError("Could not validate credentials")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
 
-    user = (
-        db.query(User)
-        .options(selectinload(User.roles).selectinload(Role.permissions))
-        .filter(User.id == user_id)
-        .first()
-    )
+    service = AuthService(db)
+    user = service.get_user_by_id(user_id)
 
-    if user is None:
-        raise UnauthorizedError("User not found")
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
 
     if not user.is_active:
-        raise ForbiddenError("Account is disabled")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user",
+        )
 
     return user
 
 
-CurrentUserDep = Annotated[User, Depends(get_current_user)]
-
-
 def require_permission(permission_code: str) -> Callable:
-    def check_permission(
-        db: Annotated[Session, Depends(get_db)],
-        current_user: CurrentUserDep,
+    def checker(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
     ) -> User:
-        auth_service = AuthService(db)
-        if not auth_service.has_permission(current_user, permission_code):
-            raise ForbiddenError(f"Permission required: {permission_code}")
+        service = AuthService(db)
+
+        if not service.has_permission(current_user, permission_code):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing permission: {permission_code}",
+            )
 
         return current_user
 
-    return check_permission
-
-
-def check_table_access(
-    table_id: str,
-    db: Annotated[Session, Depends(get_db)],
-    current_user: CurrentUserDep,
-) -> Table:
-    table = (
-        db.query(Table)
-        .filter(Table.id == table_id)
-        .first()
-    )
-
-    if table is None:
-        raise NotFoundError("Table not found")
-
-    if AuthService(db).is_admin(current_user):
-        return table
-
-    access = (
-        db.query(UserTableAccess)
-        .filter(
-            UserTableAccess.user_id == current_user.id,
-            UserTableAccess.table_id == table_id,
-        )
-        .first()
-    )
-
-    if access is None:
-        raise ForbiddenError("You do not have access to this table")
-
-    return table
+    return checker

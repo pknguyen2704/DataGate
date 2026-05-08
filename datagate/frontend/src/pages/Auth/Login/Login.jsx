@@ -14,7 +14,7 @@ import {
 import { Visibility, VisibilityOff, LockOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { login } from "~/stores/slices/authSlice/authSlice";
+import { login } from "~/stores/slices/authSlice";
 import { toast } from "react-toastify";
 import LogoImage from "~/assets/images/datagate.svg";
 

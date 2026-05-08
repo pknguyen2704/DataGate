@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, Typography, Button, Paper, Table, TableBody, 
-  TableCell, TableContainer, TableHead, TableRow, 
+import {
+  Box, Typography, Button, Paper, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow,
   Chip, Avatar, CircularProgress, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, IconButton
 } from '@mui/material';
 import {
-  PersonAdd as PersonAddIcon, 
+  PersonAdd as PersonAddIcon,
   Edit as EditIcon,
   Shield as ShieldIcon,
 } from '@mui/icons-material';
@@ -28,12 +28,13 @@ const UserList = () => {
     setLoading(true);
     try {
       const res = await usersApi.list({ page: 1, page_size: 100 });
-      setUsers(res.data || []);
+      setUsers(res.data.items || []);
     } catch {
       toast.error("Failed to fetch users. Ensure you have admin rights.");
     } finally {
       setLoading(false);
     }
+
   };
 
   useEffect(() => { fetchUsers(); }, []);
@@ -61,9 +62,9 @@ const UserList = () => {
           <Typography variant="h5" fontWeight="700">Team Members</Typography>
           <Typography variant="body2" color="text.secondary">Manage system access and assign roles.</Typography>
         </Box>
-        <Button 
-          variant="contained" 
-          startIcon={<PersonAddIcon />} 
+        <Button
+          variant="contained"
+          startIcon={<PersonAddIcon />}
           onClick={() => setOpen(true)}
           sx={{ borderRadius: 2, textTransform: 'none' }}
         >
@@ -107,10 +108,10 @@ const UserList = () => {
                   )}
                 </TableCell>
                 <TableCell>
-                   <Chip label={user.is_active ? "Active" : "Inactive"} size="small" color={user.is_active ? "success" : "default"} sx={{ borderRadius: 1.5, fontWeight: 700 }} />
+                  <Chip label={user.is_active ? "Active" : "Inactive"} size="small" color={user.is_active ? "success" : "default"} sx={{ borderRadius: 1.5, fontWeight: 700 }} />
                 </TableCell>
                 <TableCell align="right">
-                   <IconButton size="small"><EditIcon fontSize="small" /></IconButton>
+                  <IconButton size="small"><EditIcon fontSize="small" /></IconButton>
                 </TableCell>
               </TableRow>
             ))}
@@ -123,10 +124,10 @@ const UserList = () => {
         <DialogTitle sx={{ fontWeight: 700 }}>Add New Team Member</DialogTitle>
         <DialogContent dividers>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
-            <TextField label="Username" fullWidth size="small" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} />
-            <TextField label="Full Name" fullWidth size="small" value={formData.full_name} onChange={(e) => setFormData({...formData, full_name: e.target.value})} />
-            <TextField label="Email Address" fullWidth size="small" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-            <TextField label="Initial Password" type="password" fullWidth size="small" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+            <TextField label="Username" fullWidth size="small" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
+            <TextField label="Full Name" fullWidth size="small" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
+            <TextField label="Email Address" fullWidth size="small" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+            <TextField label="Initial Password" type="password" fullWidth size="small" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

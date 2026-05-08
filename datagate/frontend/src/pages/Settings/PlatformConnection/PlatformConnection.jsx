@@ -30,7 +30,7 @@ import {
   deleteConnection,
   disableConnection,
   fetchConnections,
-} from '~/stores/slices/connectionSlice/connectionSlice';
+} from '~/stores/slices/connectionSlice';
 
 const PlatformConnection = () => {
   const navigate = useNavigate();

@@ -51,7 +51,7 @@ import {
   createConnection,
   testConnection as testConnectionThunk,
   updateConnection,
-} from '~/stores/slices/connectionSlice/connectionSlice';
+} from '~/stores/slices/connectionSlice';
 
 const emptyForm = {
   name: '',

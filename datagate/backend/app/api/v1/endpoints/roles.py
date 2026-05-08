@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.db.session import get_db
-from app.models.user import User
+from app.models import User
 from app.rbac.permissions import PermissionCode
 from app.schemas.role import (
     PermissionAssign,

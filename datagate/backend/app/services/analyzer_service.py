@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
-from app.models import AnomalyResult, Table, BatchTableMetadata
+from app.models import Table, BatchTableMetadata
 
 
 class AnalyzerService:

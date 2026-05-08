@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import BadRequestError, NotFoundError
-from app.models import Rule, RuleVerificationResult, Table
+from app.models import Rule, RuleVerify, Table
 from app.schemas.rule import (
     DataRuleCreate,
     DataRuleOut,
     DataRuleStatusUpdate,
     DataRuleUpdate,
-    RuleVerificationResultOut,
+    RuleVerifyOut,
 )
 
 
@@ -128,14 +128,14 @@ class RuleService:
         self,
         table_id: str,
         top_k: int | None = None,
-    ) -> list[RuleVerificationResult]:
+    ) -> list[RuleVerify]:
         query = (
-            self.db.query(RuleVerificationResult)
-            .options(selectinload(RuleVerificationResult.rule))
-            .filter(RuleVerificationResult.table_id == table_id)
+            self.db.query(RuleVerify)
+            .options(selectinload(RuleVerify.rule))
+            .filter(RuleVerify.table_id == table_id)
             .order_by(
-                RuleVerificationResult.batch_date_hour.desc(),
-                RuleVerificationResult.verified_at.desc(),
+                RuleVerify.batch_date_hour.desc(),
+                RuleVerify.verified_at.desc(),
             )
         )
 
@@ -167,8 +167,8 @@ class RuleService:
             updated_at=rule.updated_at,
         )
 
-    def to_rule_verification_out(self, result: RuleVerificationResult) -> RuleVerificationResultOut:
-        return RuleVerificationResultOut(
+    def to_rule_verification_out(self, result: RuleVerify) -> RuleVerifyOut:
+        return RuleVerifyOut(
             id=result.id,
             rule_id=result.rule_id,
             table_id=result.table_id,

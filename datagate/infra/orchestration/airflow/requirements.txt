@@ -2,5 +2,7 @@ apache-airflow-providers-docker
 apache-airflow-providers-trino
 apache-airflow-providers-postgres
 apache-airflow-providers-apache-spark
+apache-airflow-providers-slack
 psycopg2-binary
 pydeequ
+synapseml

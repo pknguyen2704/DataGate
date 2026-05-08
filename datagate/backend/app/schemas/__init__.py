@@ -1,32 +1,97 @@
-
-from pydantic import BaseModel
-
-# ── Auth ──────────────────────────────────────────────────────────────────────
-from app.schemas.user import (
-    UserOut, UserCreate, UserUpdate, UserRoleAssign,
-)
-from app.schemas.role import (
-    PermissionOut, RoleOut, RoleCreate, RoleUpdate, PermissionAssign,
+from .common_schema import (
+    SeverityLevel,
+    MetricResultStatus,
+    LightGBMAUCStatus,
+    RuleSource,
+    RuleStatus,
 )
 
-# ── Connection &Table ────────────────────────────────────────────────────────
-from app.schemas.connection import (
-    ConnectionOut, ConnectionCreate, ConnectionUpdate,
-    ConnectionTestResult, CatalogList, SchemaList,TableList,
-)
-from app.schemas.table import (
-    TableOut, TableCreate, TableAdd, TableUpdate, TableAccessGrant,
-    PaginatedTables, ExploreTableItem, ExploreConnectionItem, TableOverviewOut,
+from .permission_schema import (
+    PermissionCreate,
+    PermissionUpdate,
+    PermissionOut,
+    PermissionLiteOut,
 )
 
-# ── Metadata Collection ───────────────────────────────────────────────────────
-from app.schemas.table_batch_metadata import (
-    BatchMetadataOut,
+from .role_schema import (
+    RoleCreate,
+    RoleUpdate,
+    RoleOut,
+    RoleLiteOut,
 )
 
+from .user_schema import (
+    UserCreate,
+    UserUpdate,
+    UserOut,
+    UserLiteOut,
+)
 
-from app.schemas.rule import (
-    RuleSource, RuleStatus, RuleVerificationStatus, ConstraintType,
-    DataRuleOut, DataRuleCreate, DataRuleUpdate,
-    DataRuleStatusUpdate, DataRuleSummary, RuleVerificationResultOut,
+from .connection_schema import (
+    ConnectionCreate,
+    ConnectionUpdate,
+    ConnectionOut,
+    ConnectionLiteOut,
+)
+
+from .table_schema import (
+    TableCreate,
+    TableUpdate,
+    TableOut,
+    TableDetailOut,
+    TableLiteOut,
+)
+
+from .batch_table_schema import (
+    BatchTableMetadataCreate,
+    BatchTableMetadataUpdate,
+    BatchTableMetadataOut,
+    BatchTableProfilingCreate,
+    BatchTableProfilingUpdate,
+    BatchTableProfilingOut,
+)
+
+from .metric_schema import (
+    BatchTableMetadataManualThresholdCreate,
+    BatchTableMetadataManualThresholdUpdate,
+    BatchTableMetadataManualThresholdOut,
+    BatchTableMetadataMetricsVerifyCreate,
+    BatchTableMetadataMetricsVerifyOut,
+    BatchTableProfilingManualThresholdCreate,
+    BatchTableProfilingManualThresholdUpdate,
+    BatchTableProfilingManualThresholdOut,
+    BatchTableProfilingMetricsVerifyCreate,
+    BatchTableProfilingMetricsVerifyOut,
+)
+
+from .lightgbm_schema import (
+    LightGBMParameterCreate,
+    LightGBMParameterUpdate,
+    LightGBMParameterOut,
+    LightGBMAUCManualThresholdCreate,
+    LightGBMAUCManualThresholdUpdate,
+    LightGBMAUCManualThresholdOut,
+    LightGBMAUCCreate,
+    LightGBMAUCUpdate,
+    LightGBMAUCOut,
+    SHAPResultCreate,
+    SHAPResultOut,
+)
+
+from .rule_schema import (
+    RuleCreate,
+    RuleUpdate,
+    RuleOut,
+    RuleVerifyCreate,
+    RuleVerifyUpdate,
+    RuleVerifyOut,
+)
+
+from .auth_schema import (
+    ChangePasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    TokenPayload,
+    TokenResponse,
+    UserMeOut,
 )

@@ -21,7 +21,7 @@ import {
   MenuOpen as MenuOpenIcon,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
-import { logout as logoutAction } from "../../stores/slices/authSlice/authSlice";
+import { logout as logoutAction } from "../../stores/slices/authSlice";
 import { useNavigate } from "react-router-dom";
 
 const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {

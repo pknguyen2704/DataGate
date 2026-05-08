@@ -45,14 +45,12 @@ def seed(db: Session) -> None:
             perm = Permission(
                 code=perm_data["code"],
                 name=perm_data["name"],
-                group=perm_data["group"],
                 description=perm_data.get("description"),
             )
             db.add(perm)
             perm_map[perm_data["code"]] = perm
         else:
             existing.name = perm_data["name"]
-            existing.group = perm_data["group"]
             existing.description = perm_data.get("description")
             perm_map[perm_data["code"]] = existing
 
