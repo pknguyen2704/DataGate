@@ -68,7 +68,7 @@ class BatchTableProfilingManualThresholdBase(BaseModel):
     description: str | None = None
 
 
-class ProfilingManualThresholdCreate(BatchTableProfilingManualThresholdBase):
+class BatchTableProfilingManualThresholdCreate(BatchTableProfilingManualThresholdBase):
     pass
 
 

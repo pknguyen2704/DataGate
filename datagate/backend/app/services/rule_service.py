@@ -1,120 +1,54 @@
-from sqlalchemy.orm import Session, selectinload
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
-from app.core.exceptions import BadRequestError, NotFoundError
 from app.models import Rule, RuleVerify, Table
-from app.schemas.rule import (
-    DataRuleCreate,
-    DataRuleOut,
-    DataRuleStatusUpdate,
-    DataRuleUpdate,
-    RuleVerifyOut,
-)
+from app.schemas.rule_schema import RuleCreate, RuleUpdate
 
 
 class RuleService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_rules(
-        self,
-        table_id: str | None = None,
-        rule_status: str | None = None,
-        top_k: int | None = None,
-    ) -> list[Rule]:
+    def list_rules(self, table_id: str | None = None, rule_status: str | None = None, limit: int | None = None) -> list[Rule]:
         query = self.db.query(Rule)
-
         if table_id:
             query = query.filter(Rule.table_id == table_id)
         if rule_status:
             query = query.filter(Rule.status == rule_status)
-
         query = query.order_by(Rule.frequency.desc(), Rule.updated_at.desc(), Rule.created_at.desc())
-
-        if top_k:
-            query = query.limit(top_k)
-
+        if limit:
+            query = query.limit(limit)
         return query.all()
 
-    def create_rule(
-        self,
-        body: DataRuleCreate,
-        created_by: str,
-    ) -> Rule:
-        table = self.db.query(Table).filter(Table.id == body.table_id).first()
-        if table is None:
-            raise NotFoundError("Table not found")
+    def get_rule_or_404(self, rule_id: str) -> Rule:
+        rule = self.db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+        return rule
 
-        existing_manual_rule = (
-            self.db.query(Rule)
-            .filter(
-                Rule.table_id == body.table_id,
-                Rule.column_name == body.column_name,
-                Rule.constraint_type == body.constraint_type,
-                Rule.source == "manual",
-            )
-            .first()
-        )
-        if existing_manual_rule:
-            raise BadRequestError("A manual rule with the same column and constraint type already exists")
-
-        rule = Rule(
-            table_id=body.table_id,
-            column_name=body.column_name,
-            constraint_type=body.constraint_type,
-            description=body.description,
-            source="manual",
-            status="active",
-            frequency=1,
-            created_by=created_by,
-            last_modified_by=created_by,
-        )
+    def create_rule(self, data: RuleCreate, user_id: str) -> Rule:
+        table = self.db.query(Table).filter(Table.id == str(data.table_id)).first()
+        if not table:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Table not found")
+        rule = Rule(**data.model_dump(), created_by=user_id, last_modified_by=user_id)
         self.db.add(rule)
         self.db.commit()
         self.db.refresh(rule)
         return rule
 
-    def get_rule_by_id(self, rule_id: str) -> Rule | None:
-        return (
-            self.db.query(Rule)
-            .options(selectinload(Rule.verification_results))
-            .filter(Rule.id == rule_id)
-            .first()
-        )
-
-    def get_rule_or_404(self, rule_id: str) -> Rule:
-        rule = self.get_rule_by_id(rule_id)
-        if rule is None:
-            raise NotFoundError("Rule not found")
-        return rule
-
-    def update_rule(
-        self,
-        rule_id: str,
-        body: DataRuleUpdate,
-        modified_by: str,
-    ) -> Rule:
+    def update_rule(self, rule_id: str, data: RuleUpdate, user_id: str) -> Rule:
         rule = self.get_rule_or_404(rule_id)
-
-        for field, value in body.model_dump(exclude_unset=True).items():
+        for field, value in data.model_dump(exclude_unset=True).items():
             setattr(rule, field, value)
-
-        if rule.status == "pending":
-            rule.status = "active"
-
-        rule.last_modified_by = modified_by
+        rule.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(rule)
         return rule
 
-    def update_rule_status(
-        self,
-        rule_id: str,
-        body: DataRuleStatusUpdate,
-        modified_by: str,
-    ) -> Rule:
+    def set_rule_active(self, rule_id: str, is_active: bool, user_id: str) -> Rule:
         rule = self.get_rule_or_404(rule_id)
-        rule.status = body.status
-        rule.last_modified_by = modified_by
+        rule.status = "active" if is_active else "inactive"
+        rule.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(rule)
         return rule
@@ -124,62 +58,30 @@ class RuleService:
         self.db.delete(rule)
         self.db.commit()
 
-    def list_rule_verifications(
-        self,
-        table_id: str,
-        top_k: int | None = None,
-    ) -> list[RuleVerify]:
-        query = (
-            self.db.query(RuleVerify)
-            .options(selectinload(RuleVerify.rule))
-            .filter(RuleVerify.table_id == table_id)
-            .order_by(
-                RuleVerify.batch_date_hour.desc(),
-                RuleVerify.verified_at.desc(),
-            )
-        )
-
-        if top_k:
-            query = query.limit(top_k)
-
+    def list_verify_results(self, table_id: str | None = None, limit: int | None = None) -> list[RuleVerify]:
+        query = self.db.query(RuleVerify).join(RuleVerify.rule)
+        if table_id:
+            query = query.filter(Rule.table_id == table_id)
+        query = query.order_by(RuleVerify.processing_date_hour.desc(), RuleVerify.updated_at.desc())
+        if limit:
+            query = query.limit(limit)
         return query.all()
 
-    def to_rule_out(self, rule: Rule) -> DataRuleOut:
-        return DataRuleOut(
-            id=rule.id,
-            table_id=rule.table_id,
-            column_name=rule.column_name,
-            constraint_type=rule.constraint_type,
-            created_by=rule.source,
-            status=rule.status,
-            description=rule.description,
-            frequency=rule.frequency,
-            first_seen_at_date_hour=rule.first_seen_at_date_hour,
-            last_seen_at_date_hour=rule.last_seen_at_date_hour,
-            constraint_name=rule.constraint_name,
-            current_value=rule.current_value,
-            suggesting_rule=rule.suggesting_rule,
-            code_for_constraint=rule.code_for_constraint,
-            suggested_at_date_hour=rule.suggested_at_date_hour,
-            created_by_user_id=rule.created_by,
-            last_modified_by_user_id=rule.last_modified_by,
-            created_at=rule.created_at,
-            updated_at=rule.updated_at,
-        )
+    def set_verify_resolved(self, verify_id: str, is_resolved: bool) -> RuleVerify:
+        result = self.db.query(RuleVerify).filter(RuleVerify.id == verify_id).first()
+        if not result:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule verify result not found")
+        result.is_resolved = is_resolved
+        self.db.commit()
+        self.db.refresh(result)
+        return result
 
-    def to_rule_verification_out(self, result: RuleVerify) -> RuleVerifyOut:
-        return RuleVerifyOut(
-            id=result.id,
-            rule_id=result.rule_id,
-            table_id=result.table_id,
-            column_name=result.rule.column_name if result.rule else None,
-            constraint_type=result.rule.constraint_type if result.rule else None,
-            batch_date_hour=result.batch_date_hour,
-            verification_status=result.verification_status,
-            actual_value=result.actual_value,
-            expected_value=result.expected_value,
-            failure_count=result.failure_count,
-            total_count=result.total_count,
-            message=result.message,
-            verified_at=result.verified_at,
+    def get_managed_tables(self) -> list[Table]:
+        return (
+            self.db.query(Table)
+            .join(Rule, Rule.table_id == Table.id)
+            .filter(Table.is_active.is_(True))
+            .distinct()
+            .order_by(Table.schema_name, Table.table_name)
+            .all()
         )

@@ -10,8 +10,10 @@ import { initializeAuth } from "~/stores/slices/authSlice";
 
 // Pages — lazy loaded for performance
 const Home = React.lazy(() => import("~/pages/Home/Home"));
-const Explore = React.lazy(() => import("~/pages/Explore/Explore"));
-
+const DataObservability = React.lazy(() => import("~/pages/DataObservability/DataObservability"));
+const DataMetric = React.lazy(() => import("~/pages/DataMetric/DataMetric"));
+const DataRule = React.lazy(() => import("~/pages/DataRule/DataRule"));
+const DataQuality = React.lazy(() => import("~/pages/DataQuality/DataQuality"));
 const Settings = React.lazy(() => import("~/pages/Settings/Settings"));
 const NotFound = React.lazy(() => import("~/pages/Other/NotFound/NotFound"));
 
@@ -36,7 +38,10 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<Home />} />
-            <Route path="/explore/*" element={<Explore />} />
+            <Route path="/observability" element={<DataObservability />} />
+            <Route path="/metrics" element={<DataMetric />} />
+            <Route path="/rules" element={<DataRule />} />
+            <Route path="/quality" element={<DataQuality />} />
             <Route path="/settings/*" element={<Settings />} />
           </Route>
         {/* </Route> */}

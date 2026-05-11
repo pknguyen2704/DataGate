@@ -3,9 +3,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.security import get_password_hash
+from app.core.security import get_hashed_password
 from app.models import Role, User
-from app.schemas.user import UserCreate, UserListOut, UserOut, UserProfileUpdate, UserRoleAssign, UserUpdate
+from app.schemas.user_schema import UserCreate, UserListOut, UserOut, UserProfileUpdate, UserRoleAssign, UserUpdate
 
 
 class UserService:
@@ -69,7 +69,7 @@ class UserService:
             username=data.username,
             full_name=data.full_name,
             email=data.email,
-            hashed_password=get_password_hash(data.password),
+            hashed_password=get_hashed_password(data.password),
             is_active=data.is_active,
         )
         if data.role_ids:
@@ -90,7 +90,7 @@ class UserService:
         if "password" in update_data:
             password = update_data.pop("password")
             if password:
-                user.hashed_password = get_password_hash(password)
+                user.hashed_password = get_hashed_password(password)
         if "role_ids" in update_data:
             role_ids = update_data.pop("role_ids")
             if role_ids is not None:

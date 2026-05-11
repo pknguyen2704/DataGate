@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.trino_client import TrinoClient
 from app.models import Connection, Table
-from app.schemas.connection import ConnectionCreate, ConnectionUpdate, ConnectionTestResult
+from app.schemas.connection_schema import ConnectionCreate, ConnectionTestResult, ConnectionUpdate
 
 
 SYSTEM_SCHEMAS = {"information_schema", "pg_catalog", "sys", "system"}
@@ -24,6 +24,7 @@ class ConnectionService:
             trino_password=data.trino_password,
             iceberg_rest_url=data.iceberg_rest_url,
             iceberg_catalog_name=data.iceberg_catalog_name,
+            iceberg_warehouse=data.iceberg_warehouse,
             minio_endpoint_url=data.minio_endpoint_url,
             minio_access_key=data.minio_access_key,
             minio_secret_key=data.minio_secret_key,
@@ -62,6 +63,7 @@ class ConnectionService:
             "trino_password",
             "iceberg_rest_url",
             "iceberg_catalog_name",
+            "iceberg_warehouse",
             "minio_endpoint_url",
             "minio_access_key",
             "minio_secret_key",
@@ -95,13 +97,15 @@ class ConnectionService:
         self.db.refresh(connection)
         return connection
 
-    def update_connection(self, connection_id: str, data: ConnectionUpdate) -> Connection:
+    def update_connection(self, connection_id: str, data: ConnectionUpdate, modifier_id: str | None = None) -> Connection:
         connection = self.get_connection_or_404(connection_id)
         update_data = data.model_dump(exclude_unset=True)
         if "connection_name" in update_data:
             self._validate_name_unique(update_data["connection_name"], exclude_id=connection_id)
         for field, value in update_data.items():
             setattr(connection, field, value)
+        if modifier_id:
+            connection.last_modified_by = modifier_id
         if self._has_connection_config_changed(update_data):
             try:
                 self._validate_connection(connection)

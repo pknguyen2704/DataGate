@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.schemas import LoginRequest, TokenResponse, UserMeOut
 from app.services import AuthService
 from app.db.session import get_db
 from app.api.deps import get_current_user
+from app.models import User
 from sqlalchemy.orm import Session
 auth_router = APIRouter(
     prefix="/auth",
@@ -24,7 +25,7 @@ def get_me(
     current_user: User = Depends(get_current_user),
     service: AuthService = Depends(get_auth_service)
 ):
-    return service.get_me(current_user)
+    return service.build_user_me(current_user)
     
 @auth_router.post("/logout")
 def logout():

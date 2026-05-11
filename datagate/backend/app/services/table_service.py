@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Connection, Table
+from app.models import BatchTableMetadata, BatchTableProfiling, Connection, LightGBMAUC, RuleVerify, Table
 from app.schemas.table_schema import TableCreate, TableUpdate
 
 
@@ -102,7 +102,6 @@ class TableService:
             schema_name=data.schema_name,
             table_name=data.table_name,
             is_active=data.is_active,
-            owner_user_id=str(owner_id),
         )
         self.db.add(table)
         self.db.commit()
@@ -155,3 +154,35 @@ class TableService:
         table = self.get_table_or_404(table_id)
         self.db.delete(table)
         self.db.commit()
+
+    def list_columns(self, table_id: str) -> list[dict]:
+        self.get_table_or_404(table_id)
+        rows = (
+            self.db.query(BatchTableProfiling.column_name, BatchTableProfiling.data_type)
+            .filter(BatchTableProfiling.table_id == table_id)
+            .order_by(BatchTableProfiling.processing_date_hour.desc(), BatchTableProfiling.column_name.asc())
+            .all()
+        )
+        seen = set()
+        columns = []
+        for column_name, data_type in rows:
+            if column_name in seen:
+                continue
+            seen.add(column_name)
+            columns.append({"column_name": column_name, "data_type": data_type})
+        return columns
+
+    def list_processing_hours(self, table_id: str) -> list[dict]:
+        self.get_table_or_404(table_id)
+        hours = set()
+        for model in (BatchTableMetadata, BatchTableProfiling, LightGBMAUC):
+            rows = self.db.query(model.processing_date_hour).filter(model.table_id == table_id).all()
+            hours.update(row[0] for row in rows if row[0])
+        rule_rows = (
+            self.db.query(RuleVerify.processing_date_hour)
+            .join(RuleVerify.rule)
+            .filter(RuleVerify.rule.has(table_id=table_id))
+            .all()
+        )
+        hours.update(row[0] for row in rule_rows if row[0])
+        return [{"processing_date_hour": hour} for hour in sorted(hours, reverse=True)]

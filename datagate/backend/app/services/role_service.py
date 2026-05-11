@@ -12,7 +12,7 @@ class RoleService:
     def list_permissions(self) -> list[Permission]:
         return (
             self.db.query(Permission)
-            .order_by(Permission.group.asc(), Permission.name.asc())
+            .order_by(Permission.permission_group.asc(), Permission.name.asc())
             .all()
         )
 

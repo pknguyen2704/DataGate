@@ -41,13 +41,15 @@ class TrinoClient:
     def test(self):
         self.execute("SELECT 1 AS ok")
     
-    def get_schemas(self) -> list[str]:
-        rows = self.execute(f"SHOW SCHEMAS FROM {self.connection.iceberg_catalog_name}")
+    def list_schemas(self, catalog: str | None = None) -> list[str]:
+        target_catalog = catalog or self.connection.iceberg_catalog_name
+        rows = self.execute(f"SHOW SCHEMAS FROM {target_catalog}")
         schemas = [list(row.values())[0] for row in rows]
         return schemas
 
-    def get_tables(self, schema: str) -> list[str]:
-        rows = self.execute(f"SHOW TABLES FROM {self.connection.iceberg_catalog_name}.{schema}")
+    def list_tables(self, catalog: str | None = None, schema: str = "default") -> list[str]:
+        target_catalog = catalog or self.connection.iceberg_catalog_name
+        rows = self.execute(f"SHOW TABLES FROM {target_catalog}.{schema}")
         tables = [list(row.values())[0] for row in rows]
         return tables
 

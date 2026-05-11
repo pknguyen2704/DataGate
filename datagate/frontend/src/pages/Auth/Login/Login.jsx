@@ -55,19 +55,14 @@ const Login = () => {
         width: "100%",
         maxWidth: 420,
         p: { xs: 3, sm: 4.5 },
-        borderRadius: "16px",
+        borderRadius: "8px",
         bgcolor: "#FFFFFF",
         backdropFilter: "blur(24px)",
-        boxShadow: "0 18px 48px rgba(15, 23, 42, 0.12)",
+        boxShadow: "0 18px 48px rgba(6, 26, 54, 0.18)",
         border: "1px solid #E2E8F0",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        animation: "slideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
-        "@keyframes slideUp": {
-          from: { opacity: 0, transform: "translateY(24px)" },
-          to: { opacity: 1, transform: "translateY(0)" },
-        },
       }}
     >
       <Box sx={{ mb: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
@@ -97,7 +92,7 @@ const Login = () => {
           value={formData.username}
           onChange={handleChange}
           InputProps={{
-            sx: { borderRadius: "10px" },
+              sx: { borderRadius: "8px" },
           }}
         />
 
@@ -112,7 +107,7 @@ const Login = () => {
           value={formData.password}
           onChange={handleChange}
           InputProps={{
-            sx: { borderRadius: "10px" },
+            sx: { borderRadius: "8px" },
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
@@ -166,7 +161,7 @@ const Login = () => {
           sx={{
             mt: 0.5,
             py: 1.4,
-            borderRadius: "10px",
+            borderRadius: "8px",
             fontWeight: 700,
             fontSize: "0.95rem",
             textTransform: "none",

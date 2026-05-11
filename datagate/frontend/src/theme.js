@@ -1,35 +1,42 @@
 import { createTheme } from "@mui/material/styles";
 
 const APP_BAR_HEIGHT = 64;
-const SIDEBAR_WIDTH = 260;
+const SIDEBAR_WIDTH = 280;
 const BASE_RADIUS = 12;
 
 export const datagateColors = {
-  pageBackground: "#F8FAFC",
-  pageBackgroundSoft: "#F1F5F9",
-  pageGradient:
-    "radial-gradient(circle at top left, rgba(37,99,235,0.08), transparent 30%), linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
-  cardBorder: "#E2E8F0",
-  cardBorderSoft: "#F1F5F9",
+  shell: "#0F172A",
+  shellSoft: "#1E293B",
+  shellLine: "#334155",
+  pageBackground: "#F1F5F9",
+  pageBackgroundSoft: "#FFFFFF",
+  pageGradient: "linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)",
+  cardBorder: "rgba(15, 23, 42, 0.15)",
+  cardBorderSoft: "rgba(15, 23, 42, 0.08)",
   cardBackground: "#FFFFFF",
   cardBackgroundMuted: "#F8FAFC",
   selectedBackground: "rgba(37, 99, 235, 0.08)",
   selectedBorder: "#2563EB",
-  tableHeadBackground: "#F1F5F9",
+  tableHeadBackground: "#F8FAFC",
   textPrimary: "#0F172A",
-  textSecondary: "#475569",
+  textSecondary: "#334155",
   accentAmber: "#F59E0B",
-  accentBlue: "#3B82F6",
-  accentBlueDeep: "#1E40AF",
+  accentBlue: "#2563EB",
+  accentBlueDeep: "#1D4ED8",
   success: "#10B981",
   warning: "#F59E0B",
   error: "#EF4444",
+  glass: {
+    background: "rgba(255, 255, 255, 0.95)",
+    border: "1px solid rgba(15, 23, 42, 0.08)",
+    blur: "blur(8px)",
+  }
 };
 
 export const datagateLayout = {
-  pagePadding: { xs: 2, md: 3 },
-  sectionGap: 3,
-  panelRadius: 1.5,
+  pagePadding: { xs: 3, md: 5 },
+  sectionGap: 6,
+  panelRadius: 1,
 };
 
 export const pageShellSx = {
@@ -41,10 +48,12 @@ export const pageShellSx = {
 };
 
 export const panelSx = {
-  borderRadius: datagateLayout.panelRadius,
-  border: `1px solid ${datagateColors.cardBorderSoft}`,
-  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
-  backgroundColor: datagateColors.cardBackground,
+  borderRadius: `${BASE_RADIUS}px`,
+  border: datagateColors.glass.border,
+  backdropFilter: datagateColors.glass.blur,
+  backgroundColor: datagateColors.glass.background,
+  boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.07)",
+  overflow: "hidden",
 };
 
 export const sectionHeaderSx = {
@@ -63,7 +72,7 @@ export const subtlePanelSx = {
 const theme = createTheme({
   spacing: 8,
   palette: {
-    mode: 'light',
+    mode: "light",
     primary: {
       main: "#1E40AF",
       light: "#3B82F6",
@@ -101,43 +110,43 @@ const theme = createTheme({
       fontSize: "4.5rem",
       lineHeight: 1.02,
       fontWeight: 800,
-      letterSpacing: "-0.05em",
+      letterSpacing: 0,
     },
     h2: {
       fontSize: "3.5rem",
       lineHeight: 1.06,
       fontWeight: 800,
-      letterSpacing: "-0.045em",
+      letterSpacing: 0,
     },
     h3: {
       fontSize: "2.5rem",
       lineHeight: 1.1,
       fontWeight: 800,
-      letterSpacing: "-0.04em",
+      letterSpacing: 0,
     },
     h4: {
       fontSize: "2rem",
       lineHeight: 1.15,
       fontWeight: 700,
-      letterSpacing: "-0.03em",
+      letterSpacing: 0,
     },
     h5: {
       fontSize: "1.5rem",
       lineHeight: 1.2,
       fontWeight: 700,
-      letterSpacing: "-0.02em",
+      letterSpacing: 0,
     },
     h6: {
       fontSize: "1.125rem",
       lineHeight: 1.3,
       fontWeight: 700,
-      letterSpacing: "-0.015em",
+      letterSpacing: 0,
     },
     subtitle1: {
       fontSize: "1rem",
       lineHeight: 1.45,
       fontWeight: 600,
-      letterSpacing: "-0.01em",
+      letterSpacing: 0,
     },
     subtitle2: {
       fontSize: "0.875rem",
@@ -170,7 +179,7 @@ const theme = createTheme({
       fontSize: "0.9375rem",
       lineHeight: 1.2,
       fontWeight: 700,
-      letterSpacing: "-0.01em",
+      letterSpacing: 0,
       textTransform: "none",
     },
   },
@@ -204,11 +213,9 @@ const theme = createTheme({
           },
         },
         ".glass-card": {
-          background: "rgba(255, 255, 255, 0.82)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(226, 232, 240, 0.9)",
-          boxShadow: "0 14px 32px rgba(2, 6, 23, 0.08)",
+          background: "#FFFFFF",
+          border: `1px solid ${datagateColors.cardBorder}`,
+          boxShadow: "0 16px 36px rgba(6, 26, 54, 0.08)",
         },
       },
     },
@@ -229,10 +236,15 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: "none",
-          boxShadow: "none",
-          border: `1px solid ${datagateColors.cardBorderSoft}`,
-          borderRadius: BASE_RADIUS,
+          backgroundColor: "#FFFFFF",
+          border: "1px solid",
+          borderColor: "rgba(0, 0, 0, 0.08)",
+          borderRadius: `${BASE_RADIUS}px`,
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.03)",
           color: datagateColors.textPrimary,
+          "&:hover": {
+            boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+          }
         },
       },
     },
@@ -243,13 +255,16 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           minHeight: 40,
-          padding: "10px 18px",
-          borderRadius: `${BASE_RADIUS}px`,
+          padding: "8px 16px",
+          borderRadius: "99px",
           boxShadow: "none",
+          fontWeight: 600,
+          transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+          textTransform: "none",
         },
         sizeSmall: {
           minHeight: 32,
-          padding: "6px 12px",
+          padding: "4px 12px",
           fontSize: "0.8125rem",
         },
         sizeLarge: {
@@ -258,17 +273,24 @@ const theme = createTheme({
           fontSize: "1rem",
         },
         contained: {
-          background: "linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)",
+          background: datagateColors.accentBlue,
+          color: "#FFFFFF",
           "&:hover": {
-            boxShadow: "0 16px 30px rgba(30, 64, 175, 0.35)",
-            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
+            background: "#1D4ED8",
+            transform: "translateY(-1px)",
           },
+          "&:active": {
+            transform: "translateY(0)",
+          }
         },
         outlined: {
           borderColor: datagateColors.cardBorder,
+          color: datagateColors.textPrimary,
           "&:hover": {
             borderColor: datagateColors.selectedBorder,
-            backgroundColor: "rgba(59, 130, 246, 0.08)",
+            backgroundColor: "rgba(37, 99, 235, 0.04)",
+            transform: "translateY(-1px)",
           },
         },
       },
@@ -290,24 +312,30 @@ const theme = createTheme({
     },
     MuiOutlinedInput: {
       styleOverrides: {
-        root: {
-          minHeight: 44,
+          root: {
+          minHeight: 40,
           borderRadius: `${BASE_RADIUS}px`,
-          backgroundColor: datagateColors.cardBackgroundMuted,
+          backgroundColor: "#FFFFFF",
+          transition: "all 0.2s ease",
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: datagateColors.cardBorder,
+            transition: "border-color 0.2s ease",
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: datagateColors.selectedBorder,
+            borderColor: "#94A3B8",
           },
-          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-            borderWidth: 1,
-            borderColor: "#3B82F6",
+          "&.Mui-focused": {
+            backgroundColor: "#FFFFFF",
+            boxShadow: "0 0 0 4px rgba(37, 99, 235, 0.1)",
+            "& .MuiOutlinedInput-notchedOutline": {
+              borderWidth: 1,
+              borderColor: datagateColors.accentBlue,
+            },
           },
         },
         input: {
-          padding: "12px 14px",
-          fontSize: "0.9375rem",
+          padding: "10px 14px",
+          fontSize: "0.875rem",
         },
       },
     },
@@ -394,9 +422,9 @@ const theme = createTheme({
           borderRadius: `${BASE_RADIUS}px`,
           "&.Mui-selected": {
             backgroundColor: "rgba(37, 99, 235, 0.18)",
-            color: "#93C5FD",
+            color: "#1E40AF",
             "& .MuiListItemIcon-root": {
-              color: "#93C5FD",
+              color: "#1E40AF",
             },
             "&:hover": {
               backgroundColor: "rgba(59, 130, 246, 0.22)",
@@ -436,10 +464,10 @@ const theme = createTheme({
     appBarHeight: `${APP_BAR_HEIGHT}px`,
     sidebarWidth: `${SIDEBAR_WIDTH}px`,
     radii: {
-      sm: 8,
-      md: 12,
-      lg: 16,
-      xl: 20,
+      sm: 12,
+      md: 16,
+      lg: 24,
+      xl: 32,
     },
     fontSizes: {
       xs: "0.75rem",

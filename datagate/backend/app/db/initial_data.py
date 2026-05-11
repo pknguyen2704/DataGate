@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db.base import Base
 from app.db.session import SessionLocal
-from app.models import User, Role, Permission
-from app.core.security import get_password_hash
+from app.models import Permission, Role, User
+from app.core.security import get_hashed_password
 from app.rbac.permissions import ALL_PERMISSIONS
 from app.rbac.roles import DEFAULT_ROLE_PERMISSIONS
 
@@ -23,120 +23,74 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def reset_database(db: Session) -> None:
-    print("Resetting DataGate application tables...")
-
+def reset_database(db: Session) -> int:
     for table in reversed(Base.metadata.sorted_tables):
         db.execute(table.delete())
-
     db.commit()
-    print(f"   Cleared {len(Base.metadata.sorted_tables)} tables")
+    return len(Base.metadata.sorted_tables)
 
 
-def seed(db: Session) -> None:
-    admin_password = os.getenv("DATAGATE_ADMIN_PASSWORD", "admin123")
-
-    print("Seeding permissions...")
-    perm_map: dict[str, Permission] = {}
-
-    for perm_data in ALL_PERMISSIONS:
-        existing = db.query(Permission).filter(Permission.code == perm_data["code"]).first()
-        if not existing:
-            perm = Permission(
-                code=perm_data["code"],
-                name=perm_data["name"],
-                description=perm_data.get("description"),
-            )
-            db.add(perm)
-            perm_map[perm_data["code"]] = perm
-        else:
-            existing.name = perm_data["name"]
-            existing.description = perm_data.get("description")
-            perm_map[perm_data["code"]] = existing
-
+def seed_permissions(db: Session) -> dict[str, Permission]:
+    permissions = {}
+    for data in ALL_PERMISSIONS:
+        permission = db.query(Permission).filter(Permission.code == data["code"]).first()
+        if not permission:
+            permission = Permission(code=data["code"])
+            db.add(permission)
+        permission.name = data["name"]
+        permission.permission_group = data.get("group")
+        permission.description = data.get("description")
+        permissions[data["code"]] = permission
     db.flush()
-    print(f"   {len(ALL_PERMISSIONS)} permissions seeded")
+    return permissions
 
-    print("Seeding roles...")
-    role_map: dict[str, Role] = {}
 
-    for role_name, perm_codes in DEFAULT_ROLE_PERMISSIONS.items():
-        existing = (
+def seed_roles(db: Session, permissions: dict[str, Permission]) -> dict[str, Role]:
+    roles = {}
+    for name, codes in DEFAULT_ROLE_PERMISSIONS.items():
+        role = (
             db.query(Role)
             .options(selectinload(Role.permissions))
-            .filter(Role.name == role_name)
+            .filter(Role.name == name)
             .first()
         )
-        if not existing:
-            role = Role(
-                name=role_name,
-                description=f"System-defined {role_name} role",
-                is_system=True,
-                is_active=True,
-                permissions=[],
-            )
+        if not role:
+            role = Role(name=name)
             db.add(role)
-            role_map[role_name] = role
-        else:
-            existing.description = existing.description or f"System-defined {role_name} role"
-            existing.is_system = True
-            existing.is_active = True
-            role_map[role_name] = existing
-
+        role.description = role.description or f"System-defined {name} role"
+        role.is_system = True
+        role.is_active = True
+        role.permissions = [permissions[code] for code in codes if code in permissions]
+        roles[name] = role
     db.flush()
+    return roles
 
-    for role_name, perm_codes in DEFAULT_ROLE_PERMISSIONS.items():
-        role = role_map[role_name]
-        role.permissions = [
-            perm_map[code]
-            for code in perm_codes
-            if code in perm_map
-        ]
 
-    db.flush()
-    print(f"   {len(DEFAULT_ROLE_PERMISSIONS)} roles seeded")
-
-    print("Seeding admin user...")
-    admin_user = (
+def seed_admin(db: Session, roles: dict[str, Role]) -> User:
+    password = os.getenv("DATAGATE_ADMIN_PASSWORD", "admin123")
+    admin = (
         db.query(User)
         .options(selectinload(User.roles))
         .filter(User.username == "admin")
         .first()
     )
+    if not admin:
+        admin = User(username="admin")
+        db.add(admin)
+    admin.email = os.getenv("DATAGATE_ADMIN_EMAIL", "admin@datagate.io")
+    admin.full_name = os.getenv("DATAGATE_ADMIN_FULL_NAME", "DataGate Admin")
+    admin.hashed_password = get_hashed_password(password)
+    admin.is_active = True
+    admin.roles = [roles["Admin"]] if "Admin" in roles else []
+    db.flush()
+    return admin
 
-    if not admin_user:
-        admin_user = User(
-            username="admin",
-            email="admin@datagate.io",
-            hashed_password=get_password_hash(admin_password),
-            full_name="DataGate Admin",
-            is_active=True,
-            roles=[],
-        )
-        db.add(admin_user)
-        db.flush()
 
-        admin_role = role_map.get("Admin")
-        if admin_role:
-            admin_user.roles.append(admin_role)
-
-        if "DATAGATE_ADMIN_PASSWORD" in os.environ:
-            print("   Admin user created (username: admin, password: DATAGATE_ADMIN_PASSWORD)")
-        else:
-            print("   Admin user created (username: admin, password: admin123)")
-    else:
-        admin_user.email = "admin@datagate.io"
-        admin_user.full_name = "DataGate Admin"
-        admin_user.hashed_password = get_password_hash(admin_password)
-        admin_user.is_active = True
-        admin_user.roles = []
-        admin_role = role_map.get("Admin")
-        if admin_role:
-            admin_user.roles.append(admin_role)
-        print("   Admin user refreshed")
-
+def seed(db: Session) -> None:
+    permissions = seed_permissions(db)
+    roles = seed_roles(db, permissions)
+    seed_admin(db, roles)
     db.commit()
-    print("Seeding complete.")
 
 
 def main() -> None:
@@ -144,8 +98,10 @@ def main() -> None:
     db = SessionLocal()
     try:
         if args.reset:
-            reset_database(db)
+            count = reset_database(db)
+            print(f"Reset {count} tables")
         seed(db)
+        print("Seed complete")
     finally:
         db.close()
 

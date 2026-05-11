@@ -2948,10 +2948,10 @@
       "1d"
     ],
     "fiscalYearStartMonth": 0,
-    "from": "2024-10-05T09:40:03.080Z",
+    "from": "2024-12-31T17:00:00.000Z",
     "hideTimepicker": false,
     "timezone": "browser",
-    "to": "2025-04-26T22:47:27.560Z"
+    "to": "2025-01-18T16:59:59.000Z"
   },
   "title": "Table Metadata & Profiling Per Batch",
   "variables": [
@@ -2960,8 +2960,8 @@
       "spec": {
         "allowCustomValue": true,
         "current": {
-          "text": "iceberg.silver.cleaned_yellow_tripdata",
-          "value": "iceberg.silver.cleaned_yellow_tripdata"
+          "text": "iceberg.bronze.yellow_tripdata",
+          "value": "iceberg.bronze.yellow_tripdata"
         },
         "definition": "SELECT catalog_name || '.' || schema_name || '.' || table_name FROM tables ORDER BY 1",
         "hide": "dontHide",
@@ -3015,8 +3015,8 @@
       "spec": {
         "allowCustomValue": true,
         "current": {
-          "text": "bdcba374-8c49-4ebf-8753-630d9c4484a0",
-          "value": "bdcba374-8c49-4ebf-8753-630d9c4484a0"
+          "text": "1e314bf5-35ba-411b-ac6c-05305b79a287",
+          "value": "1e314bf5-35ba-411b-ac6c-05305b79a287"
         },
         "definition": "SELECT id FROM tables WHERE catalog_name || '.' || schema_name || '.' || table_name = '$table_name'",
         "hide": "hideVariable",

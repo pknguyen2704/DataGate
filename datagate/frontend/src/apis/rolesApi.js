@@ -6,6 +6,6 @@ export const rolesApi = {
   get: (id) => api.get(`/roles/${id}`),
   update: (id, data) => api.patch(`/roles/${id}`, data),
   delete: (id) => api.delete(`/roles/${id}`),
-  assignPermissions: (id, permIds) => api.post(`/roles/${id}/permissions`, permIds),
+  assignPermissions: (id, permIds) => api.post(`/roles/${id}/permissions`, { permission_ids: permIds }),
   listPermissions: () => api.get('/roles/permissions'),
 };

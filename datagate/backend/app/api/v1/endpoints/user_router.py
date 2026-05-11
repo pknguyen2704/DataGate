@@ -6,7 +6,7 @@ from app.api.deps import get_current_user, require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
-from app.schemas.user import UserCreate, UserListOut, UserOut, UserProfileUpdate, UserRoleAssign, UserUpdate
+from app.schemas.user_schema import UserCreate, UserListOut, UserOut, UserProfileUpdate, UserRoleAssign, UserUpdate
 from app.services.user_service import UserService
 
 

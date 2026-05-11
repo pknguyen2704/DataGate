@@ -42,3 +42,12 @@ class TableLiteOut(BaseModel):
     table_name: str
     is_active: bool
     model_config = ConfigDict(from_attributes=True)
+
+
+class TableColumnOut(BaseModel):
+    column_name: str
+    data_type: str | None = None
+
+
+class ProcessingHourOut(BaseModel):
+    processing_date_hour: datetime

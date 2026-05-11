@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.security import create_access_token, get_hashed_password, verify_password
 from app.models import Role, User
 from app.schemas import ChangePasswordRequest, LoginRequest, TokenResponse, UserMeOut
 
@@ -109,7 +109,7 @@ class AuthService:
                 detail="Current password is incorrect",
             )
 
-        user.hashed_password = get_password_hash(data.new_password)
+        user.hashed_password = get_hashed_password(data.new_password)
 
         self.db.add(user)
         self.db.commit()

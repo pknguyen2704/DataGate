@@ -23,6 +23,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { logout as logoutAction } from "../../stores/slices/authSlice";
 import { useNavigate } from "react-router-dom";
+import { datagateColors } from "~/theme";
 
 const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
   const dispatch = useDispatch();
@@ -40,17 +41,17 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
 
   return (
     <MuiAppBar
-      position="static"
+      position="sticky"
       elevation={0}
       sx={{
-        bgcolor: "transparent",
-        border: "none",
-        borderBottom: 1,
-        borderBottomColor: "divider",
+        bgcolor: "#FFFFFF",
+        borderBottom: "1px solid",
+        borderBottomColor: "rgba(0, 0, 0, 0.08)",
         borderRadius: 0,
+        zIndex: (theme) => theme.zIndex.drawer + 1,
       }}
     >
-      <Toolbar sx={{ justifyContent: "space-between", minHeight: "64px", gap: 2 }}>
+      <Toolbar sx={{ justifyContent: "space-between", minHeight: "64px", px: { xs: 2, md: 4 } }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <IconButton
             onClick={onToggleSidebar}
@@ -58,39 +59,38 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
             sx={{
               color: "text.primary",
               bgcolor: "transparent",
-              "&:hover": { bgcolor: "action.hover" },
+              "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" },
+              transition: "all 0.2s ease"
             }}
           >
             {isSidebarCollapsed ? <MenuIcon /> : <MenuOpenIcon />}
           </IconButton>
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
               gap: 1.5,
               cursor: "pointer",
-              ml: 1,
-              px: 1,
+              px: 1.5,
               py: 0.5,
-              borderRadius: 2.5,
-              "&:hover": { bgcolor: "action.hover" },
+              borderRadius: "12px",
+              transition: "all 0.2s ease",
+              "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" },
             }}
             onClick={handleProfileClick}
           >
             <Box sx={{ textAlign: "right", display: { xs: "none", md: "block" } }}>
-              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+              <Typography variant="body2" color="text.primary" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
                 {user?.full_name || user?.username || "User"}
               </Typography>
-              {user?.username && (
-                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
-                  @{user.username}
-                </Typography>
-              )}
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                {user?.username ? `@${user.username}` : "Administrator"}
+              </Typography>
             </Box>
-            <Avatar sx={{ width: 36, height: 36, bgcolor: "primary.main", fontSize: "0.875rem", fontWeight: 700 }}>
+            <Avatar sx={{ width: 36, height: 36, bgcolor: "primary.main", fontSize: "0.875rem", fontWeight: 700, border: "2px solid #FFFFFF", boxShadow: "0 2px 8px rgba(37, 99, 235, 0.2)" }}>
               {(user?.full_name || user?.username || "User").charAt(0).toUpperCase()}
             </Avatar>
           </Box>

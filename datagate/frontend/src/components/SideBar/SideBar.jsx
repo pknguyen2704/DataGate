@@ -13,6 +13,9 @@ import {
   DashboardOutlined as DashboardIcon,
   SettingsOutlined as SettingsIcon,
   TableChartOutlined as TablesIcon,
+  TuneOutlined as MetricsIcon,
+  RuleOutlined as RuleIcon,
+  VerifiedOutlined as QualityIcon,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -28,11 +31,29 @@ const getNavItems = () => [
     permission: "dashboard:view",
   },
   {
-    text: "Explore",
+    text: "Data Observability",
     icon: <TablesIcon />,
-    path: "/explore",
-    permission: "table:view",
-  }
+    path: "/observability",
+    permission: "observability:view",
+  },
+  {
+    text: "Data Metrics",
+    icon: <MetricsIcon />,
+    path: "/metrics",
+    permission: "threshold:view",
+  },
+  {
+    text: "Data Rules",
+    icon: <RuleIcon />,
+    path: "/rules",
+    permission: "rule:view",
+  },
+  {
+    text: "Data Quality",
+    icon: <QualityIcon />,
+    path: "/quality",
+    permission: "quality:view",
+  },
 ];
 
 const SideBar = ({ isCollapsed }) => {
@@ -65,12 +86,11 @@ const SideBar = ({ isCollapsed }) => {
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "background.paper",
+        bgcolor: "transparent",
         transition: "width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s cubic-bezier(0.4,0,0.2,1)",
           overflowX: "hidden",
-          borderRight: `1px solid ${datagateColors.cardBorderSoft}`,
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)",
+          borderRight: `1px solid ${datagateColors.shellLine}`,
+          background: `linear-gradient(180deg, ${datagateColors.shell} 0%, ${datagateColors.shellSoft} 100%)`,
         }}
     >
       {/* Logo */}
@@ -96,7 +116,7 @@ const SideBar = ({ isCollapsed }) => {
             variant="h6"
             sx={{
               fontWeight: 800,
-              color: "primary.main",
+              color: "#FFFFFF",
               letterSpacing: "-0.5px",
               whiteSpace: "nowrap",
               fontSize: "1.05rem",
@@ -117,17 +137,23 @@ const SideBar = ({ isCollapsed }) => {
               selected={isActive(item.path)}
               onClick={() => navigate(item.path)}
               sx={{
-                mb: 0.5,
-                borderRadius: `${theme.datagate.radii.md}px`,
+                mb: 1,
+                borderRadius: 0,
+                mr: 0,
                 justifyContent: isCollapsed ? "center" : "flex-start",
-                px: isCollapsed ? 0 : 1.5,
-                minHeight: 42,
+                px: isCollapsed ? 0 : 2,
+                minHeight: 48,
                 cursor: "pointer",
                 "&.Mui-selected": {
-                  bgcolor: "#EFF6FF",
-                  color: "primary.main",
-                  "&:hover": { bgcolor: "#DBEAFE" },
+                  bgcolor: "rgba(255,255,255,0.1)",
+                  color: "#FFFFFF",
+                  borderLeft: "4px solid #60A5FA",
+                  "& .MuiListItemIcon-root": { color: "#60A5FA" },
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
                 },
+                "&:hover": {
+                  bgcolor: "rgba(255,255,255,0.04)",
+                }
               }}
             >
               <ListItemIcon
@@ -135,7 +161,7 @@ const SideBar = ({ isCollapsed }) => {
                   minWidth: isCollapsed ? 0 : 36,
                   display: "flex",
                   justifyContent: "center",
-                  color: isActive(item.path) ? "primary.main" : "text.secondary",
+                  color: isActive(item.path) ? "#FFFFFF" : "#BFDBFE",
                   transition: "color 0.2s",
                 }}
               >
@@ -145,10 +171,11 @@ const SideBar = ({ isCollapsed }) => {
                 <ListItemText
                   primary={item.text}
                   slotProps={{
-                    primary: {
-                      fontSize: "0.875rem",
-                      fontWeight: isActive(item.path) ? 700 : 500,
-                    },
+                  primary: {
+                    fontSize: "0.875rem",
+                    fontWeight: isActive(item.path) ? 700 : 500,
+                    color: isActive(item.path) ? "#FFFFFF" : "#DBEAFE",
+                  },
                   }}
                 />
               )}
@@ -172,8 +199,8 @@ const SideBar = ({ isCollapsed }) => {
               minHeight: 42,
               cursor: "pointer",
               "&.Mui-selected": {
-                bgcolor: "#EFF6FF",
-                color: "primary.main",
+                bgcolor: "rgba(255,255,255,0.14)",
+                color: "#FFFFFF",
               },
             }}
           >
@@ -182,7 +209,7 @@ const SideBar = ({ isCollapsed }) => {
                 minWidth: isCollapsed ? 0 : 36,
                 display: "flex",
                 justifyContent: "center",
-                color: location.pathname.startsWith("/settings") ? "primary.main" : "text.secondary",
+                color: location.pathname.startsWith("/settings") ? "#FFFFFF" : "#BFDBFE",
               }}
             >
               <SettingsIcon />
@@ -194,6 +221,7 @@ const SideBar = ({ isCollapsed }) => {
                   primary: {
                     fontSize: "0.875rem",
                     fontWeight: location.pathname.startsWith("/settings") ? 700 : 500,
+                    color: location.pathname.startsWith("/settings") ? "#FFFFFF" : "#DBEAFE",
                   },
                 }}
               />

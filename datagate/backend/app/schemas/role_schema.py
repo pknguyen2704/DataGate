@@ -24,6 +24,10 @@ class RoleUpdate(BaseModel):
     permission_ids: list[UUID] | None = None
 
 
+class PermissionAssign(BaseModel):
+    permission_ids: list[UUID] = Field(default_factory=list)
+
+
 class RoleOut(RoleBase):
     id: UUID
     created_at: datetime

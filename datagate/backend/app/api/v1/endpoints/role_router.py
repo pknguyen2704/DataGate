@@ -6,13 +6,8 @@ from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
-from app.schemas.role import (
-    PermissionAssign,
-    PermissionOut,
-    RoleCreate,
-    RoleOut,
-    RoleUpdate,
-)
+from app.schemas.permission_schema import PermissionOut
+from app.schemas.role_schema import PermissionAssign, RoleCreate, RoleOut, RoleUpdate
 from app.services.role_service import RoleService
 
 

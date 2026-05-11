@@ -7,27 +7,18 @@ from app.schemas.common_schema import LightGBMAUCStatus, SeverityLevel
 
 class LightGBMParameterBase(BaseModel):
     table_id: UUID
-
-    learningRate: float = Field(default=0.05, gt=0, le=1)
-    numLeaves: int = Field(default=31, gt=1)
-    maxDepth: int = -1
-    minDataInLeaf: int = Field(default=20, ge=1)
-
-    baggingFraction: float = Field(default=1.0, gt=0, le=1)
-    baggingFreq: int = Field(default=0, ge=0)
-    featureFraction: float = Field(default=1.0, gt=0, le=1)
-
-    lambdaL1: float = Field(default=1e-8, ge=0)
-    lambdaL2: float = Field(default=1e-8, ge=0)
-    minGainToSplit: float = Field(default=0.0, ge=0)
-    maxBin: int = Field(default=255, gt=1)
-
-    numIterations: int = Field(default=300, gt=0)
-    earlyStoppingRound: int = Field(default=30, ge=0)
-    useBarrierExecutionMode: bool = True
-
-    is_active: bool = True
-    description: str | None = None
+    learning_rate: float = Field(default=0.05, gt=0, le=1)
+    num_leaves: int = Field(default=31, gt=1)
+    max_depth: int = -1
+    min_data_in_leaf: int = Field(default=20, ge=1)
+    bagging_fraction: float = Field(default=1.0, gt=0, le=1)
+    bagging_freq: int = Field(default=0, ge=0)
+    feature_fraction: float = Field(default=1.0, gt=0, le=1)
+    lambda_l1: float = Field(default=1e-8, ge=0)
+    lambda_l2: float = Field(default=1e-8, ge=0)
+    min_gain_to_split: float = Field(default=0.0, ge=0)
+    max_bin: int = Field(default=255, gt=1)
+    num_iterations: int = Field(default=300, gt=0)
 
 
 class LightGBMParameterCreate(LightGBMParameterBase):
@@ -35,26 +26,18 @@ class LightGBMParameterCreate(LightGBMParameterBase):
 
 
 class LightGBMParameterUpdate(BaseModel):
-    learningRate: float | None = Field(default=None, gt=0, le=1)
-    numLeaves: int | None = Field(default=None, gt=1)
-    maxDepth: int | None = None
-    minDataInLeaf: int | None = Field(default=None, ge=1)
-
-    baggingFraction: float | None = Field(default=None, gt=0, le=1)
-    baggingFreq: int | None = Field(default=None, ge=0)
-    featureFraction: float | None = Field(default=None, gt=0, le=1)
-
-    lambdaL1: float | None = Field(default=None, ge=0)
-    lambdaL2: float | None = Field(default=None, ge=0)
-    minGainToSplit: float | None = Field(default=None, ge=0)
-    maxBin: int | None = Field(default=None, gt=1)
-
-    numIterations: int | None = Field(default=None, gt=0)
-    earlyStoppingRound: int | None = Field(default=None, ge=0)
-    useBarrierExecutionMode: bool | None = None
-
-    is_active: bool | None = None
-    description: str | None = None
+    learning_rate: float | None = Field(default=None, gt=0, le=1)
+    num_leaves: int | None = Field(default=None, gt=1)
+    max_depth: int | None = None
+    min_data_in_leaf: int | None = Field(default=None, ge=1)
+    bagging_fraction: float | None = Field(default=None, gt=0, le=1)
+    bagging_freq: int | None = Field(default=None, ge=0)
+    feature_fraction: float | None = Field(default=None, gt=0, le=1)
+    lambda_l1: float | None = Field(default=None, ge=0)
+    lambda_l2: float | None = Field(default=None, ge=0)
+    min_gain_to_split: float | None = Field(default=None, ge=0)
+    max_bin: int | None = Field(default=None, gt=1)
+    num_iterations: int | None = Field(default=None, gt=0)
 
 
 class LightGBMParameterOut(LightGBMParameterBase):
@@ -67,10 +50,8 @@ class LightGBMParameterOut(LightGBMParameterBase):
 
 class LightGBMAUCManualThresholdBase(BaseModel):
     lightgbm_parameter_id: UUID
-    auc_min_threshold: float | None = Field(default=None, ge=0, le=1)
-    auc_max_threshold: float | None = Field(default=None, ge=0, le=1)
+    auc_threshold: float = Field(..., ge=0, le=1)
     severity_level: SeverityLevel = SeverityLevel.WARNING
-    is_active: bool = True
     description: str | None = None
 
 
@@ -79,10 +60,8 @@ class LightGBMAUCManualThresholdCreate(LightGBMAUCManualThresholdBase):
 
 
 class LightGBMAUCManualThresholdUpdate(BaseModel):
-    auc_min_threshold: float | None = Field(default=None, ge=0, le=1)
-    auc_max_threshold: float | None = Field(default=None, ge=0, le=1)
+    auc_threshold: float | None = Field(default=None, ge=0, le=1)
     severity_level: SeverityLevel | None = None
-    is_active: bool | None = None
     description: str | None = None
 
 
@@ -95,17 +74,12 @@ class LightGBMAUCManualThresholdOut(LightGBMAUCManualThresholdBase):
 
 
 class LightGBMAUCBase(BaseModel):
+    table_id: UUID
     lightgbm_parameter_id: UUID
-    manual_threshold_id: UUID | None = None
     processing_date_hour: datetime
-
     auc_score: float | None = Field(default=None, ge=0, le=1)
-    status: LightGBMAUCStatus = LightGBMAUCStatus.FAIL
-
-    auc_min_threshold: float | None = Field(default=None, ge=0, le=1)
-    auc_max_threshold: float | None = Field(default=None, ge=0, le=1)
-    severity_level: SeverityLevel | None = None
-    message: str | None = None
+    p_value: float | None = None
+    parameter_snapshot: dict | None = None
 
 
 class LightGBMAUCCreate(LightGBMAUCBase):
@@ -113,13 +87,9 @@ class LightGBMAUCCreate(LightGBMAUCBase):
 
 
 class LightGBMAUCUpdate(BaseModel):
-    manual_threshold_id: UUID | None = None
     auc_score: float | None = Field(default=None, ge=0, le=1)
-    status: LightGBMAUCStatus | None = None
-    auc_min_threshold: float | None = Field(default=None, ge=0, le=1)
-    auc_max_threshold: float | None = Field(default=None, ge=0, le=1)
-    severity_level: SeverityLevel | None = None
-    message: str | None = None
+    p_value: float | None = None
+    parameter_snapshot: dict | None = None
 
 
 class LightGBMAUCOut(LightGBMAUCBase):

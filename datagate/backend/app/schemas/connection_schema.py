@@ -12,6 +12,7 @@ class ConnectionBase(BaseModel):
     trino_password: str | None = None
     iceberg_rest_url: str = Field(..., max_length=255)
     iceberg_catalog_name: str = Field(..., max_length=255)
+    iceberg_warehouse: str = Field(..., max_length=255)
     minio_endpoint_url: str = Field(..., max_length=255)
     minio_access_key: str = Field(..., max_length=255)
     minio_secret_key: str
@@ -31,6 +32,7 @@ class ConnectionUpdate(BaseModel):
     trino_password: str | None = None
     iceberg_rest_url: str | None = Field(default=None, max_length=255)
     iceberg_catalog_name: str | None = Field(default=None, max_length=255)
+    iceberg_warehouse: str | None = Field(default=None, max_length=255)
     minio_endpoint_url: str | None = Field(default=None, max_length=255)
     minio_access_key: str | None = Field(default=None, max_length=255)
     minio_secret_key: str | None = None
@@ -46,6 +48,7 @@ class ConnectionOut(BaseModel):
     trino_user: str
     iceberg_rest_url: str
     iceberg_catalog_name: str
+    iceberg_warehouse: str
     minio_endpoint_url: str
     is_active: bool
     created_by: UUID | None = None

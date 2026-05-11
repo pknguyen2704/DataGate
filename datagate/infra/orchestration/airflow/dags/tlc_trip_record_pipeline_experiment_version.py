@@ -17,8 +17,8 @@ from data_quality_gate import check_data_quality_gate
 LOCAL_TZ = pendulum.timezone("Asia/Ho_Chi_Minh")
 
 
-SIM_START = "2025-01-02 00:00:00"
-SIM_END = "2025-01-16 00:00:00"
+SIM_START = "2025-01-28 12:00:00"
+SIM_END = "2025-02-01 00:00:00"
 SIM_STEP_HOURS = 12
 SIM_VAR_NAME = "yellow_tripdata_next_processing_date_hour"
 

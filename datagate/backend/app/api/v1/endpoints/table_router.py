@@ -2,11 +2,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import check_table_access, require_permission
+from app.api.deps import require_permission
 from app.db.session import get_db
-from app.models import Table, User
+from app.models import User
 from app.rbac.permissions import PermissionCode
-from app.schemas.table_schema import TableCreate, TableDetailOut, TableUpdate
+from app.schemas.table_schema import ProcessingHourOut, TableColumnOut, TableCreate, TableDetailOut, TableUpdate
 from app.services.table_service import TableService
 
 
@@ -41,12 +41,14 @@ def create_table(
 
 @table_router.get("/{table_id}", response_model=TableDetailOut)
 def get_table(
-    table: Table = Depends(check_table_access),
+    table_id: UUID,
+    service: TableService = Depends(get_table_service),
+    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
 ):
-    return table
+    return service.get_table_or_404(str(table_id))
 
 
-@table_router.patch("/{table_id}", response_model=TableDetailOut)
+@table_router.put("/{table_id}", response_model=TableDetailOut)
 def update_table(
     table_id: UUID,
     data: TableUpdate,
@@ -54,6 +56,24 @@ def update_table(
     _user: User = Depends(require_permission(PermissionCode.TABLE_UPDATE)),
 ):
     return service.update_table(table_id=str(table_id), data=data)
+
+
+@table_router.get("/{table_id}/columns", response_model=list[TableColumnOut])
+def list_table_columns(
+    table_id: UUID,
+    service: TableService = Depends(get_table_service),
+    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+):
+    return service.list_columns(str(table_id))
+
+
+@table_router.get("/{table_id}/processing-hours", response_model=list[ProcessingHourOut])
+def list_table_processing_hours(
+    table_id: UUID,
+    service: TableService = Depends(get_table_service),
+    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+):
+    return service.list_processing_hours(str(table_id))
 
 
 @table_router.patch("/{table_id}/activate", response_model=TableDetailOut)

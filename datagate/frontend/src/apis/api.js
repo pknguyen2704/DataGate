@@ -5,9 +5,19 @@ export { rolesApi } from "./rolesApi";
 export { connectionsApi } from "./connectionsApi";
 export { tablesApi } from "./tablesApi";
 export { rulesApi } from "./rulesApi";
-export { exploreApi } from "./exploreApi";
+export { healthApi } from "./healthApi";
+export { observabilityApi } from "./observabilityApi";
+export { metricsApi } from "./metricsApi";
+export { qualityApi } from "./qualityApi";
+export { anomalyApi } from "./anomalyApi";
+export { lightgbmApi } from "./lightgbmApi";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const getDefaultApiUrl = () => {
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:8000/api/v1`;
+};
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || getDefaultApiUrl();
 const api = axios.create({ baseURL: API_BASE_URL, timeout: 30000 });
 
 api.interceptors.request.use((config) => {

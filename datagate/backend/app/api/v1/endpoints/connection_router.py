@@ -6,10 +6,8 @@ from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
-from app.schemas.connection import ConnectionCreate, ConnectionOut, ConnectionTestResult, ConnectionUpdate
-from app.schemas.table import TableOut
+from app.schemas.connection_schema import ConnectionCreate, ConnectionOut, ConnectionTestResult, ConnectionUpdate
 from app.services.connection_service import ConnectionService
-from app.services.table_service import TableService
 
 
 connection_router = APIRouter(prefix="/connections", tags=["Connections"])
@@ -17,10 +15,6 @@ connection_router = APIRouter(prefix="/connections", tags=["Connections"])
 
 def get_connection_service(db: Session = Depends(get_db)) -> ConnectionService:
     return ConnectionService(db)
-
-
-def get_table_service(db: Session = Depends(get_db)) -> TableService:
-    return TableService(db)
 
 
 @connection_router.get("", response_model=list[ConnectionOut])
@@ -50,14 +44,14 @@ def get_connection(
     return service.get_connection_or_404(str(connection_id))
 
 
-@connection_router.patch("/{connection_id}", response_model=ConnectionOut)
+@connection_router.put("/{connection_id}", response_model=ConnectionOut)
 def update_connection(
     connection_id: UUID,
     body: ConnectionUpdate,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_UPDATE)),
+    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_UPDATE)),
 ):
-    return service.update_connection(str(connection_id), body)
+    return service.update_connection(str(connection_id), body, str(current_user.id))
 
 
 @connection_router.patch("/{connection_id}/activate", response_model=ConnectionOut)
@@ -97,15 +91,6 @@ def test_connection(
     return service.test_connection(str(connection_id))
 
 
-@connection_router.get("/{connection_id}/catalogs", response_model=list[str])
-def list_catalogs(
-    connection_id: UUID,
-    service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
-):
-    return service.list_catalogs(str(connection_id))
-
-
 @connection_router.get("/{connection_id}/schemas", response_model=list[str])
 def list_schemas(
     connection_id: UUID,
@@ -115,31 +100,11 @@ def list_schemas(
     return service.list_schemas(str(connection_id))
 
 
-@connection_router.get("/{connection_id}/tables", response_model=list[str])
+@connection_router.get("/{connection_id}/schemas/{schema_name}/tables", response_model=list[str])
 def list_tables(
     connection_id: UUID,
-    schema: str = Query(...),
-    catalog: str | None = Query(default=None),
+    schema_name: str,
     service: ConnectionService = Depends(get_connection_service),
     _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
 ):
-    return service.list_tables(str(connection_id), schema=schema, catalog=catalog)
-
-
-@connection_router.get("/{connection_id}/managed-tables", response_model=list[TableOut])
-def list_managed_tables(
-    connection_id: UUID,
-    connection_service: ConnectionService = Depends(get_connection_service),
-    table_service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
-):
-    connection_id_str = str(connection_id)
-    connection_service.get_connection_or_404(connection_id_str)
-    tables = table_service.list_tables(connection_id=connection_id_str)
-    return [
-        table_service.enrich_table(
-            table=table,
-            connection_name=table.connection.connection_name if table.connection else None,
-        )
-        for table in tables
-    ]
+    return service.list_tables(str(connection_id), schema=schema_name)
