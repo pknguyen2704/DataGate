@@ -96,6 +96,7 @@ class BatchTableProfilingMetricsVerify(Base):
     severity_level = Column(Enum("warning", "critical", name="manual_threshold_severity_level"), nullable=True)
     
     is_resolved = Column(Boolean, default=False, nullable=False)
+    resolved_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     processing_date_hour = Column(DateTime, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -103,6 +104,7 @@ class BatchTableProfilingMetricsVerify(Base):
 
     profiling_manual_threshold = relationship("BatchTableProfilingManualThreshold", back_populates="results")
     batch_table_profiling = relationship("BatchTableProfiling", back_populates="batch_table_profiling_metrics_verify")
+    resolved_by_user = relationship("User", foreign_keys=[resolved_by])
 
     __table_args__ = (
         Index("ix_batch_table_profiling_metrics_verify__threshold_batch_unique", "profiling_manual_threshold_id", "batch_table_profiling_id", unique=True),

@@ -12,12 +12,14 @@ from app.api.v1.endpoints.role_router import role_router
 from app.api.v1.endpoints.rule_router import rules_router
 from app.api.v1.endpoints.table_router import table_router
 from app.api.v1.endpoints.user_router import user_router
+from app.api.v1.endpoints.permission_router import permission_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
 api_router.include_router(user_router)
 api_router.include_router(role_router)
+api_router.include_router(permission_router)
 api_router.include_router(connection_router)
 api_router.include_router(table_router)
 api_router.include_router(rules_router)

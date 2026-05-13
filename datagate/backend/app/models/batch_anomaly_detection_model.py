@@ -103,7 +103,7 @@ class LightGBMAUCManualThreshold(Base):
     auc_threshold = Column(Float, nullable=False)
     severity_level = Column(Enum("warning", "critical", name="manual_threshold_severity_level"), nullable=False)
     description = Column(Text, nullable=True)
-
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -127,13 +127,14 @@ class LightGBMAUCVerify(Base):
     auc_threshold = Column(Float, nullable=True)
     severity_level = Column(Enum("warning", "critical", name="manual_threshold_severity_level"), nullable=True)
     is_resolved = Column(Boolean, default=False, nullable=False)
-
+    resolved_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     processing_date_hour = Column(DateTime, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     lightgbm_result = relationship("LightGBMAUC", back_populates="auc_verify")
     manual_threshold = relationship("LightGBMAUCManualThreshold", back_populates="auc_verifies")
+    resolved_by_user = relationship("User", foreign_keys=[resolved_by])
 
     __table_args__ = (
         Index("ix_lgbm_verify__result_id", "lightgbm_result_id", unique=True),

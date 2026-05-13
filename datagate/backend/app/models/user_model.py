@@ -26,8 +26,6 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     roles = relationship("Role", secondary=user_roles, back_populates="users")
-    created_rules = relationship("Rule", foreign_keys="Rule.created_by", back_populates="created_by_user")
-
     __table_args__ = (
         Index("ix_users__username", "username", unique=True),
         Index("ix_users__email", "email", unique=True),
