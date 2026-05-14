@@ -17,7 +17,7 @@ export const datagateColors = {
   cardBackgroundMuted: "#F8FAFC",
   selectedBackground: "rgba(37, 99, 235, 0.08)",
   selectedBorder: "#2563EB",
-  tableHeadBackground: "#F8FAFC",
+  tableHeadBackground: "#1E40AF",
   textPrimary: "#0F172A",
   textSecondary: "#334155",
   accentAmber: "#F59E0B",
@@ -371,12 +371,13 @@ const theme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         head: {
-          fontSize: "0.8125rem",
+          fontSize: "0.875rem",
           fontWeight: 700,
-          color: datagateColors.textSecondary,
+          color: "#FFFFFF",
           paddingTop: 14,
           paddingBottom: 14,
           backgroundColor: datagateColors.tableHeadBackground,
+          borderBottom: "none",
         },
         body: {
           fontSize: "0.9375rem",

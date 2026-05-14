@@ -3,14 +3,13 @@ export { authApi } from "./authApi";
 export { usersApi } from "./usersApi";
 export { rolesApi } from "./rolesApi";
 export { connectionsApi } from "./connectionsApi";
-export { tablesApi } from "./tablesApi";
+export { dataAssetsApi } from "./dataAssetsApi";
 export { rulesApi } from "./rulesApi";
-export { healthApi } from "./healthApi";
+export { homeApi } from "./homeApi";
 export { observabilityApi } from "./observabilityApi";
 export { metricsApi } from "./metricsApi";
-export { qualityApi } from "./qualityApi";
-export { anomalyApi } from "./anomalyApi";
-export { lightgbmApi } from "./lightgbmApi";
+export { dataQualityApi } from "./dataQualityApi";
+export { modelParametersApi } from "./modelConfigsApi";
 
 const getDefaultApiUrl = () => {
   const { protocol, hostname } = window.location;
@@ -19,6 +18,10 @@ const getDefaultApiUrl = () => {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || getDefaultApiUrl();
 const api = axios.create({ baseURL: API_BASE_URL, timeout: 30000 });
+
+api.defaults.headers.get['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+api.defaults.headers.get['Pragma'] = 'no-cache';
+api.defaults.headers.get['Expires'] = '0';
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");

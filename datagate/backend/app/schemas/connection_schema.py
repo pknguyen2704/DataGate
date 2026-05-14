@@ -1,6 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.common_schema import PaginatedResponse
 
 
 class ConnectionBase(BaseModel):
@@ -50,8 +51,8 @@ class ConnectionOut(BaseModel):
     iceberg_catalog_name: str
     iceberg_warehouse: str
     minio_endpoint_url: str
+    minio_access_key: str
     is_active: bool
-    created_by: UUID | None = None
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -63,6 +64,10 @@ class ConnectionLiteOut(BaseModel):
     iceberg_catalog_name: str
     is_active: bool
     model_config = ConfigDict(from_attributes=True)
+
+
+class ConnectionListOut(PaginatedResponse[ConnectionOut]):
+    pass
 
 
 class ConnectionTestResult(BaseModel):

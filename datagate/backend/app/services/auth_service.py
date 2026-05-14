@@ -44,12 +44,21 @@ class AuthService:
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Inactive user",
+                detail="Account access restricted. Please contact your administrator for assistance.",
             )
 
+        # Longer expiration for remember_me (30 days)
+        expires_delta = None
+        if data.remember_me:
+            from datetime import timedelta
+            expires_delta = timedelta(days=30)
+
+        access_token = create_access_token(user.id, expires_delta=expires_delta)
+
         return TokenResponse(
-            access_token=create_access_token(user.id),
+            access_token=access_token,
             token_type="bearer",
+            user=self.build_user_me(user)
         )
 
     def build_user_me(self, user: User) -> UserMeOut:
@@ -94,6 +103,9 @@ class AuthService:
             return True
 
         if "admin:*" in permission_codes:
+            return True
+
+        if any(role.name == "Admin" and role.is_active for role in user.roles):
             return True
 
         return False

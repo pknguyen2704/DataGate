@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.schemas.role_schema import RoleLiteOut
+from app.schemas.common_schema import PaginatedResponse
 
 
 class UserBase(BaseModel):
@@ -36,6 +37,10 @@ class UserRoleAssign(BaseModel):
     role_ids: list[UUID] = Field(default_factory=list)
 
 
+class UserPasswordUpdate(BaseModel):
+    password: str = Field(..., min_length=6, max_length=128)
+
+
 class UserOut(UserBase):
     id: UUID
     created_at: datetime
@@ -53,8 +58,5 @@ class UserLiteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class UserListOut(BaseModel):
-    items: list[UserOut]
-    total: int
-    page: int
-    page_size: int
+class UserListOut(PaginatedResponse[UserOut]):
+    pass

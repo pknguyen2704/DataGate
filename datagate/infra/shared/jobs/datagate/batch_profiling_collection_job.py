@@ -1,7 +1,10 @@
 import argparse
+import gc
 import logging
 import os
+import sys
 import uuid
+from contextlib import suppress
 from datetime import datetime
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -427,6 +430,28 @@ def collect_one_table_profiling(spark, pg_hook, table_info, processing_date_hour
     )
 
 
+def close_pg_hook(pg_hook):
+    if pg_hook is None:
+        return
+
+    with suppress(Exception):
+        conn = getattr(pg_hook, "conn", None)
+        if conn is not None and not conn.closed:
+            conn.close()
+
+
+def stop_spark_session(spark):
+    if spark is None:
+        return
+
+    with suppress(Exception):
+        spark.catalog.clearCache()
+    with suppress(Exception):
+        spark.sparkContext.cancelAllJobs()
+    with suppress(Exception):
+        spark.stop()
+
+
 def main():
     args = parse_args()
     schema_name = validate_name(args.schema_name, "schema_name")
@@ -434,35 +459,38 @@ def main():
         args.processing_date_hour
     )
 
-    pg_hook = PostgresHook(
-        postgres_conn_id=args.datagate_db_conn_id
-    )
-
-    connection_config = get_connection_config(
-        pg_hook=pg_hook,
-        connection_name=args.connection_name,
-    )
-
-    catalog_name = connection_config["iceberg_catalog_name"]
-
-    active_tables = get_active_tables(
-        pg_hook=pg_hook,
-        catalog_name=catalog_name,
-        schema_name=schema_name,
-    )
-
-    if not active_tables:
-        logger.warning(
-            "No active tables found | connection=%s | catalog=%s | schema=%s",
-            connection_config["connection_name"],
-            catalog_name,
-            schema_name,
-        )
-        return
-
-    spark = create_spark_session(connection_config)
+    pg_hook = None
+    spark = None
 
     try:
+        pg_hook = PostgresHook(
+            postgres_conn_id=args.datagate_db_conn_id
+        )
+
+        connection_config = get_connection_config(
+            pg_hook=pg_hook,
+            connection_name=args.connection_name,
+        )
+
+        catalog_name = connection_config["iceberg_catalog_name"]
+
+        active_tables = get_active_tables(
+            pg_hook=pg_hook,
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+        )
+
+        if not active_tables:
+            logger.warning(
+                "No active tables found | connection=%s | catalog=%s | schema=%s",
+                connection_config["connection_name"],
+                catalog_name,
+                schema_name,
+            )
+            return 0
+
+        spark = create_spark_session(connection_config)
+
         logger.info(
             "Found %s active table(s) | connection=%s | catalog=%s | schema=%s",
             len(active_tables),
@@ -479,9 +507,28 @@ def main():
                 processing_date_hour=processing_date_hour,
             )
 
+        return 0
+
+    except Exception:
+        logger.exception(
+            "Profiling collection failed | connection=%s | schema=%s | hour=%s",
+            args.connection_name,
+            schema_name,
+            processing_date_hour,
+        )
+        return 1
+
     finally:
-        spark.stop()
+        stop_spark_session(spark)
+        close_pg_hook(pg_hook)
+        gc.collect()
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    with suppress(Exception):
+        sys.stdout.flush()
+    with suppress(Exception):
+        sys.stderr.flush()
+    logging.shutdown()
+    os._exit(exit_code)

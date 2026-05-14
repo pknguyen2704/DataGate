@@ -132,7 +132,7 @@ export const Stat = ({ label, value, tone = "blue", subtitle }) => {
           boxShadow: "0 12px 20px rgba(0,0,0,0.05)",
           borderColor: color
         },
-        p: 3,
+        p: 2,
         bgcolor: 'white',
         border: '1px solid',
         borderColor: 'divider',
@@ -144,8 +144,8 @@ export const Stat = ({ label, value, tone = "blue", subtitle }) => {
       }}
     >
       <Box sx={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', bgcolor: color }} />
-      <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 1.2, opacity: 0.8 }}>{label}</Typography>
-      <Typography variant="h3" sx={{ mt: 1, color, fontWeight: 900 }}>{value ?? "—"}</Typography>
+      <Typography variant="overline" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 1.2, opacity: 0.8, fontSize: '0.65rem' }}>{label}</Typography>
+      <Typography variant="h4" sx={{ mt: 0.5, color, fontWeight: 900 }}>{value ?? "—"}</Typography>
       {subtitle && <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontWeight: 500 }}>{subtitle}</Typography>}
     </Paper>
   );
@@ -153,18 +153,20 @@ export const Stat = ({ label, value, tone = "blue", subtitle }) => {
 
 export const StatusChip = ({ value }) => {
   const normalized = String(value || "unknown").toLowerCase();
-  const isError = normalized.includes("fail") || normalized.includes("critical") || normalized.includes("inactive") || normalized.includes("no");
+  const isError = normalized.includes("fail") || normalized.includes("failure") || normalized.includes("critical") || normalized.includes("inactive") || normalized.includes("no");
   const isWarning = normalized.includes("warning") || normalized.includes("warn");
+  const isSuccess = normalized.includes("pass") || normalized.includes("success") || normalized.includes("active") || normalized.includes("yes");
   const isPending = normalized.includes("pending");
   const isDefault = normalized.includes("unknown") || normalized.includes("manual");
   
-  const bgcolor = isError ? "#EF4444" : isWarning ? "#F59E0B" : isPending ? "#6366F1" : isDefault ? "#64748B" : "#10B981";
+  const labelText = isError ? "FAIL" : isWarning ? (normalized.toUpperCase()) : isSuccess ? "PASS" : normalized.toUpperCase();
+  const bgcolor = isError ? "#EF4444" : isWarning ? "#F59E0B" : isSuccess ? "#10B981" : isPending ? "#6366F1" : isDefault ? "#64748B" : "#10B981";
   const color = "#FFFFFF";
 
   return (
     <Chip 
       size="small" 
-      label={value || "unknown"} 
+      label={labelText} 
       sx={{ 
         bgcolor, 
         color, 

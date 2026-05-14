@@ -39,6 +39,7 @@ default_args = {
     "start_date": pendulum.datetime(2024, 1, 1, tz=LOCAL_TZ),
     "retries": 1,
     "retry_delay": timedelta(minutes=2),
+    "execution_timeout": timedelta(hours=2),
     "on_failure_callback": [task_fail_slack_alert],
 }
 
@@ -56,10 +57,11 @@ with DAG(
     dag_id="yellow_tripdata_pipeline",
     default_args=default_args,
     schedule=None,
+    dagrun_timeout=timedelta(hours=6),
     catchup=False,
     tags=["datagate", "iceberg", "yellow_tripdata"],
     params={
-        "processing_date_hour": "2025-01-17 12:00:00",
+        "processing_date_hour": "2025-01-02 00:00:00",
     },
 ) as dag:
     ingest_data = SparkSubmitOperator(

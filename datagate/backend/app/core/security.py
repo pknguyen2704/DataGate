@@ -10,10 +10,13 @@ pwd_context = CryptContext(
 )
 
 def create_access_token(
-    subject: str | Any
+    subject: str | Any,
+    expires_delta: timedelta | None = None
 ) -> str:
-    expires_delta = timedelta(minutes=config.access_token_expire_minutes)
-    expire = datetime.utcnow() + expires_delta
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=config.access_token_expire_minutes)
     payload = {
         "sub": str(subject),
         "exp": expire

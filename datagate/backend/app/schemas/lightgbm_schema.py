@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 
-from app.schemas.common_schema import LightGBMAUCStatus, SeverityLevel
+from app.schemas.common_schema import LightGBMAUCStatus, SeverityLevel, PaginatedResponse
 
 
 class LightGBMParameterBase(BaseModel):
@@ -46,6 +46,10 @@ class LightGBMParameterOut(LightGBMParameterBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LightGBMParameterListOut(PaginatedResponse[LightGBMParameterOut]):
+    pass
 
 
 class LightGBMAUCManualThresholdBase(BaseModel):
@@ -98,6 +102,10 @@ class LightGBMAUCOut(LightGBMAUCBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LightGBMAUCListOut(PaginatedResponse[LightGBMAUCOut]):
+    pass
 
 
 class SHAPResultBase(BaseModel):

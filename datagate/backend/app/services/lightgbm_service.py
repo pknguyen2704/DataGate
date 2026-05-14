@@ -47,11 +47,24 @@ class LightGBMService:
     def import_json(self, data: dict, user_id: str) -> LightGBMParameter:
         return self.create_parameter(data, user_id)
 
-    def list_auc_results(self, table_id: str | None = None) -> list[LightGBMAUC]:
+    def list_auc_results(self, table_id: str | None = None, page: int = 1, page_size: int = 50) -> dict:
         query = self.db.query(LightGBMAUC)
         if table_id:
             query = query.filter(LightGBMAUC.table_id == table_id)
-        return query.order_by(LightGBMAUC.processing_date_hour.desc()).all()
+            
+        total = query.count()
+        items = (
+            query.order_by(LightGBMAUC.processing_date_hour.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
 
     def get_auc_result_or_404(self, auc_result_id: str) -> LightGBMAUC:
         row = self.db.query(LightGBMAUC).filter(LightGBMAUC.id == auc_result_id).first()

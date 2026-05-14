@@ -4,6 +4,7 @@ from .common_schema import (
     LightGBMAUCStatus,
     RuleSource,
     RuleStatus,
+    PaginatedResponse,
 )
 
 from .permission_schema import (
@@ -85,6 +86,19 @@ from .rule_schema import (
     RuleVerifyCreate,
     RuleVerifyUpdate,
     RuleVerifyOut,
+)
+
+from .dashboard_schema import (
+    PlatformOverviewOut,
+    TimelineStatsOut,
+    SchemaHealthOut,
+    TableHealthOut,
+    FailureSummaryOut,
+    GrafanaVariablesOut,
+    GrafanaEmbedUrlOut,
+    QualityResultOut,
+    HomeSummaryOut,
+    TimeRangeOut,
 )
 
 from .auth_schema import (

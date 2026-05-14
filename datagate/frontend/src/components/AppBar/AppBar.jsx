@@ -36,7 +36,7 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
   const handleLogout = () => {
     handleClose();
     dispatch(logoutAction());
-    navigate("/auth/login");
+    navigate("/login");
   };
 
   return (

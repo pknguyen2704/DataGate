@@ -49,6 +49,7 @@ class ManagedSchemaNodeOut(BaseModel):
 
 
 class GrafanaVariablesOut(BaseModel):
+    catalogs: list[str]
     schemas: list[str]
     tables: list[str]
     processing_date_hours: list[datetime]
@@ -58,6 +59,11 @@ class GrafanaEmbedUrlOut(BaseModel):
     url: str
 
 
+class TimeRangeOut(BaseModel):
+    default_from: datetime | None
+    default_to: datetime | None
+
+
 class QualityResultOut(BaseModel):
     id: str
     result_type: str
@@ -65,3 +71,12 @@ class QualityResultOut(BaseModel):
     severity_level: str | None = None
     is_resolved: bool
     processing_date_hour: datetime
+
+
+class HomeSummaryOut(BaseModel):
+    total_tables: int
+    total_pass: int
+    total_fail: int
+    warning_fail: int
+    critical_fail: int
+    unresolved_alerts: int

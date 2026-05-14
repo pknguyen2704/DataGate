@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.connection_schema import ConnectionLiteOut
+from app.schemas.common_schema import PaginatedResponse
 
 
 class TableBase(BaseModel):
@@ -28,6 +29,8 @@ class TableOut(TableBase):
     connection_id: UUID
     created_at: datetime
     updated_at: datetime
+    latest_processing_date_hour: datetime | None = None
+    has_anomaly_config: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -41,7 +44,12 @@ class TableLiteOut(BaseModel):
     schema_name: str
     table_name: str
     is_active: bool
+    latest_processing_date_hour: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class TableListOut(PaginatedResponse[TableOut]):
+    pass
 
 
 class TableColumnOut(BaseModel):

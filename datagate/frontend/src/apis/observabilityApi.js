@@ -1,7 +1,8 @@
 import api from "./api";
 
 export const observabilityApi = {
-  managedTree: () => api.get("/observability/managed-tree"),
-  grafanaVariables: () => api.get("/observability/grafana/variables"),
-  grafanaEmbedUrl: () => api.get("/observability/grafana/embed-url"),
+  getDefaultTimeRange: (tableId) => api.get(`/observability/tables/${tableId}/default-time-range`),
+  getDashboardUrl: (tableId, params) => api.get(`/observability/tables/${tableId}/dashboard`, { params }),
+  getManagedTree: () => api.get("/observability/managed-tree"),
+  getGrafanaVariables: () => api.get("/observability/grafana/variables"),
 };

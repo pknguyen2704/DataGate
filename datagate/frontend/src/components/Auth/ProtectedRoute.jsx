@@ -3,8 +3,8 @@ import { useSelector } from 'react-redux'
 import { Box, CircularProgress } from '@mui/material'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
-const ProtectedRoute = () => {
-  const { isAuthenticated, loading } = useSelector((state) => state.auth)
+const ProtectedRoute = ({ permission }) => {
+  const { isAuthenticated, loading, user } = useSelector((state) => state.auth)
   const location = useLocation();
 
   if (loading) {
@@ -25,11 +25,16 @@ const ProtectedRoute = () => {
   if (!isAuthenticated) {
     return (
       <Navigate 
-        to="/auth/login"
+        to="/login"
         state={{ from: location }}
         replace
       />
     )
+  }
+
+  // Permission check
+  if (permission && !user?.permissions?.includes(permission)) {
+    return <Navigate to="/app/home" replace />;
   }
 
   return <Outlet />

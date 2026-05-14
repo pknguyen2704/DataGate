@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 
 from app.schemas.permission_schema import PermissionLiteOut
+from app.schemas.common_schema import PaginatedResponse
 
 
 class RoleBase(BaseModel):
@@ -43,3 +44,7 @@ class RoleLiteOut(BaseModel):
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RoleListOut(PaginatedResponse[RoleOut]):
+    pass

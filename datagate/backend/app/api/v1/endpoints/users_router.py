@@ -1,0 +1,94 @@
+from uuid import UUID
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, require_permission
+from app.db.session import get_db
+from app.models import User
+from app.rbac.permissions import PermissionCode
+from app.schemas.user_schema import UserCreate, UserListOut, UserOut, UserProfileUpdate, UserRoleAssign, UserUpdate, UserPasswordUpdate
+from app.services.user_service import UserService
+
+
+users_router = APIRouter(tags=["Users"])
+
+
+def get_user_service(db: Session = Depends(get_db)) -> UserService:
+    return UserService(db)
+
+
+@users_router.get("", response_model=UserListOut)
+def list_users(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None),
+    service: UserService = Depends(get_user_service),
+    _user: User = Depends(require_permission(PermissionCode.USER_VIEW)),
+):
+    return service.list_users(page=page, page_size=page_size, search=search)
+
+
+@users_router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def create_user(
+    data: UserCreate,
+    service: UserService = Depends(get_user_service),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+):
+    return service.create_user(data)
+
+
+@users_router.get("/{user_id}", response_model=UserOut)
+def get_user(
+    user_id: UUID,
+    service: UserService = Depends(get_user_service),
+    _user: User = Depends(require_permission(PermissionCode.USER_VIEW)),
+):
+    return service.to_user_out(service.get_user_or_404(str(user_id)))
+
+
+@users_router.patch("/{user_id}", response_model=UserOut)
+def update_user(
+    user_id: UUID,
+    data: UserUpdate,
+    service: UserService = Depends(get_user_service),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+):
+    return service.update_user(user_id=str(user_id), data=data)
+
+
+@users_router.post("/{user_id}/activate", response_model=UserOut)
+def activate_user(
+    user_id: UUID,
+    service: UserService = Depends(get_user_service),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+):
+    return service.activate_user(str(user_id))
+
+
+@users_router.post("/{user_id}/deactivate", response_model=UserOut)
+def deactivate_user(
+    user_id: UUID,
+    service: UserService = Depends(get_user_service),
+    current_user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+):
+    return service.deactivate_user(user_id=str(user_id), current_user_id=str(current_user.id))
+
+
+@users_router.patch("/{user_id}/roles", response_model=UserOut)
+def assign_roles(
+    user_id: UUID,
+    data: UserRoleAssign,
+    service: UserService = Depends(get_user_service),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+):
+    return service.assign_roles(user_id=str(user_id), data=data)
+
+
+@users_router.patch("/{user_id}/password", response_model=UserOut)
+def update_password(
+    user_id: UUID,
+    data: UserPasswordUpdate,
+    service: UserService = Depends(get_user_service),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+):
+    return service.update_user(user_id=str(user_id), data=UserUpdate(password=data.password))

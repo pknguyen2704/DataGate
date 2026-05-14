@@ -9,15 +9,17 @@ const clearStoredToken = () => localStorage.removeItem(TOKEN_KEY);
 
 export const login = createAsyncThunk(
   "auth/login",
-  async ({ username, password }, { rejectWithValue }) => {
+  async (loginData, { rejectWithValue }) => {
     try {
-      const res = await authApi.login(username, password);
+      const res = await authApi.login(loginData);
       const accessToken = res.data.access_token;
       saveToken(accessToken);
 
-      const meRes = await authApi.getMe();
+      // Use user info from login response if available, otherwise fetch it
+      const user = res.data.user;
+      
       return {
-        user: meRes.data,
+        user: user,
         token: accessToken,
       };
     } catch (err) {

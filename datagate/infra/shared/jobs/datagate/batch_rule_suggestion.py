@@ -1,7 +1,10 @@
 import argparse
+import gc
 import logging
 import os
+import sys
 import uuid
+from contextlib import suppress
 from datetime import datetime
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -208,7 +211,7 @@ def save_rules(pg_hook, rows):
             id,
             table_id,
             source,
-            status,
+            is_active,
             severity_level,
             column_name,
             constraint_name,
@@ -240,7 +243,7 @@ def save_rules(pg_hook, rows):
             str(uuid.uuid4()),
             r["table_id"],
             "system",
-            "pending",
+            False,
             "warning",
             r["column_name"],
             r["constraint_name"],
@@ -282,29 +285,73 @@ def suggest_rules_for_table(spark, pg_hook, table_info, processing_date_hour):
     return len(rows)
 
 
+def close_pg_hook(pg_hook):
+    if pg_hook is None:
+        return
+
+    with suppress(Exception):
+        conn = getattr(pg_hook, "conn", None)
+        if conn is not None and not conn.closed:
+            conn.close()
+
+
+def stop_spark_session(spark):
+    if spark is None:
+        return
+
+    with suppress(Exception):
+        spark.catalog.clearCache()
+    with suppress(Exception):
+        spark.sparkContext.cancelAllJobs()
+    with suppress(Exception):
+        spark.stop()
+
+
 def main():
     args = parse_args()
     schema_names = normalize_schema_names(args.schema_names)
     processing_date_hour = normalize_processing_date_hour(args.processing_date_hour)
 
-    pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
-    connection_config = get_connection_config(pg_hook, args.connection_name)
-    active_tables = get_active_tables(pg_hook, connection_config["catalog_name"], schema_names)
+    pg_hook = None
+    spark = None
 
-    if not active_tables:
-        logger.info("No active tables found | schemas=%s", schema_names)
-        return
-
-    spark = create_spark_session(connection_config)
     try:
+        pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
+        connection_config = get_connection_config(pg_hook, args.connection_name)
+        active_tables = get_active_tables(pg_hook, connection_config["catalog_name"], schema_names)
+
+        if not active_tables:
+            logger.info("No active tables found | schemas=%s", schema_names)
+            return 0
+
+        spark = create_spark_session(connection_config)
         total = sum(
             suggest_rules_for_table(spark, pg_hook, table, processing_date_hour)
             for table in active_tables
         )
         logger.info("Rule suggestion completed | schemas=%s | tables=%s | total_rules=%s", schema_names, len(active_tables), total)
+        return 0
+
+    except Exception:
+        logger.exception(
+            "Rule suggestion failed | connection=%s | schemas=%s | hour=%s",
+            args.connection_name,
+            schema_names,
+            processing_date_hour,
+        )
+        return 1
+
     finally:
-        spark.stop()
+        stop_spark_session(spark)
+        close_pg_hook(pg_hook)
+        gc.collect()
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    with suppress(Exception):
+        sys.stdout.flush()
+    with suppress(Exception):
+        sys.stderr.flush()
+    logging.shutdown()
+    os._exit(exit_code)

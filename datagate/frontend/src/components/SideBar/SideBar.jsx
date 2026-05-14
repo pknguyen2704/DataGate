@@ -27,32 +27,14 @@ const getNavItems = () => [
   {
     text: "Home",
     icon: <DashboardIcon />,
-    path: "/home",
+    path: "/app/home",
     permission: "dashboard:view",
   },
   {
-    text: "Data Observability",
+    text: "Data Assets",
     icon: <TablesIcon />,
-    path: "/observability",
-    permission: "observability:view",
-  },
-  {
-    text: "Data Metrics",
-    icon: <MetricsIcon />,
-    path: "/metrics",
-    permission: "threshold:view",
-  },
-  {
-    text: "Data Rules",
-    icon: <RuleIcon />,
-    path: "/rules",
-    permission: "rule:view",
-  },
-  {
-    text: "Data Quality",
-    icon: <QualityIcon />,
-    path: "/quality",
-    permission: "quality:view",
+    path: "/app/data-assets",
+    permission: "table:view",
   },
 ];
 
@@ -187,48 +169,50 @@ const SideBar = ({ isCollapsed }) => {
       <Divider />
 
       {/* Settings at the bottom */}
-      <List sx={{ px: 1, pb: 1, pt: 0.5 }}>
-        <Tooltip title={isCollapsed ? "Settings" : ""} placement="right">
-          <ListItemButton
-            selected={location.pathname.startsWith("/settings")}
-            onClick={() => navigate("/settings")}
-            sx={{
-              borderRadius: `${theme.datagate.radii.md}px`,
-              justifyContent: isCollapsed ? "center" : "flex-start",
-              px: isCollapsed ? 0 : 1.5,
-              minHeight: 42,
-              cursor: "pointer",
-              "&.Mui-selected": {
-                bgcolor: "rgba(255,255,255,0.14)",
-                color: "#FFFFFF",
-              },
-            }}
-          >
-            <ListItemIcon
+      {(hasPermission("user:view") || hasPermission("role:view") || hasPermission("connection:view") || hasPermission("model_config:view")) && (
+        <List sx={{ px: 1, pb: 1, pt: 0.5 }}>
+          <Tooltip title={isCollapsed ? "Settings" : ""} placement="right">
+            <ListItemButton
+              selected={location.pathname.startsWith("/app/settings")}
+              onClick={() => navigate("/app/settings")}
               sx={{
-                minWidth: isCollapsed ? 0 : 36,
-                display: "flex",
-                justifyContent: "center",
-                color: location.pathname.startsWith("/settings") ? "#FFFFFF" : "#BFDBFE",
+                borderRadius: `${theme.datagate.radii.md}px`,
+                justifyContent: isCollapsed ? "center" : "flex-start",
+                px: isCollapsed ? 0 : 1.5,
+                minHeight: 42,
+                cursor: "pointer",
+                "&.Mui-selected": {
+                  bgcolor: "rgba(255,255,255,0.14)",
+                  color: "#FFFFFF",
+                },
               }}
             >
-              <SettingsIcon />
-            </ListItemIcon>
-            {!isCollapsed && (
-              <ListItemText
-                primary="Settings"
-                slotProps={{
-                  primary: {
-                    fontSize: "0.875rem",
-                    fontWeight: location.pathname.startsWith("/settings") ? 700 : 500,
-                    color: location.pathname.startsWith("/settings") ? "#FFFFFF" : "#DBEAFE",
-                  },
+              <ListItemIcon
+                sx={{
+                  minWidth: isCollapsed ? 0 : 36,
+                  display: "flex",
+                  justifyContent: "center",
+                  color: location.pathname.startsWith("/app/settings") ? "#FFFFFF" : "#BFDBFE",
                 }}
-              />
-            )}
-          </ListItemButton>
-        </Tooltip>
-      </List>
+              >
+                <SettingsIcon />
+              </ListItemIcon>
+              {!isCollapsed && (
+                <ListItemText
+                  primary="Settings"
+                  slotProps={{
+                    primary: {
+                      fontSize: "0.875rem",
+                      fontWeight: location.pathname.startsWith("/app/settings") ? 700 : 500,
+                      color: location.pathname.startsWith("/app/settings") ? "#FFFFFF" : "#DBEAFE",
+                    },
+                  }}
+                />
+              )}
+            </ListItemButton>
+          </Tooltip>
+        </List>
+      )}
     </Box>
   );
 };

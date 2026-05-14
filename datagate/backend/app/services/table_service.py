@@ -1,9 +1,9 @@
 from uuid import UUID
 from fastapi import HTTPException, status
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import BatchTableMetadata, BatchTableProfiling, Connection, LightGBMAUC, RuleVerify, Table
+from app.models import BatchTableMetadata, BatchTableProfiling, Connection, LightGBMAUC, RuleVerify, Table, Rule, LightGBMParameter
 from app.schemas.table_schema import TableCreate, TableUpdate
 
 
@@ -58,25 +58,135 @@ class TableService:
                 detail="Table already registered",
             )
 
+    def get_latest_processing_hour(self, table_id: str) -> datetime | None:
+        hours = []
+        for model in (BatchTableMetadata, BatchTableProfiling, LightGBMAUC):
+            latest = (
+                self.db.query(model.processing_date_hour)
+                .filter(model.table_id == table_id)
+                .order_by(model.processing_date_hour.desc())
+                .first()
+            )
+            if latest and latest[0]:
+                hours.append(latest[0])
+        
+        # Check RuleVerify via Rule
+        latest_rule_verify = (
+            self.db.query(RuleVerify.processing_date_hour)
+            .join(RuleVerify.rule)
+            .filter(Rule.table_id == table_id)
+            .order_by(RuleVerify.processing_date_hour.desc())
+            .first()
+        )
+        if latest_rule_verify and latest_rule_verify[0]:
+            hours.append(latest_rule_verify[0])
+            
+        if not hours:
+            return None
+        return max(hours)
+
+    def get_latest_processing_hours(self, table_ids: list[str]) -> dict[str, datetime]:
+        if not table_ids:
+            return {}
+            
+        latest_dates = {}
+        for model in (BatchTableMetadata, BatchTableProfiling, LightGBMAUC):
+            rows = (
+                self.db.query(model.table_id, func.max(model.processing_date_hour))
+                .filter(model.table_id.in_(table_ids))
+                .group_by(model.table_id)
+                .all()
+            )
+            for tid, dt in rows:
+                if dt:
+                    latest_dates[tid] = max(latest_dates.get(tid, dt), dt)
+        
+        # RuleVerify is slightly different due to join
+        rule_rows = (
+            self.db.query(Rule.table_id, func.max(RuleVerify.processing_date_hour))
+            .join(RuleVerify.rule)
+            .filter(Rule.table_id.in_(table_ids))
+            .group_by(Rule.table_id)
+            .all()
+        )
+        for tid, dt in rule_rows:
+            if dt:
+                latest_dates[tid] = max(latest_dates.get(tid, dt), dt)
+                
+        return latest_dates
+
     def list_tables(
         self,
         connection_id: str | None = None,
+        catalog_name: str | None = None,
+        schema_name: str | None = None,
         is_active: bool | None = None,
-    ) -> list[Table]:
-        query = self.db.query(Table).options(selectinload(Table.connection))
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        # Join with Connection to filter out inactive connections
+        query = self.db.query(Table).join(Connection).options(selectinload(Table.connection))
+        
+        # Only hide tables from inactive connections ALWAYS
+        query = query.filter(Connection.is_active.is_(True))
+        
         if connection_id:
             query = query.filter(Table.connection_id == connection_id)
+        if catalog_name:
+            query = query.filter(Table.catalog_name == catalog_name)
+        if schema_name:
+            query = query.filter(Table.schema_name == schema_name)
+            
+        # Standard filtering: Default to active only if not specified
         if is_active is not None:
             query = query.filter(Table.is_active == is_active)
-        return query.order_by(Table.updated_at.desc()).all()
+        elif not connection_id: 
+            # If not in a specific connection management view, show only active
+            query = query.filter(Table.is_active.is_(True))
+        
+        total = query.count()
+        tables = (
+            query.order_by(Table.schema_name.asc(), Table.table_name.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        
+        # Batch fetch latest processing hours to avoid N+1 queries
+        table_ids = [str(t.id) for t in tables]
+        latest_hours = self.get_latest_processing_hours(table_ids)
+
+        # Batch fetch anomaly configs
+        anomaly_configs = (
+            self.db.query(LightGBMParameter.table_id)
+            .filter(LightGBMParameter.table_id.in_(table_ids))
+            .all()
+        )
+        anomaly_table_ids = {str(r[0]) for r in anomaly_configs}
+        
+        for table in tables:
+            tid = str(table.id)
+            table.latest_processing_date_hour = latest_hours.get(tid)
+            table.has_anomaly_config = tid in anomaly_table_ids
+            
+        return {
+            "items": tables,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
 
     def get_table_by_id(self, table_id: str) -> Table | None:
-        return (
+        table = (
             self.db.query(Table)
             .options(selectinload(Table.connection))
             .filter(Table.id == table_id)
             .first()
         )
+        if table:
+            table.latest_processing_date_hour = self.get_latest_processing_hour(table_id)
+            table.has_anomaly_config = self.db.query(LightGBMParameter).filter(LightGBMParameter.table_id == table_id).first() is not None
+        return table
 
     def get_table_or_404(self, table_id: str) -> Table:
         table = self.get_table_by_id(table_id)
@@ -86,6 +196,19 @@ class TableService:
                 detail="Table not found",
             )
         return table
+
+    def validate_table_accessible(self, table: Table) -> None:
+        if not table.connection.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Connection is inactive",
+            )
+        
+        if not table.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Table is inactive",
+            )
 
     def create_table(self, data: TableCreate, owner_id: str) -> Table:
         connection = self._get_connection_or_404(data.connection_id)

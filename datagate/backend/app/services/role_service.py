@@ -16,13 +16,23 @@ class RoleService:
             .all()
         )
 
-    def list_roles(self) -> list[Role]:
-        return (
-            self.db.query(Role)
-            .options(selectinload(Role.permissions))
-            .order_by(Role.created_at.desc())
+    def list_roles(self, page: int = 1, page_size: int = 50) -> dict:
+        query = self.db.query(Role).options(selectinload(Role.permissions))
+        
+        total = query.count()
+        items = (
+            query.order_by(Role.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
             .all()
         )
+        
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
 
     def get_role_by_id(self, role_id: str) -> Role | None:
         return (
@@ -108,7 +118,8 @@ class RoleService:
         if role.is_system:
             raise BadRequestError("Cannot delete a system role")
 
-        self.db.delete(role)
+        # Soft delete/deactivate
+        role.is_active = False
         self.db.commit()
 
     def assign_permissions_to_role(

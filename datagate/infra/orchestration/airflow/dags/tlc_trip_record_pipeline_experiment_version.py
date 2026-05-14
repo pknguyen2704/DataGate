@@ -17,8 +17,8 @@ from data_quality_gate import check_data_quality_gate
 LOCAL_TZ = pendulum.timezone("Asia/Ho_Chi_Minh")
 
 
-SIM_START = "2025-01-28 12:00:00"
-SIM_END = "2025-02-01 00:00:00"
+SIM_START = "2025-01-02 12:00:00"
+SIM_END = "2025-01-15 12:00:00"
 SIM_STEP_HOURS = 12
 SIM_VAR_NAME = "yellow_tripdata_next_processing_date_hour"
 
@@ -56,6 +56,7 @@ default_args = {
     "start_date": pendulum.datetime(2024, 1, 1, tz=LOCAL_TZ),
     "retries": 1,
     "retry_delay": timedelta(minutes=2),
+    "execution_timeout": timedelta(hours=2),
     "on_failure_callback": [task_fail_slack_alert],
 }
 
@@ -83,6 +84,7 @@ with DAG(
     dag_id="yellow_tripdata_pipeline_experiment_version",
     default_args=default_args,
     schedule=timedelta(minutes=10),
+    dagrun_timeout=timedelta(hours=6),
     catchup=False,
     max_active_runs=1,
     is_paused_upon_creation=True,

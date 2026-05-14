@@ -5,6 +5,7 @@ class PermissionCode:
     USER_CREATE = "user:create"
     USER_UPDATE = "user:update"
     USER_DELETE = "user:delete"
+    USER_MANAGE = "user:manage"
 
     ROLE_VIEW = "role:view"
     ROLE_CREATE = "role:create"
@@ -17,6 +18,7 @@ class PermissionCode:
     CONNECTION_UPDATE = "connection:update"
     CONNECTION_DELETE = "connection:delete"
     CONNECTION_TEST = "connection:test"
+    CONNECTION_MANAGE = "connection:manage"
 
     TABLE_VIEW = "table:view"
     TABLE_CREATE = "table:create"
@@ -57,67 +59,71 @@ class PermissionCode:
     JOB_VIEW = "job:view"
     JOB_TRIGGER = "job:trigger"
 
+    MODEL_CONFIG_VIEW = "model_config:view"
+    MODEL_CONFIG_MANAGE = "model_config:manage"
+
     DASHBOARD_VIEW = "dashboard:view"
+    HOME_VIEW = "home:view"
 
 
 ALL_PERMISSIONS = [
-    {"code": PermissionCode.ADMIN, "name": "Super Admin", "group": "System"},
+    {"code": PermissionCode.ADMIN, "name": "System Administrator (Super Admin)", "group": "System"},
 
     {"code": PermissionCode.USER_VIEW, "name": "View Users", "group": "User Management"},
     {"code": PermissionCode.USER_CREATE, "name": "Create User", "group": "User Management"},
     {"code": PermissionCode.USER_UPDATE, "name": "Update User", "group": "User Management"},
     {"code": PermissionCode.USER_DELETE, "name": "Delete User", "group": "User Management"},
+    {"code": PermissionCode.USER_MANAGE, "name": "Manage Users, Roles and Permissions", "group": "User Management"},
 
-    {"code": PermissionCode.ROLE_VIEW, "name": "View Roles", "group": "Role Management"},
-    {"code": PermissionCode.ROLE_CREATE, "name": "Create Role", "group": "Role Management"},
-    {"code": PermissionCode.ROLE_UPDATE, "name": "Update Role", "group": "Role Management"},
-    {"code": PermissionCode.ROLE_DELETE, "name": "Delete Role", "group": "Role Management"},
-    {"code": PermissionCode.ROLE_ASSIGN_PERMISSION, "name": "Assign Permission to Role", "group": "Role Management"},
+    {"code": PermissionCode.ROLE_VIEW, "name": "View Roles", "group": "User Management"},
+    {"code": PermissionCode.ROLE_CREATE, "name": "Create Role", "group": "User Management"},
+    {"code": PermissionCode.ROLE_UPDATE, "name": "Update Role", "group": "User Management"},
+    {"code": PermissionCode.ROLE_DELETE, "name": "Delete Role", "group": "User Management"},
+    {"code": PermissionCode.ROLE_ASSIGN_PERMISSION, "name": "Assign Permissions to Role", "group": "User Management"},
 
-    {"code": PermissionCode.CONNECTION_VIEW, "name": "View Connections", "group": "Connection Management"},
-    {"code": PermissionCode.CONNECTION_CREATE, "name": "Create Connection", "group": "Connection Management"},
-    {"code": PermissionCode.CONNECTION_UPDATE, "name": "Update Connection", "group": "Connection Management"},
-    {"code": PermissionCode.CONNECTION_DELETE, "name": "Delete Connection", "group": "Connection Management"},
-    {"code": PermissionCode.CONNECTION_TEST, "name": "Test Connection", "group": "Connection Management"},
+    {"code": PermissionCode.CONNECTION_VIEW, "name": "View Connections", "group": "Data Connection Management"},
+    {"code": PermissionCode.CONNECTION_CREATE, "name": "Create Connection", "group": "Data Connection Management"},
+    {"code": PermissionCode.CONNECTION_UPDATE, "name": "Update Connection", "group": "Data Connection Management"},
+    {"code": PermissionCode.CONNECTION_DELETE, "name": "Disable/Delete Connection", "group": "Data Connection Management"},
+    {"code": PermissionCode.CONNECTION_TEST, "name": "Test Connection", "group": "Data Connection Management"},
+    {"code": PermissionCode.CONNECTION_MANAGE, "name": "Manage System Connections", "group": "Data Connection Management"},
 
-    {"code": PermissionCode.TABLE_VIEW, "name": "View Tables", "group": "Table Management"},
-    {"code": PermissionCode.TABLE_CREATE, "name": "Register Table", "group": "Table Management"},
-    {"code": PermissionCode.TABLE_UPDATE, "name": "Update Table", "group": "Table Management"},
-    {"code": PermissionCode.TABLE_DELETE, "name": "Delete Table", "group": "Table Management"},
-    {"code": PermissionCode.TABLE_GRANT_ACCESS, "name": "Grant Table Access", "group": "Table Management"},
-    {"code": PermissionCode.TABLE_REVOKE_ACCESS, "name": "Revoke Table Access", "group": "Table Management"},
+    {"code": PermissionCode.TABLE_VIEW, "name": "View Table List", "group": "Metadata & Profiling"},
+    {"code": PermissionCode.TABLE_CREATE, "name": "Register New Table", "group": "Metadata & Profiling"},
+    {"code": PermissionCode.TABLE_UPDATE, "name": "Update Table Info", "group": "Metadata & Profiling"},
+    {"code": PermissionCode.TABLE_DELETE, "name": "Delete Table Registration", "group": "Metadata & Profiling"},
 
-    {"code": PermissionCode.TABLE_MANAGE_THRESHOLDS, "name": "Manage Table Thresholds", "group": "Table Owner"},
-    {"code": PermissionCode.TABLE_MANAGE_RULES, "name": "Manage Table Rules", "group": "Table Owner"},
+    {"code": PermissionCode.METADATA_VIEW, "name": "View Metadata", "group": "Metadata & Profiling"},
+    {"code": PermissionCode.METADATA_COLLECT, "name": "Collect Metadata", "group": "Metadata & Profiling"},
+    {"code": PermissionCode.OBSERVABILITY_VIEW, "name": "View Data Observability", "group": "Metadata & Profiling"},
 
-    {"code": PermissionCode.METADATA_VIEW, "name": "View Metadata", "group": "Metadata"},
-    {"code": PermissionCode.METADATA_COLLECT, "name": "Collect Metadata", "group": "Metadata"},
-    {"code": PermissionCode.OBSERVABILITY_VIEW, "name": "View Observability", "group": "Metadata"},
+    {"code": PermissionCode.RULE_VIEW, "name": "View Data Rules", "group": "Data Rule Management"},
+    {"code": PermissionCode.RULE_CREATE, "name": "Create Draft Rule", "group": "Data Rule Management"},
+    {"code": PermissionCode.RULE_UPDATE, "name": "Update Draft Rule", "group": "Data Rule Management"},
+    {"code": PermissionCode.RULE_DELETE, "name": "Delete Data Rule", "group": "Data Rule Management"},
+    {"code": PermissionCode.RULE_ENABLE_DISABLE, "name": "Approve & Enable/Disable Rules", "group": "Data Rule Management"},
+    {"code": PermissionCode.RULE_SUGGEST, "name": "Suggest Automatic Rules", "group": "Data Rule Management"},
 
-    {"code": PermissionCode.RULE_VIEW, "name": "View Rules", "group": "Rule Management"},
-    {"code": PermissionCode.RULE_CREATE, "name": "Create Rule", "group": "Rule Management"},
-    {"code": PermissionCode.RULE_UPDATE, "name": "Update Rule", "group": "Rule Management"},
-    {"code": PermissionCode.RULE_DELETE, "name": "Delete Rule", "group": "Rule Management"},
-    {"code": PermissionCode.RULE_ENABLE_DISABLE, "name": "Enable/Disable Rule", "group": "Rule Management"},
-    {"code": PermissionCode.RULE_SUGGEST, "name": "Suggest Rules", "group": "Rule Management"},
+    {"code": PermissionCode.QUALITY_VIEW, "name": "View Data Quality Results", "group": "Data Quality Management"},
+    {"code": PermissionCode.QUALITY_RUN, "name": "Update Resolution Status (Resolve)", "group": "Data Quality Management"},
 
-    {"code": PermissionCode.QUALITY_VIEW, "name": "View Quality Results", "group": "Data Quality"},
-    {"code": PermissionCode.QUALITY_RUN, "name": "Run Quality Validation", "group": "Data Quality"},
+    {"code": PermissionCode.THRESHOLD_VIEW, "name": "View Warning Thresholds", "group": "Threshold Management"},
+    {"code": PermissionCode.THRESHOLD_CREATE, "name": "Create Warning Threshold", "group": "Threshold Management"},
+    {"code": PermissionCode.THRESHOLD_UPDATE, "name": "Update Warning Threshold", "group": "Threshold Management"},
+    {"code": PermissionCode.THRESHOLD_DELETE, "name": "Delete Warning Threshold", "group": "Threshold Management"},
 
-    {"code": PermissionCode.THRESHOLD_VIEW, "name": "View Thresholds", "group": "Threshold Management"},
-    {"code": PermissionCode.THRESHOLD_CREATE, "name": "Create Threshold", "group": "Threshold Management"},
-    {"code": PermissionCode.THRESHOLD_UPDATE, "name": "Update Threshold", "group": "Threshold Management"},
-    {"code": PermissionCode.THRESHOLD_DELETE, "name": "Delete Threshold", "group": "Threshold Management"},
+    {"code": PermissionCode.ANOMALY_VIEW, "name": "View Anomaly Detection Results", "group": "Anomaly Detection Management"},
+    {"code": PermissionCode.ANOMALY_RUN, "name": "Run Anomaly Detection", "group": "Anomaly Detection Management"},
 
-    {"code": PermissionCode.ANOMALY_VIEW, "name": "View Anomaly Results", "group": "Anomaly Detection"},
-    {"code": PermissionCode.ANOMALY_RUN, "name": "Run Anomaly Detection", "group": "Anomaly Detection"},
+    {"code": PermissionCode.ALERT_VIEW, "name": "View Alerts", "group": "System"},
+    {"code": PermissionCode.ALERT_UPDATE_STATUS, "name": "Update Alert Status", "group": "System"},
 
-    {"code": PermissionCode.ALERT_VIEW, "name": "View Alerts", "group": "Alert Management"},
-    {"code": PermissionCode.ALERT_UPDATE_STATUS, "name": "Update Alert Status", "group": "Alert Management"},
-    {"code": PermissionCode.ALERT_ACKNOWLEDGE, "name": "Acknowledge Alert", "group": "Alert Management"},
+    {"code": PermissionCode.JOB_VIEW, "name": "View Schedules (Jobs)", "group": "System"},
+    {"code": PermissionCode.JOB_TRIGGER, "name": "Trigger Job Manually", "group": "System"},
 
-    {"code": PermissionCode.JOB_VIEW, "name": "View Job Runs", "group": "Job Orchestration"},
-    {"code": PermissionCode.JOB_TRIGGER, "name": "Trigger Jobs", "group": "Job Orchestration"},
+    {"code": PermissionCode.MODEL_CONFIG_VIEW, "name": "View Model Parameters", "group": "Model Parameter Management"},
+    {"code": PermissionCode.MODEL_CONFIG_MANAGE, "name": "Manage Model Parameters", "group": "Model Parameter Management"},
 
-    {"code": PermissionCode.DASHBOARD_VIEW, "name": "View Dashboard", "group": "Dashboard"},
+    {"code": PermissionCode.DASHBOARD_VIEW, "name": "View Monitoring Dashboard", "group": "Dashboard/Grafana"},
+    {"code": PermissionCode.HOME_VIEW, "name": "View System Summary (Home)", "group": "Dashboard/Grafana"},
 ]

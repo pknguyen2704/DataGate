@@ -1,5 +1,6 @@
 import logging
 import uuid
+from contextlib import suppress
 from datetime import datetime
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -177,32 +178,46 @@ def save_metadata_results(pg_hook, rows):
     conn.commit()
 
 
+def close_pg_hook(pg_hook):
+    if pg_hook is None:
+        return
+
+    with suppress(Exception):
+        conn = getattr(pg_hook, "conn", None)
+        if conn is not None and not conn.closed:
+            conn.close()
+
+
 def evaluate_metadata_metrics(datagate_db_conn_id, connection_name, schema_name, processing_date_hour):
     processing_date_hour = normalize_processing_date_hour(processing_date_hour)
     pg_hook = PostgresHook(postgres_conn_id=datagate_db_conn_id)
 
-    config = get_connection_config(pg_hook, connection_name)
-    table_ids = get_active_table_ids(pg_hook, config["catalog_name"], schema_name)
+    try:
+        config = get_connection_config(pg_hook, connection_name)
+        table_ids = get_active_table_ids(pg_hook, config["catalog_name"], schema_name)
 
-    if not table_ids:
-        logger.info("No active tables found | connection=%s | schema=%s", connection_name, schema_name)
+        if not table_ids:
+            logger.info("No active tables found | connection=%s | schema=%s", connection_name, schema_name)
+            return True
+
+        rows = get_metadata_rows(pg_hook, table_ids, processing_date_hour)
+        results = build_metadata_results(rows, processing_date_hour)
+        save_metadata_results(pg_hook, results)
+
+        passed = sum(row[4] == "pass" for row in results)
+        failed = sum(row[4] == "fail" for row in results)
+
+        logger.info(
+            "Metadata metrics evaluated | connection=%s | schema=%s | hour=%s | total=%s | pass=%s | fail=%s",
+            connection_name,
+            schema_name,
+            processing_date_hour,
+            len(results),
+            passed,
+            failed,
+        )
+
         return True
 
-    rows = get_metadata_rows(pg_hook, table_ids, processing_date_hour)
-    results = build_metadata_results(rows, processing_date_hour)
-    save_metadata_results(pg_hook, results)
-
-    passed = sum(row[4] == "pass" for row in results)
-    failed = sum(row[4] == "fail" for row in results)
-
-    logger.info(
-        "Metadata metrics evaluated | connection=%s | schema=%s | hour=%s | total=%s | pass=%s | fail=%s",
-        connection_name,
-        schema_name,
-        processing_date_hour,
-        len(results),
-        passed,
-        failed,
-    )
-
-    return True
+    finally:
+        close_pg_hook(pg_hook)

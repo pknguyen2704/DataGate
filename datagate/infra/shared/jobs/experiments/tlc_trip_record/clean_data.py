@@ -1,5 +1,9 @@
 import argparse
+import gc
 import logging
+import os
+import sys
+from contextlib import suppress
 from datetime import datetime
 from functools import reduce
 from operator import or_
@@ -161,6 +165,18 @@ def write_to_silver(df, target_table):
     df.writeTo(full_table).overwritePartitions()
 
 
+def stop_spark_session(spark):
+    if spark is None:
+        return
+
+    with suppress(Exception):
+        spark.catalog.clearCache()
+    with suppress(Exception):
+        spark.sparkContext.cancelAllJobs()
+    with suppress(Exception):
+        spark.stop()
+
+
 def main():
     start = perf_counter()
     args = parse_args()
@@ -169,9 +185,10 @@ def main():
     target_table = validate_table_name(TARGET_TABLE, "TARGET_TABLE")
     processing_date_hour = normalize_datetime(args.processing_date_hour)
 
-    spark = create_spark_session()
+    spark = None
 
     try:
+        spark = create_spark_session()
         bronze_df = read_bronze_batch(spark, source_table, processing_date_hour)
         before_count = bronze_df.count()
 
@@ -183,10 +200,26 @@ def main():
         write_to_silver(silver_df, target_table)
 
         logger.info("[Job Completed] %s finished in %.3f seconds", JOB_NAME, perf_counter() - start)
+        return 0
+
+    except Exception:
+        logger.exception(
+            "[Job Failed] %s | processing_date_hour=%s",
+            JOB_NAME,
+            processing_date_hour,
+        )
+        return 1
 
     finally:
-        spark.stop()
+        stop_spark_session(spark)
+        gc.collect()
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    with suppress(Exception):
+        sys.stdout.flush()
+    with suppress(Exception):
+        sys.stderr.flush()
+    logging.shutdown()
+    os._exit(exit_code)

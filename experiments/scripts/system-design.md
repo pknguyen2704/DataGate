@@ -13,7 +13,7 @@
 + Tổng đang có bao nhiêu pass/fail (warning/critical) ở các bảng trên các bảng ghi _verify.py
 ## Data Assets
 - Danh sách các bảng đang được tích hợp/Quản lý chất lượng dữ liệu
-+ Có thể filter theo Connection/Catalog/Layer
++ Có thể filter theo Connection/Catalog/Schema
 - Sau khi chọn một bảng, sẽ theo dõi các tab cụ thể của bảng đó
 ### Observability
 - Tích hợp bảng Grafana đã được thiết kế vào
@@ -43,7 +43,7 @@
 ++ Description
 ++ Created_by
 ++ Last modified
-#### Đối với anomaly detection: (Chỉ những layer/bảng sử dụng chức năng này mới hiện tab này)
+#### Đối với anomaly detection: (Chỉ những schema/bảng sử dụng chức năng này mới hiện tab này)
 ++ auc_threshold
 ++ Severity
 ++ Status
@@ -69,7 +69,7 @@
 
 - Có filter theo processing_date_hour để lấy kết quả của một processing_date_hour đó 
 - Có một cột để cập nhật trạng thái là đã xử lý hay chưa
-- Lọc theo bảng, layer, processing_date_hour, status, severity
+- Lọc theo bảng, schema, processing_date_hour, status, severity
 - Xem kết quả metadata metrics verify
 - Xem kết quả profiling metrics verify
 - Xem kết quả rule verify
@@ -79,6 +79,7 @@
 ## Setting
 ### Platform Connection
 - Quản lý thông tin kết nối đến nền tảng dữ liệu lớn. Mỗi connection có thể bao gồm nhiều bảng dữ liệu được hệ thống theo dõi. (Cho phép cập nhật thông tin connection, có thể test connection, có thể thêm hoặc loại bỏ các bảng muốn hệ thống này quản lý)
+- Có thể tạo connection (Có form tạo connection)
 ### Model Configuration
 + Hiển thị dạng bảng (dòng dữ liệu là mỗi bảng còn các cột là các siêu tham số)
 + Có thể chỉnh sửa, update, có tính năng để upload Json, tự động mapping
@@ -95,24 +96,23 @@
 - Quản lý người dùng (Thông tin, role,...)
 ## Phân quyền
 Bảng phân quyền
-| Nhóm chức năng                    |                                       Quyền thao tác | Admin | Data Engineer | Data Analyst | Ghi chú                                                                                       |
-| --------------------------------- | ---------------------------------------------------: | :---: | :-----------: | :----------: | --------------------------------------------------------------------------------------------- |
-| Đăng nhập hệ thống                |                                    Truy cập hệ thống |   Có  |       Có      |      Có      | Tất cả người dùng phải đăng nhập trước khi sử dụng các chức năng quản trị.                    |
-| Phân quyền người dùng             |             Xem danh sách người dùng, vai trò, quyền |   Có  |     Không     |     Không    | Chỉ Admin được quản lý phân quyền.                                                            |
-| Phân quyền người dùng             |                 Thêm, sửa, xóa người dùng và vai trò |   Có  |     Không     |     Không    | Tránh người dùng không có thẩm quyền thay đổi quyền truy cập.                                 |
-| Quản lý kết nối nền tảng dữ liệu  |                                Xem thông tin kết nối |   Có  |       Có      |      Có      | Data Engineer và Data Analyst có thể xem để phục vụ theo dõi hệ thống.                        |
-| Quản lý kết nối nền tảng dữ liệu  |                       Thêm, sửa, vô hiệu hóa kết nối |   Có  |     Không     |     Không    | Theo rule: Data Engineer và Data Analyst không được chỉnh sửa platform connection.            |
-| Quản lý tham số mô hình           |                                  Xem tham số mô hình |   Có  |       Có      |      Có      | Cho phép các vai trò theo dõi cấu hình mô hình phát hiện bất thường.                          |
-| Quản lý tham số mô hình           |                       Thêm, sửa, xóa tham số mô hình |   Có  |       Có      |     Không    | Data Analyst chủ yếu có quyền xem, không nên chỉnh sửa cấu hình kỹ thuật.                     |
-| Xem siêu dữ liệu và hồ sơ dữ liệu |               Xem metadata, profiling, lịch sử batch |   Có  |       Có      |      Có      | Đây là nhóm chức năng theo dõi, phù hợp cho cả ba vai trò.                                    |
-| Quản lý ngưỡng cảnh báo           |                                  Xem ngưỡng cảnh báo |   Có  |       Có      |      Có      | Data Analyst có thể xem để hiểu tiêu chí đánh giá.                                            |
-| Quản lý ngưỡng cảnh báo           |                       Thêm, sửa, xóa ngưỡng cảnh báo |   Có  |       Có      |     Không    | Theo rule: Data Analyst không được chỉnh sửa các ngưỡng.                                      |
-| Quản lý luật dữ liệu              |                                   Xem danh sách luật |   Có  |       Có      |      Có      | Tất cả vai trò đều có thể xem luật dữ liệu.                                                   |
-| Quản lý luật dữ liệu              |                               Thêm, sửa luật dữ liệu |   Có  |       Có      |      Có      | Theo rule: Data Analyst có thể chỉnh sửa rule.                                                |
-| Quản lý luật dữ liệu              |                    Xóa hoặc vô hiệu hóa luật dữ liệu |   Có  |       Có      |     Có       | Data Analyst chỉ nên được chỉnh sửa nội dung luật, không nên xóa/vô hiệu hóa luật quan trọng. |
-| Quản lý chất lượng dữ liệu        |                      Xem kết quả kiểm tra chất lượng |   Có  |       Có      |      Có      | Phù hợp với nhu cầu giám sát dữ liệu.                                                         |
-| Quản lý chất lượng dữ liệu        | Cập nhật trạng thái xử lý kết quả chất lượng dữ liệu |   Có  |       Có      |     Không    | Đây là thao tác ảnh hưởng đến vận hành, nên giới hạn cho Admin và Data Engineer.              |
-| Dashboard/Grafana                 |                               Xem dashboard giám sát |   Có  |       Có      |      Có      | Chức năng phục vụ quan sát tổng quan chất lượng dữ liệu.                                      |
+| Nhóm chức năng                    |                                        Quyền thao tác | Admin | Data Engineer | Data Analyst | Ghi chú                                                                                 |
+| --------------------------------- | ----------------------------------------------------: | :---: | :-----------: | :----------: | --------------------------------------------------------------------------------------- |
+| Đăng nhập hệ thống                |                                     Truy cập hệ thống |   Có  |       Có      |      Có      | Tất cả người dùng phải đăng nhập trước khi sử dụng hệ thống.                            |
+| Phân quyền người dùng             |      Xem, thêm, sửa, xóa người dùng, vai trò và quyền |   Có  |     Không     |     Không    | Chỉ Admin được quản lý phân quyền người dùng.                                           |
+| Quản lý kết nối nền tảng dữ liệu  |                                 Xem thông tin kết nối |   Có  |       Có      |     Không    | Data Engineer được xem để phục vụ vận hành; Data Analyst không cần truy cập connection. |
+| Quản lý kết nối nền tảng dữ liệu  |                        Thêm, sửa, vô hiệu hóa kết nối |   Có  |     Không     |     Không    | Chỉ Admin được thay đổi platform connection.                                            |
+| Quản lý tham số mô hình           |                                   Xem tham số mô hình |   Có  |       Có      |      Có      | Các vai trò có thể xem để hiểu cấu hình phát hiện bất thường.                           |
+| Quản lý tham số mô hình           |                        Thêm, sửa, xóa tham số mô hình |   Có  |       Có      |     Không    | Tham số mô hình là cấu hình kỹ thuật, chỉ Admin và Data Engineer được chỉnh sửa.        |
+| Xem siêu dữ liệu và hồ sơ dữ liệu |              Xem metadata, profiling và lịch sử batch |   Có  |       Có      |      Có      | Cả ba vai trò đều có thể theo dõi trạng thái dữ liệu.                                   |
+| Quản lý ngưỡng cảnh báo           |                                   Xem ngưỡng cảnh báo |   Có  |       Có      |      Có      | Data Analyst được xem để hiểu tiêu chí đánh giá chất lượng dữ liệu.                     |
+| Quản lý ngưỡng cảnh báo           |                        Thêm, sửa, xóa ngưỡng cảnh báo |   Có  |       Có      |     Không    | Ngưỡng là cấu hình vận hành, chỉ Admin và Data Engineer được chỉnh sửa.                 |
+| Quản lý luật dữ liệu              |             Xem, thêm, sửa rule nháp và gửi phê duyệt |   Có  |       Có      |      Có      | Data Analyst được đề xuất và chỉnh sửa luật ở trạng thái nháp.                          |
+| Quản lý luật dữ liệu              |                Phê duyệt, bật/tắt và xóa luật dữ liệu |   Có  |       Có      |     Không    | Các thao tác này ảnh hưởng trực tiếp đến quy trình kiểm tra chất lượng dữ liệu.         |
+| Quản lý chất lượng dữ liệu        | Xem kết quả kiểm tra và chi tiết lỗi warning/critical |   Có  |       Có      |      Có      | Cả ba vai trò đều có thể xem kết quả để giám sát và phân tích nguyên nhân.              |
+| Quản lý chất lượng dữ liệu        |  Cập nhật trạng thái xử lý kết quả chất lượng dữ liệu |   Có  |       Có      |     Không    | Thao tác resolve là thao tác vận hành, giới hạn cho Admin và Data Engineer.             |
+| Dashboard/Grafana                 |                                Xem dashboard giám sát |   Có  |       Có      |      Có      | Chức năng phục vụ quan sát tổng quan chất lượng dữ liệu.                                |
+
 
 
 # API
@@ -163,7 +163,7 @@ Response nên trả về:
 Query gợi ý:
 
 ```text
-GET /api/v1/home/summary?connection_id=&catalog_name=&schema_name=&layer=&from_time=&to_time=
+GET /api/v1/home/summary?connection_id=&catalog_name=&schema_name=&from_time=&to_time=
 ```
 
 Response gợi ý:
@@ -192,7 +192,7 @@ Response gợi ý:
 Query filter:
 
 ```text
-GET /api/v1/data-assets/tables?connection_id=&catalog_name=&schema_name=&layer=&is_active=true&page=1&page_size=20
+GET /api/v1/data-assets/tables?connection_id=&catalog_name=&schema_name=&is_active=true&page=1&page_size=20
 ```
 
 Response gợi ý:
@@ -206,7 +206,6 @@ Response gợi ý:
       "catalog_name": "iceberg",
       "schema_name": "silver",
       "table_name": "yellow_tripdata",
-      "layer": "silver",
       "is_active": true,
       "latest_processing_date_hour": "2025-01-15 12:00:00"
     }
@@ -362,7 +361,7 @@ Lưu ý quyền: Data Analyst được tạo/sửa nội dung rule, nhưng khôn
 Query filter:
 
 ```text
-GET /api/v1/data-quality/results?table_id=&layer=&processing_date_hour=&status=&severity_level=&result_type=
+GET /api/v1/data-quality/results?table_id=&schema_name=&processing_date_hour=&status=&severity_level=&result_type=
 ```
 
 Trong đó result_type có thể là:

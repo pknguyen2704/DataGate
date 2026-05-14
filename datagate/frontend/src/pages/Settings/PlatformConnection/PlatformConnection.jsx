@@ -3,16 +3,18 @@ import {
   Box, Button, Table, TableBody, TableCell, TableHead, TableRow, 
   Paper, Typography, CircularProgress, Stack, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Switch, FormControlLabel, Grid
+  Switch, FormControlLabel, Grid, Tooltip, TablePagination, TableContainer,
+  MenuItem, Select, FormControl, InputLabel, Chip
 } from "@mui/material";
 import { 
-  RefreshOutlined, AddOutlined, EditOutlined, DeleteOutline, 
+  RefreshOutlined, AddOutlined, EditOutlined, 
   ArrowBackOutlined, VisibilityOutlined, SaveOutlined, 
-  StorageOutlined, SearchOutlined, CheckCircleOutline, CancelOutlined
+  StorageOutlined, SearchOutlined, CheckCircleOutline, CancelOutlined,
+  BugReportOutlined, PowerSettingsNewOutlined, DeleteOutline
 } from "@mui/icons-material";
-import { MenuItem, Select, FormControl, InputLabel } from "@mui/material";
+import { useSelector } from "react-redux";
 import { connectionsApi } from "~/apis/connectionsApi";
-import { tablesApi } from "~/apis/tablesApi";
+import { dataAssetsApi } from "~/apis/dataAssetsApi";
 import { StateBox, StatusChip, TabContainer, TabButton } from "~/components/DataGate/Page";
 import { useApiResource } from "~/hooks/useApiResource";
 import { toast } from "react-toastify";
@@ -34,13 +36,26 @@ const INITIAL_CONNECTION = {
 };
 
 function PlatformConnection() {
+  const { user } = useSelector(state => state.auth);
+  const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
+  const hasPerm = user?.permissions?.some(p => p === "connection:manage" || p?.code === "connection:manage");
+  const canManage = isAdmin || hasPerm;
+  
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
-  const connections = useApiResource(() => connectionsApi.list());
+  
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  
+  const connections = useApiResource(() => connectionsApi.list({ 
+    page: page + 1, 
+    page_size: pageSize 
+  }), [page, pageSize]);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_CONNECTION);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const handleOpenAdd = () => {
     setForm(INITIAL_CONNECTION);
@@ -50,32 +65,52 @@ function PlatformConnection() {
 
   const handleOpenEdit = (row) => {
     setForm({
-      connection_name: row.connection_name || "",
-      description: row.description || "",
-      trino_host: row.trino_host || "",
-      trino_port: row.trino_port || 8080,
-      trino_user: row.trino_user || "admin",
-      trino_password: row.trino_password || "",
-      iceberg_rest_url: row.iceberg_rest_url || "",
-      iceberg_catalog_name: row.iceberg_catalog_name || "iceberg",
-      iceberg_warehouse: row.iceberg_warehouse || "",
-      minio_endpoint_url: row.minio_endpoint_url || "",
-      minio_access_key: row.minio_access_key || "",
-      minio_secret_key: row.minio_secret_key || "",
-      is_active: row.is_active ?? true
+      ...row,
+      trino_password: "", // Don't show old password
+      minio_secret_key: "", // Don't show old secret
     });
     setEditingId(row.id);
     setOpenDialog(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure? This will remove all associated metadata.")) return;
+  const handleToggleActive = async (row) => {
     try {
-      await connectionsApi.delete(id);
-      toast.success("Deleted");
+      if (row.is_active) {
+        await connectionsApi.deactivate(row.id);
+        toast.success("Deactivated");
+      } else {
+        await connectionsApi.activate(row.id);
+        toast.success("Activated");
+      }
       connections.reload();
     } catch (err) {
-      toast.error("Failed to delete");
+      toast.error("Action failed");
+    }
+  };
+
+  const handleDeactivate = async (id) => {
+    if (!window.confirm("Are you sure you want to deactivate this connection?")) return;
+    try {
+      await connectionsApi.deactivate(id);
+      toast.success("Deactivated");
+      connections.reload();
+    } catch (err) {
+      toast.error("Failed to deactivate");
+    }
+  };
+
+  const handleTest = async () => {
+    if (editingId) {
+      setTesting(true);
+      try {
+        const res = await connectionsApi.test(editingId);
+        if (res.data.success) toast.success(res.data.message);
+        else toast.error(res.data.message);
+      } catch (err) {
+        toast.error("Test failed: " + (err.response?.data?.detail || err.message));
+      } finally {
+        setTesting(false);
+      }
     }
   };
 
@@ -92,7 +127,7 @@ function PlatformConnection() {
       setOpenDialog(false);
       connections.reload();
     } catch (err) {
-      toast.error("Save failed");
+      toast.error(err.response?.data?.detail || "Save failed");
     } finally {
       setSaving(false);
     }
@@ -103,11 +138,16 @@ function PlatformConnection() {
       <ConnectionDetail 
         connectionId={selectedConnectionId} 
         onBack={() => setSelectedConnectionId(null)} 
+        canManage={canManage}
+        onToggleActive={handleToggleActive}
       />
     );
   }
 
-  const rows = connections.data || [];
+  let rows = [];
+  if (connections.data && connections.data.items) {
+    rows = connections.data.items;
+  }
 
   return (
     <Box>
@@ -115,250 +155,265 @@ function PlatformConnection() {
         <Button startIcon={<RefreshOutlined />} variant="outlined" size="small" onClick={connections.reload} sx={{ borderRadius: 1.5 }}>
           Refresh
         </Button>
-        <Button startIcon={<AddOutlined />} variant="contained" size="small" onClick={handleOpenAdd} sx={{ borderRadius: 1.5 }}>
-          Add Connection
-        </Button>
+        {canManage && (
+          <Button startIcon={<AddOutlined />} variant="contained" size="small" onClick={handleOpenAdd} sx={{ borderRadius: 1.5 }}>
+            Add Connection
+          </Button>
+        )}
       </Box>
 
       <StateBox loading={connections.loading} error={connections.error} empty={!rows.length}>
-        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <Table size="small">
             <TableHead>
-              <TableRow>
-                <TableCell sx={{ bgcolor: '#1E40AF !important', color: 'white !important', fontWeight: 'bold' }}>Name</TableCell>
-                <TableCell sx={{ bgcolor: '#1E40AF !important', color: 'white !important', fontWeight: 'bold' }}>Trino Host</TableCell>
-                <TableCell sx={{ bgcolor: '#1E40AF !important', color: 'white !important', fontWeight: 'bold' }}>Catalog</TableCell>
-                <TableCell sx={{ bgcolor: '#1E40AF !important', color: 'white !important', fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell align="right" sx={{ bgcolor: '#1E40AF !important', color: 'white !important', fontWeight: 'bold' }}>Action</TableCell>
+              <TableRow sx={{ bgcolor: 'primary.main' }}>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Connection Name</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Description</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.id} hover>
-                  <TableCell onClick={() => setSelectedConnectionId(row.id)} sx={{ cursor: 'pointer', fontWeight: 500 }}>{row.connection_name}</TableCell>
-                  <TableCell>{row.trino_host}:{row.trino_port}</TableCell>
-                  <TableCell>{row.iceberg_catalog_name}</TableCell>
-                  <TableCell><StatusChip value={row.is_active ? "active" : "inactive"} /></TableCell>
+                  <TableCell onClick={() => setSelectedConnectionId(row.id)} sx={{ cursor: 'pointer', fontWeight: 600 }}>{row.connection_name}</TableCell>
+                  <TableCell>{row.description || "—"}</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Switch 
+                        size="small" 
+                        checked={row.is_active} 
+                        onChange={() => handleToggleActive(row)}
+                        color="success"
+                        disabled={!canManage}
+                      />
+                      <Chip 
+                        label={row.is_active ? "Active" : "Inactive"} 
+                        size="small" 
+                        variant="outlined" 
+                        color={row.is_active ? "success" : "default"}
+                        sx={{ ml: 1, border: 'none', fontWeight: 600 }}
+                      />
+                    </Box>
+                  </TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" color="primary" sx={{ mr: 0.5, bgcolor: 'primary.50' }} onClick={() => setSelectedConnectionId(row.id)}>
-                      <VisibilityOutlined fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" color="info" sx={{ mr: 0.5, bgcolor: 'info.50' }} onClick={() => handleOpenEdit(row)}>
-                      <EditOutlined fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" color="error" sx={{ bgcolor: 'error.50' }} onClick={() => handleDelete(row.id)}>
-                      <DeleteOutline fontSize="small" />
-                    </IconButton>
+                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                      <Tooltip title="View Details">
+                        <IconButton size="small" color="primary" onClick={() => setSelectedConnectionId(row.id)}>
+                          <VisibilityOutlined fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      {canManage && (
+                        <>
+                          <Tooltip title="Edit">
+                            <IconButton size="small" color="info" onClick={() => handleOpenEdit(row)}>
+                              <EditOutlined fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {row.is_active && (
+                            <Tooltip title="Deactivate">
+                              <IconButton size="small" color="error" onClick={() => handleDeactivate(row.id)}>
+                                <PowerSettingsNewOutlined fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </Paper>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={connections.data?.total || 0}
+            rowsPerPage={pageSize}
+            page={page}
+            onPageChange={(e, newPage) => setPage(newPage)}
+            onRowsPerPageChange={(e) => {
+              setPageSize(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+          />
+        </TableContainer>
       </StateBox>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-        <DialogTitle sx={{ bgcolor: '#1E40AF', color: 'white', fontWeight: 'bold', py: 2 }}>
-          {editingId ? "Edit" : "New"} Platform Connection
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>
+          {editingId ? "Edit" : "New"} Connection
         </DialogTitle>
-        <DialogContent dividers sx={{ p: 3 }}>
-          <Grid container spacing={3}>
+        <DialogContent dividers>
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12} md={6}>
-              <TextField 
-                label="Connection Name" 
-                fullWidth size="small" 
-                value={form.connection_name}
-                onChange={e => setForm({...form, connection_name: e.target.value})}
-              />
+              <TextField label="Name" fullWidth size="small" value={form.connection_name} onChange={e => setForm({...form, connection_name: e.target.value})} />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField 
-                label="Description" 
-                fullWidth size="small" 
-                value={form.description}
-                onChange={e => setForm({...form, description: e.target.value})}
-              />
+              <TextField label="Description" fullWidth size="small" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
             </Grid>
             
-            <Grid item xs={12}><Typography variant="subtitle2" color="primary" fontWeight="bold">Trino Configuration</Typography></Grid>
-            <Grid item xs={12} md={6}>
-              <TextField 
-                label="Trino Host" 
-                fullWidth size="small" 
-                value={form.trino_host}
-                onChange={e => setForm({...form, trino_host: e.target.value})}
-              />
+            <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>TRINO</Typography></Grid>
+            <Grid item xs={12} md={4}>
+              <TextField label="Host" fullWidth size="small" value={form.trino_host} onChange={e => setForm({...form, trino_host: e.target.value})} />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField 
-                label="Trino Port" 
-                type="number"
-                fullWidth size="small" 
-                value={form.trino_port}
-                onChange={e => setForm({...form, trino_port: parseInt(e.target.value)})}
-              />
+            <Grid item xs={12} md={2}>
+              <TextField label="Port" type="number" fullWidth size="small" value={form.trino_port} onChange={e => setForm({...form, trino_port: parseInt(e.target.value)})} />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField 
-                label="Trino User" 
-                fullWidth size="small" 
-                value={form.trino_user}
-                onChange={e => setForm({...form, trino_user: e.target.value})}
-              />
+            <Grid item xs={12} md={3}>
+              <TextField label="User" fullWidth size="small" value={form.trino_user} onChange={e => setForm({...form, trino_user: e.target.value})} />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField 
-                label="Trino Password" 
-                type="password"
-                fullWidth size="small" 
-                value={form.trino_password}
-                onChange={e => setForm({...form, trino_password: e.target.value})}
-              />
+            <Grid item xs={12} md={3}>
+              <TextField label="Password" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.trino_password} onChange={e => setForm({...form, trino_password: e.target.value})} />
             </Grid>
 
-            <Grid item xs={12}><Typography variant="subtitle2" color="primary" fontWeight="bold">Iceberg Configuration</Typography></Grid>
+            <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>ICEBERG</Typography></Grid>
             <Grid item xs={12} md={4}>
-              <TextField 
-                label="Catalog Name" 
-                fullWidth size="small" 
-                value={form.iceberg_catalog_name}
-                onChange={e => setForm({...form, iceberg_catalog_name: e.target.value})}
-              />
+              <TextField label="Catalog" fullWidth size="small" value={form.iceberg_catalog_name} onChange={e => setForm({...form, iceberg_catalog_name: e.target.value})} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField 
-                label="REST URL" 
-                fullWidth size="small" 
-                value={form.iceberg_rest_url}
-                onChange={e => setForm({...form, iceberg_rest_url: e.target.value})}
-              />
+              <TextField label="REST URL" fullWidth size="small" value={form.iceberg_rest_url} onChange={e => setForm({...form, iceberg_rest_url: e.target.value})} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField 
-                label="Warehouse" 
-                fullWidth size="small" 
-                value={form.iceberg_warehouse}
-                onChange={e => setForm({...form, iceberg_warehouse: e.target.value})}
-              />
+              <TextField label="Warehouse" fullWidth size="small" value={form.iceberg_warehouse} onChange={e => setForm({...form, iceberg_warehouse: e.target.value})} />
             </Grid>
 
-            <Grid item xs={12}><Typography variant="subtitle2" color="primary" fontWeight="bold">MinIO/S3 Storage</Typography></Grid>
+            <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>STORAGE (MINIO/S3)</Typography></Grid>
             <Grid item xs={12} md={4}>
-              <TextField 
-                label="Endpoint URL" 
-                fullWidth size="small" 
-                value={form.minio_endpoint_url}
-                onChange={e => setForm({...form, minio_endpoint_url: e.target.value})}
-              />
+              <TextField label="Endpoint" fullWidth size="small" value={form.minio_endpoint_url} onChange={e => setForm({...form, minio_endpoint_url: e.target.value})} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField 
-                label="Access Key" 
-                fullWidth size="small" 
-                value={form.minio_access_key}
-                onChange={e => setForm({...form, minio_access_key: e.target.value})}
-              />
+              <TextField label="Access Key" fullWidth size="small" value={form.minio_access_key} onChange={e => setForm({...form, minio_access_key: e.target.value})} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField 
-                label="Secret Key" 
-                type="password"
-                fullWidth size="small" 
-                value={form.minio_secret_key}
-                onChange={e => setForm({...form, minio_secret_key: e.target.value})}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <FormControlLabel 
-                control={<Switch checked={form.is_active} onChange={e => setForm({...form, is_active: e.target.checked})} />}
-                label="Active Status"
-              />
+              <TextField label="Secret Key" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.minio_secret_key} onChange={e => setForm({...form, minio_secret_key: e.target.value})} />
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 2.5, gap: 1 }}>
-          <Button onClick={() => setOpenDialog(false)} color="inherit" sx={{ fontWeight: 'bold' }}>Cancel</Button>
-          <Button variant="contained" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving} sx={{ fontWeight: 'bold', px: 4 }}>
-            {saving ? "Saving..." : editingId ? "Update" : "Create"}
-          </Button>
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+          <Box>
+            {editingId && (
+              <Button startIcon={<BugReportOutlined />} color="info" onClick={handleTest} disabled={testing}>
+                {testing ? "Testing..." : "Test Connection"}
+              </Button>
+            )}
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={() => setOpenDialog(false)} color="inherit">Cancel</Button>
+            <Button variant="contained" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </Stack>
         </DialogActions>
       </Dialog>
     </Box>
   );
 }
 
-function ConnectionDetail({ connectionId, onBack }) {
+function ConnectionDetail({ connectionId, onBack, canManage, onToggleActive }) {
   const [tab, setTab] = useState("config");
   const connection = useApiResource(() => connectionsApi.get(connectionId));
 
-  if (connection.loading) return <CircularProgress />;
+  if (connection.loading) return <Box sx={{ p: 10, textAlign: 'center' }}><CircularProgress /></Box>;
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <IconButton onClick={onBack} sx={{ mr: 1 }} color="primary">
-          <ArrowBackOutlined />
-        </IconButton>
-        <Typography variant="h6" fontWeight="bold">
-          {connection.data?.connection_name || 'Connection Details'}
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <IconButton onClick={onBack} sx={{ mr: 1 }} color="primary"><ArrowBackOutlined /></IconButton>
+        <Typography variant="h6" fontWeight={700}>{connection.data?.connection_name}</Typography>
       </Box>
 
       <TabContainer>
-        <TabButton 
-          active={tab === "config"}
-          onClick={() => setTab("config")}
-          label="Configuration"
-        />
-        <TabButton 
-          active={tab === "tables"}
-          onClick={() => setTab("tables")}
-          label="Managed Tables"
-        />
+        <TabButton active={tab === "config"} onClick={() => setTab("config")} label="Configuration" />
+        <TabButton active={tab === "tables"} onClick={() => setTab("tables")} label="Managed Tables" />
       </TabContainer>
 
       {tab === "config" && (
-        <Paper sx={{ p: 4, borderRadius: 2 }} variant="outlined">
-          <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary">Connection Parameters</Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary">Trino Host</Typography>
-              <Typography variant="body2" fontWeight={500}>{connection.data.trino_host}:{connection.data.trino_port}</Typography>
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>General Info</Typography>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary">Iceberg Catalog</Typography>
-              <Typography variant="body2" fontWeight={500}>{connection.data.iceberg_catalog_name}</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>DESCRIPTION</Typography>
+              <Typography variant="body2">{connection.data.description || "N/A"}</Typography>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary">MinIO Endpoint</Typography>
-              <Typography variant="body2" fontWeight={500}>{connection.data.minio_endpoint_url}</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>STATUS</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                <Switch 
+                  size="small" 
+                  checked={connection.data.is_active} 
+                  onChange={() => onToggleActive(connection.data)}
+                  color="success"
+                  disabled={!canManage}
+                />
+                <Chip 
+                  label={connection.data.is_active ? "Active" : "Inactive"} 
+                  size="small" 
+                  variant="outlined" 
+                  color={connection.data.is_active ? "success" : "default"}
+                  sx={{ ml: 1, border: 'none', fontWeight: 600 }}
+                />
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Trino Configuration</Typography>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary">Iceberg Warehouse</Typography>
-              <Typography variant="body2" fontWeight={500}>{connection.data.iceberg_warehouse}</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>HOST</Typography>
+              <Typography variant="body2">{connection.data.trino_host}</Typography>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary">Created At</Typography>
-              <Typography variant="body2" fontWeight={500}>{new Date(connection.data.created_at).toLocaleString()}</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>PORT</Typography>
+              <Typography variant="body2">{connection.data.trino_port}</Typography>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary">Status</Typography>
-              <Box><StatusChip value={connection.data.is_active ? "active" : "inactive"} /></Box>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>USER</Typography>
+              <Typography variant="body2">{connection.data.trino_user}</Typography>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Iceberg Configuration</Typography>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>CATALOG NAME</Typography>
+              <Typography variant="body2">{connection.data.iceberg_catalog_name}</Typography>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>REST URL</Typography>
+              <Typography variant="body2">{connection.data.iceberg_rest_url}</Typography>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>WAREHOUSE</Typography>
+              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{connection.data.iceberg_warehouse}</Typography>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Storage (MinIO/S3) Configuration</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>ENDPOINT URL</Typography>
+              <Typography variant="body2">{connection.data.minio_endpoint_url}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>ACCESS KEY</Typography>
+              <Typography variant="body2">{connection.data.minio_access_key}</Typography>
             </Grid>
           </Grid>
         </Paper>
       )}
 
       {tab === "tables" && (
-        <ManagedTables connectionId={connectionId} connectionData={connection.data} />
+        <ManagedTables connectionId={connectionId} connectionData={connection.data} canManage={canManage} />
       )}
     </Box>
   );
 }
 
-function ManagedTables({ connectionId, connectionData }) {
-  const tables = useApiResource(() => tablesApi.list({ connection_id: connectionId }), [connectionId]);
+function ManagedTables({ connectionId, connectionData, canManage }) {
+  const [tables, setTables] = useState({ data: [], loading: true });
   const [openAdd, setOpenAdd] = useState(false);
   const [adding, setAdding] = useState(false);
   
@@ -370,13 +425,22 @@ function ManagedTables({ connectionId, connectionData }) {
   const [loadingDiscovery, setLoadingDiscovery] = useState(false);
   const [selectedTable, setSelectedTable] = useState("");
 
+  const refreshManaged = async () => {
+    setTables(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await connectionsApi.list(); 
+    } catch (err) {}
+  };
+
+  const managedRes = useApiResource(() => dataAssetsApi.list({ connection_id: connectionId }), [connectionId]);
+
   const fetchSchemas = async () => {
     setLoadingSchemas(true);
     try {
-      const res = await connectionsApi.listSchemas(connectionId);
+      const res = await connectionsApi.discover(connectionId);
       setSchemas(res.data || []);
     } catch (err) {
-      toast.error("Failed to fetch schemas");
+      toast.error("Discovery failed");
     } finally {
       setLoadingSchemas(false);
     }
@@ -385,119 +449,109 @@ function ManagedTables({ connectionId, connectionData }) {
   const fetchDiscoveryTables = async (schemaName) => {
     setLoadingDiscovery(true);
     try {
-      const res = await connectionsApi.listTables(connectionId, schemaName);
+      const res = await connectionsApi.discover(connectionId, schemaName);
       setDiscoveryTables(res.data || []);
     } catch (err) {
-      toast.error("Failed to fetch tables from schema: " + schemaName);
+      toast.error("Table discovery failed");
     } finally {
       setLoadingDiscovery(false);
     }
   };
 
-  const handleOpenAdd = () => {
-    setSelectedSchema("");
-    setSelectedTable("");
-    setDiscoveryTables([]);
-    setOpenAdd(true);
-    fetchSchemas();
-  };
-
-  const handleSchemaChange = (e) => {
-    const val = e.target.value;
-    setSelectedSchema(val);
-    setSelectedTable("");
-    if (val) {
-      fetchDiscoveryTables(val);
-    }
-  };
-
   const handleRegister = async () => {
-    if (!selectedSchema || !selectedTable) return;
     setAdding(true);
     try {
-      await tablesApi.create({
-        connection_id: connectionId,
-        catalog_name: connectionData.iceberg_catalog_name,
-        schema_name: selectedSchema,
-        table_name: selectedTable,
-        is_active: true
+      await connectionsApi.addManagedTable(connectionId, {
+        catalog: connectionData.iceberg_catalog_name,
+        schema: selectedSchema,
+        table_name: selectedTable
       });
-      toast.success(`Registered table: ${selectedTable}`);
+      toast.success("Table registered");
       setOpenAdd(false);
-      tables.reload();
+      managedRes.reload();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to register table");
+      toast.error(err.response?.data?.detail || "Registration failed");
     } finally {
       setAdding(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Unregister this table? This will not delete data in Iceberg but will remove it from DataGate.")) return;
+  const handleToggleTableActive = async (table) => {
     try {
-      await tablesApi.delete(id);
-      toast.success("Unregistered successfully");
-      tables.reload();
-    } catch (err) {
-      toast.error("Failed to unregister");
-    }
-  };
-
-  const handleToggleActive = async (row) => {
-    try {
-      if (row.is_active) {
-        await tablesApi.deactivate(row.id);
+      if (table.is_active) {
+        await dataAssetsApi.deactivate(table.id);
+        toast.success("Table deactivated");
       } else {
-        await tablesApi.activate(row.id);
+        await dataAssetsApi.activate(table.id);
+        toast.success("Table activated");
       }
-      tables.reload();
+      managedRes.reload();
     } catch (err) {
-      toast.error("Failed to update status");
+      toast.error("Action failed");
     }
   };
 
-  const rows = tables.data || [];
+  const handleDelete = async (tableId) => {
+    if (!window.confirm("Remove this table from management?")) return;
+    try {
+      await connectionsApi.removeManagedTable(connectionId, tableId);
+      toast.success("Removed");
+      managedRes.reload();
+    } catch (err) {
+      toast.error("Removal failed");
+    }
+  };
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button 
-          startIcon={<AddOutlined />} 
-          variant="contained" 
-          size="small" 
-          onClick={handleOpenAdd}
-          sx={{ borderRadius: 1.5 }}
-        >
-          Register Table
-        </Button>
+        {canManage && (
+          <Button startIcon={<AddOutlined />} variant="contained" size="small" onClick={() => { setOpenAdd(true); fetchSchemas(); }}>
+            Register Table
+          </Button>
+        )}
       </Box>
 
-      <StateBox loading={tables.loading} error={tables.error} empty={!rows.length}>
-        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      <StateBox loading={managedRes.loading} error={managedRes.error} empty={!(managedRes.data?.items || []).length}>
+        <Paper variant="outlined" sx={{ borderRadius: 2 }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 'bold' }}>Schema</TableCell>
-                <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 'bold' }}>Table Name</TableCell>
-                <TableCell sx={{ bgcolor: '#F8FAFC', fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell align="right" sx={{ bgcolor: '#F8FAFC', fontWeight: 'bold' }}>Actions</TableCell>
+                <TableCell>Schema</TableCell>
+                <TableCell>Table Name</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id} hover>
+              {(managedRes.data?.items || []).map((row) => (
+                <TableRow key={row.id}>
                   <TableCell>{row.schema_name}</TableCell>
-                  <TableCell fontWeight={500}>{row.table_name}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{row.table_name}</TableCell>
                   <TableCell>
-                    <StatusChip value={row.is_active ? "active" : "inactive"} />
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Switch 
+                        size="small" 
+                        checked={row.is_active} 
+                        onChange={() => handleToggleTableActive(row)}
+                        color="success"
+                        disabled={!canManage}
+                      />
+                      <Chip 
+                        label={row.is_active ? "Active" : "Inactive"} 
+                        size="small" 
+                        variant="outlined" 
+                        color={row.is_active ? "success" : "default"}
+                        sx={{ ml: 1, border: 'none', fontWeight: 600 }}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" onClick={() => handleToggleActive(row)} color={row.is_active ? "warning" : "success"}>
-                      {row.is_active ? <CancelOutlined fontSize="small" /> : <CheckCircleOutline fontSize="small" />}
-                    </IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}>
-                      <DeleteOutline fontSize="small" />
-                    </IconButton>
+                    {canManage && (
+                      <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}>
+                        <DeleteOutline fontSize="small" />
+                      </IconButton>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -506,61 +560,27 @@ function ManagedTables({ connectionId, connectionData }) {
         </Paper>
       </StateBox>
 
-      <Dialog open={openAdd} onClose={() => setOpenAdd(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <StorageOutlined color="primary" />
-          Register New Table
-        </DialogTitle>
+      <Dialog open={openAdd} onClose={() => setOpenAdd(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Register Managed Table</DialogTitle>
         <DialogContent dividers>
-          <Stack spacing={3} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Select a schema and table from <strong>{connectionData.iceberg_catalog_name}</strong> to register in DataGate.
-            </Typography>
-            
+          <Stack spacing={2} sx={{ mt: 1 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Schema</InputLabel>
-              <Select
-                value={selectedSchema}
-                label="Schema"
-                onChange={handleSchemaChange}
-                disabled={loadingSchemas}
-              >
-                {loadingSchemas ? (
-                  <MenuItem disabled><CircularProgress size={20} sx={{ mr: 1 }} /> Loading...</MenuItem>
-                ) : (
-                  schemas.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)
-                )}
+              <Select value={selectedSchema} label="Schema" onChange={e => { setSelectedSchema(e.target.value); fetchDiscoveryTables(e.target.value); }}>
+                {loadingSchemas ? <MenuItem disabled>Loading...</MenuItem> : schemas.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
               </Select>
             </FormControl>
-
-            <FormControl fullWidth size="small" disabled={!selectedSchema || loadingDiscovery}>
+            <FormControl fullWidth size="small" disabled={!selectedSchema}>
               <InputLabel>Table</InputLabel>
-              <Select
-                value={selectedTable}
-                label="Table"
-                onChange={e => setSelectedTable(e.target.value)}
-              >
-                {loadingDiscovery ? (
-                  <MenuItem disabled><CircularProgress size={20} sx={{ mr: 1 }} /> Discovery...</MenuItem>
-                ) : (
-                  discoveryTables.length === 0 ? (
-                    <MenuItem disabled>No tables found</MenuItem>
-                  ) : (
-                    discoveryTables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)
-                  )
-                )}
+              <Select value={selectedTable} label="Table" onChange={e => setSelectedTable(e.target.value)}>
+                {loadingDiscovery ? <MenuItem disabled>Discovering...</MenuItem> : discoveryTables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
               </Select>
             </FormControl>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setOpenAdd(false)} color="inherit">Cancel</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleRegister} 
-            disabled={!selectedTable || adding}
-            startIcon={adding ? <CircularProgress size={16} /> : <SaveOutlined />}
-          >
+        <DialogActions>
+          <Button onClick={() => setOpenAdd(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleRegister} disabled={!selectedTable || adding}>
             {adding ? "Registering..." : "Register"}
           </Button>
         </DialogActions>

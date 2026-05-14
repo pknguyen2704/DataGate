@@ -1,8 +1,8 @@
 import api from "./api";
 
 export const authApi = {
-  login: (username, password) =>
-    api.post("/auth/login", { username, password }),
+  login: (data) =>
+    api.post("/auth/login", data),
 
   getMe: () => api.get("/auth/me"),
 

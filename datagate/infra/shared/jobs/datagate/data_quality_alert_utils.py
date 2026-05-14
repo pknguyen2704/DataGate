@@ -1,5 +1,6 @@
 import logging
 from collections import Counter, defaultdict
+from contextlib import suppress
 from datetime import datetime
 from decimal import Decimal
 
@@ -419,10 +420,21 @@ def build_quality_alert_message(
     return "\n".join(lines)
 
 
-def send_slack_message(slack_webhook_conn_id, message):
+def send_slack_message(slack_webhook_conn_id, message, timeout=30):
     SlackWebhookHook(
         slack_webhook_conn_id=slack_webhook_conn_id,
+        timeout=timeout,
     ).send_text(message)
+
+
+def close_pg_hook(pg_hook):
+    if pg_hook is None:
+        return
+
+    with suppress(Exception):
+        conn = getattr(pg_hook, "conn", None)
+        if conn is not None and not conn.closed:
+            conn.close()
 
 
 def run_quality_gate(
@@ -434,74 +446,79 @@ def run_quality_gate(
     include_auc=False,
     slack_webhook_conn_id="slack_dq",
     max_alert_rows=30,
+    slack_timeout=30,
 ):
     schema_name = validate_name(schema_name, "schema_name")
     processing_date_hour = normalize_processing_date_hour(processing_date_hour)
     pg_hook = PostgresHook(postgres_conn_id=datagate_db_conn_id)
 
-    connection_config = get_connection_config(pg_hook, connection_name)
+    try:
+        connection_config = get_connection_config(pg_hook, connection_name)
 
-    table_ids = get_active_tables(
-        pg_hook,
-        connection_config["catalog_name"],
-        schema_name,
-    )
-
-    if not table_ids:
-        logger.info(
-            "No active tables found | schema=%s",
+        table_ids = get_active_tables(
+            pg_hook,
+            connection_config["catalog_name"],
             schema_name,
         )
+
+        if not table_ids:
+            logger.info(
+                "No active tables found | schema=%s",
+                schema_name,
+            )
+            return True
+
+        rows = fetch_quality_failure_details(
+            pg_hook=pg_hook,
+            table_ids=table_ids,
+            processing_date_hour=processing_date_hour,
+            include_rule=include_rule,
+            include_auc=include_auc,
+        )
+
+        severity_counts = Counter(row["severity_level"] for row in rows)
+        type_counts = Counter(row["check_type"] for row in rows)
+
+        critical_count = severity_counts.get("critical", 0)
+        warning_count = severity_counts.get("warning", 0)
+
+        logger.info(
+            "Quality gate checked | schema=%s | processing_date_hour=%s | total_fail=%s | critical=%s | warning=%s | metadata=%s | profiling=%s | rule=%s | auc=%s",
+            schema_name,
+            processing_date_hour,
+            len(rows),
+            critical_count,
+            warning_count,
+            type_counts.get("metadata", 0),
+            type_counts.get("profiling", 0),
+            type_counts.get("rule", 0),
+            type_counts.get("lightgbm_auc", 0),
+        )
+
+        if rows:
+            message = build_quality_alert_message(
+                connection_name=connection_name,
+                schema_name=schema_name,
+                processing_date_hour=processing_date_hour,
+                rows=rows,
+                max_detail_rows=max_alert_rows,
+            )
+            send_slack_message(slack_webhook_conn_id, message, timeout=slack_timeout)
+
+        if critical_count > 0:
+            raise AirflowException(
+                f"Quality gate failed. "
+                f"schema={schema_name}, "
+                f"processing_date_hour={processing_date_hour}, "
+                f"unresolved_critical={critical_count}, "
+                f"unresolved_warning={warning_count}, "
+                f"metadata_fail={type_counts.get('metadata', 0)}, "
+                f"profiling_fail={type_counts.get('profiling', 0)}, "
+                f"rule_fail={type_counts.get('rule', 0)}, "
+                f"auc_fail={type_counts.get('lightgbm_auc', 0)}"
+            )
+
         return True
 
-    rows = fetch_quality_failure_details(
-        pg_hook=pg_hook,
-        table_ids=table_ids,
-        processing_date_hour=processing_date_hour,
-        include_rule=include_rule,
-        include_auc=include_auc,
-    )
-
-    severity_counts = Counter(row["severity_level"] for row in rows)
-    type_counts = Counter(row["check_type"] for row in rows)
-
-    critical_count = severity_counts.get("critical", 0)
-    warning_count = severity_counts.get("warning", 0)
-
-    logger.info(
-        "Quality gate checked | schema=%s | processing_date_hour=%s | total_fail=%s | critical=%s | warning=%s | metadata=%s | profiling=%s | rule=%s | auc=%s",
-        schema_name,
-        processing_date_hour,
-        len(rows),
-        critical_count,
-        warning_count,
-        type_counts.get("metadata", 0),
-        type_counts.get("profiling", 0),
-        type_counts.get("rule", 0),
-        type_counts.get("lightgbm_auc", 0),
-    )
-
-    if rows:
-        message = build_quality_alert_message(
-            connection_name=connection_name,
-            schema_name=schema_name,
-            processing_date_hour=processing_date_hour,
-            rows=rows,
-            max_detail_rows=max_alert_rows,
-        )
-        send_slack_message(slack_webhook_conn_id, message)
-
-    if critical_count > 0:
-        raise AirflowException(
-            f"Quality gate failed. "
-            f"schema={schema_name}, "
-            f"processing_date_hour={processing_date_hour}, "
-            f"unresolved_critical={critical_count}, "
-            f"unresolved_warning={warning_count}, "
-            f"metadata_fail={type_counts.get('metadata', 0)}, "
-            f"profiling_fail={type_counts.get('profiling', 0)}, "
-            f"rule_fail={type_counts.get('rule', 0)}, "
-            f"auc_fail={type_counts.get('lightgbm_auc', 0)}"
-        )
-
-    return True
+    finally:
+        close_pg_hook(pg_hook)

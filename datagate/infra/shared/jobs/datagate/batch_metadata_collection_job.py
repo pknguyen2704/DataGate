@@ -1,5 +1,6 @@
 import logging
 import uuid
+from contextlib import suppress
 from datetime import datetime
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.providers.trino.hooks.trino import TrinoHook
@@ -86,12 +87,16 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
 
 def fetch_one_as_dict(trino_hook, sql):
     cursor = trino_hook.get_cursor()
-    cursor.execute(sql)
-    row = cursor.fetchone()
-    if row is None:
-        return None
-    columns = [desc[0] for desc in cursor.description]
-    return dict(zip(columns, row))
+    try:
+        cursor.execute(sql)
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        columns = [desc[0] for desc in cursor.description]
+        return dict(zip(columns, row))
+    finally:
+        with suppress(Exception):
+            cursor.close()
 
 def build_batch_table_metadata_sql(
     catalog_name,
@@ -226,6 +231,16 @@ def collect_one_table_metadata(
         processing_date_hour,
     )
 
+def close_hook_connection(hook):
+    if hook is None:
+        return
+
+    for attr_name in ("conn", "_conn"):
+        with suppress(Exception):
+            conn = getattr(hook, attr_name, None)
+            if conn is not None:
+                conn.close()
+
 def collect_metadata(
     trino_conn_id,
     datagate_db_conn_id,
@@ -235,39 +250,47 @@ def collect_metadata(
 ):
     schema_name = validate_name(schema_name, "schema_name")
     processing_date_hour = normalize_processing_date_hour(processing_date_hour)
-    trino_hook = TrinoHook(trino_conn_id=trino_conn_id)
-    pg_hook = PostgresHook(postgres_conn_id=datagate_db_conn_id)
-    connection_config = get_connection_config(
-        pg_hook=pg_hook,
-        connection_name=connection_name,
-    )
-    catalog_name = connection_config["iceberg_catalog_name"]
-    active_tables = get_active_tables(
-        pg_hook=pg_hook,
-        catalog_name=catalog_name,
-        schema_name=schema_name,
-    )
-    if not active_tables:
-        logger.warning(
-            "No active tables found for connection=%s, catalog=%s, schema=%s",
+    trino_hook = None
+    pg_hook = None
+
+    try:
+        trino_hook = TrinoHook(trino_conn_id=trino_conn_id)
+        pg_hook = PostgresHook(postgres_conn_id=datagate_db_conn_id)
+        connection_config = get_connection_config(
+            pg_hook=pg_hook,
+            connection_name=connection_name,
+        )
+        catalog_name = connection_config["iceberg_catalog_name"]
+        active_tables = get_active_tables(
+            pg_hook=pg_hook,
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+        )
+        if not active_tables:
+            logger.warning(
+                "No active tables found for connection=%s, catalog=%s, schema=%s",
+                connection_config["connection_name"],
+                catalog_name,
+                schema_name,
+            )
+            return
+        logger.info(
+            "Found %s active table(s) | connection=%s | catalog=%s | schema=%s",
+            len(active_tables),
             connection_config["connection_name"],
             catalog_name,
             schema_name,
         )
-        return
-    logger.info(
-        "Found %s active table(s) | connection=%s | catalog=%s | schema=%s",
-        len(active_tables),
-        connection_config["connection_name"],
-        catalog_name,
-        schema_name,
-    )
-    for table_info in active_tables:
-        collect_one_table_metadata(
-            trino_hook=trino_hook,
-            pg_hook=pg_hook,
-            catalog_name=catalog_name,
-            schema_name=schema_name,
-            table_info=table_info,
-            processing_date_hour=processing_date_hour,
-        )
+        for table_info in active_tables:
+            collect_one_table_metadata(
+                trino_hook=trino_hook,
+                pg_hook=pg_hook,
+                catalog_name=catalog_name,
+                schema_name=schema_name,
+                table_info=table_info,
+                processing_date_hour=processing_date_hour,
+            )
+
+    finally:
+        close_hook_connection(trino_hook)
+        close_hook_connection(pg_hook)

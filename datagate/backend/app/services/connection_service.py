@@ -1,3 +1,4 @@
+import re
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -48,9 +49,21 @@ class ConnectionService:
             client.test()
             client.list_schemas(connection.iceberg_catalog_name)
         except Exception as exc:
+            # Clean up error message (remove HTML if present, truncate if too long)
+            error_msg = str(exc)
+            if "<html>" in error_msg.lower():
+                # Try to extract message from trino HttpError format: error 405: b'<html>...'
+                match = re.search(r"error (\d+):", error_msg)
+                status_code = f" (Status {match.group(1)})" if match else ""
+                error_msg = f"Server responded with an error{status_code}. This usually happens when the port is incorrect or pointing to a different service."
+            
+            # Truncate very long messages
+            if len(error_msg) > 250:
+                error_msg = error_msg[:247] + "..."
+                
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Connection test failed: {exc}",
+                detail=f"Connection test failed: {error_msg}",
             ) from exc
         finally:
             client.close()
@@ -70,14 +83,41 @@ class ConnectionService:
         }
         return any(field in update_data for field in fields)
 
-    def list_connections(self, is_active: bool | None = None) -> list[Connection]:
-        query = self.db.query(Connection)
+    def list_connections(self, page: int = 1, page_size: int = 50, is_active: bool | None = None) -> dict:
+        from sqlalchemy.orm import selectinload
+        query = self.db.query(Connection).options(
+            selectinload(Connection.created_by_user),
+            selectinload(Connection.last_modified_by_user)
+        )
         if is_active is not None:
             query = query.filter(Connection.is_active == is_active)
-        return query.order_by(Connection.created_at.desc()).all()
+        
+        total = query.count()
+        items = (
+            query.order_by(Connection.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
 
     def get_connection_by_id(self, connection_id: str) -> Connection | None:
-        return self.db.query(Connection).filter(Connection.id == connection_id).first()
+        from sqlalchemy.orm import selectinload
+        return (
+            self.db.query(Connection)
+            .options(
+                selectinload(Connection.created_by_user),
+                selectinload(Connection.last_modified_by_user)
+            )
+            .filter(Connection.id == connection_id)
+            .first()
+        )
 
     def get_connection_or_404(self, connection_id: str) -> Connection:
         connection = self.get_connection_by_id(connection_id)
@@ -103,6 +143,9 @@ class ConnectionService:
         if "connection_name" in update_data:
             self._validate_name_unique(update_data["connection_name"], exclude_id=connection_id)
         for field, value in update_data.items():
+            # Skip empty passwords/secrets to avoid overwriting with empty string
+            if field in ["trino_password", "minio_secret_key"] and not value:
+                continue
             setattr(connection, field, value)
         if modifier_id:
             connection.last_modified_by = modifier_id
@@ -179,3 +222,42 @@ class ConnectionService:
             return client.list_tables(target_catalog, schema)
         finally:
             client.close()
+
+    def add_managed_table(self, connection_id: str, catalog: str, schema: str, table_name: str) -> Table:
+        # Check if already managed
+        existing = (
+            self.db.query(Table)
+            .filter(
+                Table.connection_id == connection_id,
+                Table.catalog_name == catalog,
+                Table.schema_name == schema,
+                Table.table_name == table_name
+            )
+            .first()
+        )
+        if existing:
+            return existing
+            
+        table = Table(
+            connection_id=connection_id,
+            catalog_name=catalog,
+            schema_name=schema,
+            table_name=table_name,
+            is_active=True
+        )
+        self.db.add(table)
+        self.db.commit()
+        self.db.refresh(table)
+        return table
+
+    def remove_managed_table(self, table_id: str) -> None:
+        table = self.db.query(Table).filter(Table.id == table_id).first()
+        if not table:
+            raise HTTPException(status_code=404, detail="Managed table not found")
+        
+        # Check if has results
+        # We prefer soft delete if it has data, but for now simple delete is ok if user requested it.
+        # But wait, Table model doesn't have soft delete for the row itself, just is_active.
+        # I'll just delete the row.
+        self.db.delete(table)
+        self.db.commit()

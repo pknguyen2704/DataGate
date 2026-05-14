@@ -1,58 +1,71 @@
 import React from "react";
-import { Box, Button, Stack, Paper, Typography } from "@mui/material";
-import { SettingsInputComponentOutlined, ModelTrainingOutlined, PeopleOutlined } from "@mui/icons-material";
-import { Panel, TabContainer, TabButton } from "~/components/DataGate/Page";
-
-// Import the sub-components
-import PlatformConnection from "./PlatformConnection/PlatformConnection";
-import ModelParameter from "./ModelParameter/ModelParameter";
+import { Box, Typography, Paper, List, ListItemButton, ListItemIcon, ListItemText, Divider } from "@mui/material";
+import { SettingsInputComponentOutlined, ModelTrainingOutlined, PeopleOutlined, ShieldOutlined } from "@mui/icons-material";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useSelector } from "react-redux";
 import UserManagement from "./UserManagement/UserManagement";
+import RoleManagement from "./RoleManagement/RoleManagement";
 
-function Settings() {
-  const [tab, setTab] = React.useState("connections");
+const SettingsPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useSelector((state) => state.auth);
+  const permissions = user?.permissions || [];
+
+  const hasPermission = (permCode) => {
+    if (!permCode) return true;
+    return permissions.includes(permCode);
+  };
+
+  const menuItems = [
+    { text: "Platform Connections", icon: <SettingsInputComponentOutlined />, path: "/app/settings/connections", permission: "connection:view" },
+    { text: "Model parameters", icon: <ModelTrainingOutlined />, path: "/app/settings/model-configs", permission: "model_config:view" },
+    { text: "Users", icon: <PeopleOutlined />, path: "/app/settings/users", permission: "user:view" },
+    { text: "Roles", icon: <ShieldOutlined />, path: "/app/settings/roles", permission: "user:view" },
+  ];
+
+  const visibleItems = menuItems.filter(item => hasPermission(item.permission));
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: "background.default", flexGrow: 1, overflow: "hidden" }}>
-      <Stack spacing={3}>
-        {/* Title Frame */}
-        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, bgcolor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid', borderColor: 'divider', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>Settings</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>Manage platform connections, AI models, and user access.</Typography>
-          </Box>
-        </Paper>
+    <Box sx={{ display: 'flex', height: '100%', p: 3, gap: 3 }}>
+      <Paper sx={{ width: 280, flexShrink: 0, borderRadius: 2, height: 'fit-content', border: '1px solid', borderColor: 'divider', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+        <Box sx={{ p: 2.5 }}>
+          <Typography variant="h6" fontWeight={800}>Settings</Typography>
+        </Box>
+        <Divider />
+        <List sx={{ p: 1 }}>
+          {visibleItems.map((item) => (
+            <ListItemButton
+              key={item.text}
+              selected={location.pathname === item.path}
+              onClick={() => navigate(item.path)}
+              sx={{
+                borderRadius: 1.5,
+                mb: 0.5,
+                '&.Mui-selected': {
+                  bgcolor: 'primary.50',
+                  color: 'primary.main',
+                  '& .MuiListItemIcon-root': { color: 'primary.main' },
+                  '&:hover': { bgcolor: 'primary.100' }
+                }
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={<Typography variant="body2" fontWeight={600}>{item.text}</Typography>} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Paper>
 
-        <TabContainer>
-          <TabButton 
-            active={tab === "connections"}
-            onClick={() => setTab("connections")}
-            label="Platform Connection"
-            icon={<SettingsInputComponentOutlined />}
-          />
-          <TabButton 
-            active={tab === "model"}
-            onClick={() => setTab("model")}
-            label="Model Config"
-            icon={<ModelTrainingOutlined />}
-          />
-          <TabButton 
-            active={tab === "users"}
-            onClick={() => setTab("users")}
-            label="Users & RBAC"
-            icon={<PeopleOutlined />}
-          />
-        </TabContainer>
-
-        <Panel sx={{ flexGrow: 1 }}>
-          <Box sx={{ minHeight: 400 }}>
-            {tab === "connections" && <PlatformConnection />}
-            {tab === "model" && <ModelParameter />}
-            {tab === "users" && <UserManagement />}
-          </Box>
-        </Panel>
-      </Stack>
+      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+        <Outlet />
+      </Box>
     </Box>
   );
-}
+};
 
-export default Settings;
+export default SettingsPage;
+
+export { UserManagement as UsersPlaceholder, RoleManagement as RolesPlaceholder };
+export const ConnectionsPlaceholder = () => <Typography variant="h5">Connections Management</Typography>;
+export const ModelConfigsPlaceholder = () => <Typography variant="h5">Model Configurations</Typography>;

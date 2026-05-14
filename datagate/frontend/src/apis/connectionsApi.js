@@ -1,13 +1,20 @@
 import api from "./api";
+
+const BASE_URL = "/settings/connections";
+
 export const connectionsApi = {
-  list: (params) => api.get("/connections", { params }),
-  create: (data) => api.post("/connections", data),
-  get: (id) => api.get(`/connections/${id}`),
-  update: (id, data) => api.put(`/connections/${id}`, data),
-  activate: (id) => api.patch(`/connections/${id}/activate`),
-  deactivate: (id) => api.patch(`/connections/${id}/deactivate`),
-  delete: (id) => api.delete(`/connections/${id}`),
-  test: (id) => api.post(`/connections/${id}/test`),
-  listSchemas: (id) => api.get(`/connections/${id}/schemas`),
-  listTables: (id, schemaName) => api.get(`/connections/${id}/schemas/${schemaName}/tables`),
+  list: (params) => api.get(BASE_URL, { params }),
+  create: (data) => api.post(BASE_URL, data),
+  get: (id) => api.get(`${BASE_URL}/${id}`),
+  update: (id, data) => api.patch(`${BASE_URL}/${id}`, data),
+  activate: (id) => api.post(`${BASE_URL}/${id}/activate`),
+  deactivate: (id) => api.post(`${BASE_URL}/${id}/deactivate`),
+  test: (id) => api.post(`${BASE_URL}/${id}/test`),
+  
+  // Table Discovery
+  discover: (id, schema) => api.get(`${BASE_URL}/${id}/discover-tables`, { params: { schema } }),
+  
+  // Managed Tables
+  addManagedTable: (id, data) => api.post(`${BASE_URL}/${id}/managed-tables`, null, { params: data }),
+  removeManagedTable: (id, tableId) => api.delete(`${BASE_URL}/${id}/managed-tables/${tableId}`),
 };

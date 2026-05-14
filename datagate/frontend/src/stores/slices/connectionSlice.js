@@ -1,1 +1,0 @@
-// Platform connection, test connection, managed tables

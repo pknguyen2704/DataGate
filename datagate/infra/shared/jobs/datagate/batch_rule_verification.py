@@ -1,7 +1,10 @@
 import argparse
+import gc
 import logging
 import os
+import sys
 import uuid
+from contextlib import suppress
 from datetime import datetime
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -113,7 +116,7 @@ def get_active_rules(pg_hook, table_id):
         SELECT id, column_name, constraint_name, code_for_constraint, severity_level
         FROM rules
         WHERE table_id = %s
-          AND status = 'active'
+          AND is_active = TRUE
         ORDER BY column_name, code_for_constraint
         """,
         parameters=(table_id,),
@@ -193,10 +196,10 @@ def map_status(value):
     value = str(value or "").strip().lower()
 
     if value == "success":
-        return "success"
+        return "pass"
 
     if value == "failure":
-        return "failed"
+        return "fail"
 
     return "error"
 
@@ -337,6 +340,28 @@ def verify_rules_for_table(spark, table_info, rules, processing_date_hour):
     return rows
 
 
+def close_pg_hook(pg_hook):
+    if pg_hook is None:
+        return
+
+    with suppress(Exception):
+        conn = getattr(pg_hook, "conn", None)
+        if conn is not None and not conn.closed:
+            conn.close()
+
+
+def stop_spark_session(spark):
+    if spark is None:
+        return
+
+    with suppress(Exception):
+        spark.catalog.clearCache()
+    with suppress(Exception):
+        spark.sparkContext.cancelAllJobs()
+    with suppress(Exception):
+        spark.stop()
+
+
 def main():
     args = parse_args()
     schema_name = validate_name(args.schema_name, "schema_name")
@@ -349,19 +374,21 @@ def main():
         processing_date_hour,
     )
 
-    pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
-    connection_config = get_connection_config(pg_hook, args.connection_name)
-    tables = get_active_tables(pg_hook, connection_config["catalog_name"], schema_name)
-
-    if not tables:
-        logger.info("No active tables found | schema=%s", schema_name)
-        return
-
-    logger.info("Found active tables | schema=%s | tables=%s", schema_name, len(tables))
-
-    spark = create_spark_session(connection_config)
+    pg_hook = None
+    spark = None
 
     try:
+        pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
+        connection_config = get_connection_config(pg_hook, args.connection_name)
+        tables = get_active_tables(pg_hook, connection_config["catalog_name"], schema_name)
+
+        if not tables:
+            logger.info("No active tables found | schema=%s", schema_name)
+            return 0
+
+        logger.info("Found active tables | schema=%s | tables=%s", schema_name, len(tables))
+
+        spark = create_spark_session(connection_config)
         total = 0
 
         for table in tables:
@@ -394,10 +421,28 @@ def main():
             len(tables),
             total,
         )
+        return 0
+
+    except Exception:
+        logger.exception(
+            "Rule verification failed | connection=%s | schema=%s | hour=%s",
+            args.connection_name,
+            schema_name,
+            processing_date_hour,
+        )
+        return 1
 
     finally:
-        spark.stop()
+        stop_spark_session(spark)
+        close_pg_hook(pg_hook)
+        gc.collect()
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    with suppress(Exception):
+        sys.stdout.flush()
+    with suppress(Exception):
+        sys.stderr.flush()
+    logging.shutdown()
+    os._exit(exit_code)

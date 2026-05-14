@@ -46,5 +46,12 @@ class Config:
     database_password: str = _get_env("DATABASE_PASSWORD")
     database_db: str = _get_env("DATABASE_DB")
     database_url: str = _build_database_url()
+    
+    grafana_url: str = _get_env("GRAFANA_URL", "http://datagate.io.vn:3000").strip("/")
+    grafana_dashboard_uid: str = _get_env("GRAFANA_DASHBOARD_UID", "adcx6gp")
+    grafana_dashboard_slug: str = _get_env(
+        "GRAFANA_DASHBOARD_SLUG",
+        "table-metadata-and-profiling-per-batch",
+    ).strip("/")
 
 config = Config()

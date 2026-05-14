@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import Rule, RuleVerify, Table
 from app.schemas.rule_schema import RuleCreate, RuleUpdate
@@ -9,16 +9,73 @@ class RuleService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_rules(self, table_id: str | None = None, rule_status: str | None = None, limit: int | None = None) -> list[Rule]:
+    def list_rules(
+        self, 
+        table_id: str | None = None, 
+        column_name: str | None = None,
+        source: str | None = None,
+        rule_status: str | None = None, 
+        severity_level: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 50
+    ) -> dict:
         query = self.db.query(Rule)
         if table_id:
             query = query.filter(Rule.table_id == table_id)
+        if column_name:
+            query = query.filter(Rule.column_name == column_name)
+        if source:
+            query = query.filter(Rule.source == source)
+        
+        if search:
+            from sqlalchemy import or_
+            search_filter = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Rule.column_name.ilike(search_filter),
+                    Rule.constraint_name.ilike(search_filter),
+                    Rule.description.ilike(search_filter),
+                    Rule.code_for_constraint.ilike(search_filter)
+                )
+            )
+            
+        # Map status to is_active/source
         if rule_status:
-            query = query.filter(Rule.status == rule_status)
-        query = query.order_by(Rule.frequency.desc(), Rule.updated_at.desc(), Rule.created_at.desc())
-        if limit:
-            query = query.limit(limit)
-        return query.all()
+            if rule_status == "active":
+                query = query.filter(Rule.is_active.is_(True))
+            elif rule_status == "pending":
+                query = query.filter(Rule.is_active.is_(False), Rule.source == "system")
+            elif rule_status == "inactive":
+                query = query.filter(Rule.is_active.is_(False), Rule.source == "manual")
+                
+        if severity_level:
+            query = query.filter(Rule.severity_level == severity_level)
+            
+        total = query.count()
+        from sqlalchemy import case
+        
+        items = (
+            query.options(
+                joinedload(Rule.created_by_user),
+                joinedload(Rule.last_modified_by_user)
+            )
+            .order_by(
+                Rule.is_active.desc(),
+                case({"critical": 0, "warning": 1}, value=Rule.severity_level).asc(),
+                Rule.frequency.desc()
+            )
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
 
     def get_rule_or_404(self, rule_id: str) -> Rule:
         rule = self.db.query(Rule).filter(Rule.id == rule_id).first()
@@ -27,10 +84,20 @@ class RuleService:
         return rule
 
     def create_rule(self, data: RuleCreate, user_id: str) -> Rule:
+        # Check if table exists
         table = self.db.query(Table).filter(Table.id == str(data.table_id)).first()
         if not table:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Table not found")
-        rule = Rule(**data.model_dump(), created_by=user_id, last_modified_by=user_id)
+            
+        rule_dict = data.model_dump()
+        # If manual, active by default. If system, inactive (pending) by default.
+        if rule_dict.get("source") == "system":
+            rule_dict["is_active"] = False
+        else:
+            rule_dict["is_active"] = True
+            
+        rule = Rule(**rule_dict, created_by=user_id, last_modified_by=user_id)
+        
         self.db.add(rule)
         self.db.commit()
         self.db.refresh(rule)
@@ -38,16 +105,23 @@ class RuleService:
 
     def update_rule(self, rule_id: str, data: RuleUpdate, user_id: str) -> Rule:
         rule = self.get_rule_or_404(rule_id)
-        for field, value in data.model_dump(exclude_unset=True).items():
+        
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
             setattr(rule, field, value)
+            
         rule.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(rule)
         return rule
 
-    def set_rule_active(self, rule_id: str, is_active: bool, user_id: str) -> Rule:
+    def set_rule_status(self, rule_id: str, status_value: str, user_id: str) -> Rule:
         rule = self.get_rule_or_404(rule_id)
-        rule.status = "active" if is_active else "inactive"
+        if status_value == "active":
+            rule.is_active = True
+        elif status_value == "inactive":
+            rule.is_active = False
+            
         rule.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(rule)

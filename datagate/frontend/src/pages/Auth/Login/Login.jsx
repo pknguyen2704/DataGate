@@ -10,6 +10,7 @@ import {
   IconButton,
   InputAdornment,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import { Visibility, VisibilityOff, LockOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +26,7 @@ const Login = () => {
     password: "",
     rememberMe: false,
   });
+  const [loginError, setLoginError] = useState("");
 
   const dispatch = useDispatch();
   const { loading } = useSelector((state) => state.auth);
@@ -40,158 +42,191 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoginError("");
     try {
-      await dispatch(login({ username: formData.username, password: formData.password })).unwrap();
+      await dispatch(login({ 
+        username: formData.username, 
+        password: formData.password,
+        remember_me: formData.rememberMe 
+      })).unwrap();
       toast.success("Welcome back to DataGate!");
-      navigate("/");
+      navigate("/app/home");
     } catch (err) {
-      toast.error(err || "Invalid credentials. Please try again.");
+      const errorMsg = typeof err === 'string' ? err : err?.detail || err?.message || "Invalid credentials. Please try again.";
+      setLoginError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
   return (
     <Box
       sx={{
-        width: "100%",
-        maxWidth: 420,
-        p: { xs: 3, sm: 4.5 },
-        borderRadius: "8px",
-        bgcolor: "#FFFFFF",
-        backdropFilter: "blur(24px)",
-        boxShadow: "0 18px 48px rgba(6, 26, 54, 0.18)",
-        border: "1px solid #E2E8F0",
+        minHeight: "100vh",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
+        justifyContent: "center",
+        background: `linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)`,
+        p: 2
       }}
     >
-      <Box sx={{ mb: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-        <Box component="img" src={LogoImage} alt="DataGate Logo" sx={{ height: 48 }} />
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 700, color: "primary.main", letterSpacing: "-0.5px" }}
-        >
-          Sign in to DataGate
-        </Typography>
-      </Box>
-
       <Box
-        component="form"
-        onSubmit={handleSubmit}
-        sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 2 }}
+        sx={{
+          width: "100%",
+          maxWidth: 420,
+          p: { xs: 4, sm: 5 },
+          borderRadius: "16px",
+          bgcolor: "#FFFFFF",
+          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.05)",
+          border: "1px solid rgba(0, 0, 0, 0.05)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
       >
-        <TextField
-          fullWidth
-          label="Username"
-          name="username"
-          type="text"
-          variant="outlined"
-          required
-          autoComplete="username"
-          autoFocus
-          value={formData.username}
-          onChange={handleChange}
-          InputProps={{
-              sx: { borderRadius: "8px" },
-          }}
-        />
-
-        <TextField
-          fullWidth
-          label="Password"
-          name="password"
-          type={showPassword ? "text" : "password"}
-          variant="outlined"
-          required
-          autoComplete="current-password"
-          value={formData.password}
-          onChange={handleChange}
-          InputProps={{
-            sx: { borderRadius: "8px" },
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  onClick={() => setShowPassword((s) => !s)}
-                  edge="end"
-                  size="small"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <FormControlLabel
-            control={
-              <Checkbox
-                name="rememberMe"
-                size="small"
-                color="primary"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-              />
-            }
-            label={<Typography variant="body2">Remember me</Typography>}
-          />
-          <Link
-            href="#"
-            variant="body2"
-            underline="hover"
-            sx={{ fontWeight: 600, color: "primary.main" }}
+        <Box sx={{ mb: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+          <Box 
+            sx={{ 
+              width: 60, 
+              height: 60, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              bgcolor: 'primary.main', 
+              borderRadius: '12px',
+              mb: 1,
+              boxShadow: "0 8px 16px rgba(37, 99, 235, 0.2)"
+            }}
           >
-            Forgot password?
-          </Link>
+            <Box component="img" src={LogoImage} alt="DataGate Logo" sx={{ height: 32, filter: 'brightness(0) invert(1)' }} />
+          </Box>
+          <Typography
+            variant="h4"
+            sx={{ fontWeight: 800, color: "#0F172A", letterSpacing: "-1px" }}
+          >
+            DataGate
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+            Sign in to your account to continue
+          </Typography>
         </Box>
 
-        <Button
-          fullWidth
-          type="submit"
-          variant="contained"
-          disabled={loading}
-          size="large"
-          sx={{
-            mt: 0.5,
-            py: 1.4,
-            borderRadius: "8px",
-            fontWeight: 700,
-            fontSize: "0.95rem",
-            textTransform: "none",
-            bgcolor: "primary.main",
-            boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
-            "&:hover": {
-              bgcolor: "primary.dark",
-              boxShadow: "0 6px 20px rgba(37,99,235,0.45)",
-            },
-            transition: "all 0.2s ease",
-          }}
-          startIcon={
-            loading ? (
-              <CircularProgress size={18} color="inherit" />
-            ) : (
-              <LockOutlined fontSize="small" />
-            )
-          }
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 2.5 }}
         >
-          {loading ? "Authenticating…" : "Sign In"}
-        </Button>
-      </Box>
+          {loginError && (
+            <Alert severity="error" sx={{ borderRadius: 2, '& .MuiAlert-message': { fontWeight: 500 } }}>
+              {loginError}
+            </Alert>
+          )}
 
-      <Typography
-        variant="caption"
-        color="text.disabled"
-        sx={{ mt: 3, textAlign: "center" }}
-      >
-        Access is restricted to authorized personnel only.
-      </Typography>
+          <TextField
+            fullWidth
+            label="Username or Email"
+            name="username"
+            type="text"
+            variant="outlined"
+            required
+            autoComplete="username"
+            autoFocus
+            value={formData.username}
+            onChange={handleChange}
+            InputProps={{
+                sx: { borderRadius: "10px" },
+            }}
+          />
+
+          <TextField
+            fullWidth
+            label="Password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            variant="outlined"
+            required
+            autoComplete="current-password"
+            value={formData.password}
+            onChange={handleChange}
+            InputProps={{
+              sx: { borderRadius: "10px" },
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword((s) => !s)}
+                    edge="end"
+                    size="small"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mt: -1
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Checkbox
+                  name="rememberMe"
+                  size="small"
+                  color="primary"
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Remember me</Typography>}
+            />
+
+          </Box>
+
+          <Button
+            fullWidth
+            type="submit"
+            variant="contained"
+            disabled={loading}
+            size="large"
+            sx={{
+              py: 1.6,
+              borderRadius: "10px",
+              fontWeight: 700,
+              fontSize: "1rem",
+              textTransform: "none",
+              bgcolor: "primary.main",
+              boxShadow: "0 10px 20px rgba(37, 99, 235, 0.2)",
+              "&:hover": {
+                bgcolor: "primary.dark",
+                boxShadow: "0 12px 24px rgba(37, 99, 235, 0.3)",
+              },
+              transition: "all 0.3s ease",
+            }}
+            startIcon={
+              loading ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <LockOutlined fontSize="small" />
+              )
+            }
+          >
+            {loading ? "Authenticating…" : "Sign In"}
+          </Button>
+        </Box>
+
+        <Typography
+          variant="caption"
+          color="text.disabled"
+          sx={{ mt: 4, textAlign: "center", fontWeight: 500 }}
+        >
+          &copy; 2026 DataGate Platform. All rights reserved.
+        </Typography>
+      </Box>
     </Box>
   );
 };

@@ -1,80 +1,81 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
-
-from app.schemas.common_schema import RuleSource, RuleStatus, SeverityLevel
+from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.common_schema import PaginatedResponse, RuleSource, RuleStatus, SeverityLevel
+from app.schemas.user_schema import UserLiteOut
 
 
 class RuleBase(BaseModel):
     table_id: UUID
-
-    source: RuleSource = RuleSource.MANUAL
-    status: RuleStatus = RuleStatus.PENDING
-    severity_level: SeverityLevel = SeverityLevel.WARNING
-
     column_name: str = Field(..., max_length=255)
     constraint_name: str | None = Field(default=None, max_length=512)
     description: str | None = None
-
-    frequency: int = Field(default=1, ge=1)
     current_value: str | None = Field(default=None, max_length=255)
     suggesting_rule: str | None = Field(default=None, max_length=255)
     code_for_constraint: str = Field(..., max_length=512)
     rule_description: str | None = None
+    frequency: int = 1
+    source: RuleSource = RuleSource.MANUAL
+    severity_level: SeverityLevel = SeverityLevel.WARNING
+    is_active: bool = True
 
-    created_by: UUID | None = None
-    last_modified_by: UUID | None = None
 
-
-class RuleCreate(RuleBase):
-    pass
+class RuleCreate(BaseModel):
+    table_id: UUID
+    column_name: str = Field(..., max_length=255)
+    constraint_name: str | None = Field(default=None, max_length=512)
+    code_for_constraint: str = Field(..., max_length=512)
+    severity_level: SeverityLevel = SeverityLevel.WARNING
+    description: str | None = None
+    frequency: int = 1
+    source: RuleSource = RuleSource.MANUAL
 
 
 class RuleUpdate(BaseModel):
-    source: RuleSource | None = None
-    status: RuleStatus | None = None
-    severity_level: SeverityLevel | None = None
-
     column_name: str | None = Field(default=None, max_length=255)
     constraint_name: str | None = Field(default=None, max_length=512)
-    description: str | None = None
-
-    frequency: int | None = Field(default=None, ge=1)
-    current_value: str | None = Field(default=None, max_length=255)
-    suggesting_rule: str | None = Field(default=None, max_length=255)
     code_for_constraint: str | None = Field(default=None, max_length=512)
-    rule_description: str | None = None
-
-    last_modified_by: UUID | None = None
+    severity_level: SeverityLevel | None = None
+    description: str | None = None
+    is_active: bool | None = None
+    frequency: int | None = None
 
 
 class RuleOut(RuleBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-
+    created_by: UUID | None = None
+    last_modified_by: UUID | None = None
+    created_by_user: UserLiteOut | None = None
+    last_modified_by_user: UserLiteOut | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
-class RuleVerifyBase(BaseModel):
-    rule_id: UUID
-    constraint_status: str = Field(..., max_length=50)
-    constraint_message: str | None = None
-    processing_date_hour: datetime
-
-
-class RuleVerifyCreate(RuleVerifyBase):
+class RuleListOut(PaginatedResponse[RuleOut]):
     pass
 
 
+class RuleVerifyCreate(BaseModel):
+    rule_id: UUID
+    table_id: UUID
+    batch_id: str | None = None
+    status: str
+    message: str | None = None
+
+
 class RuleVerifyUpdate(BaseModel):
-    constraint_status: str | None = Field(default=None, max_length=50)
-    constraint_message: str | None = None
+    is_resolved: bool
 
 
-class RuleVerifyOut(RuleVerifyBase):
+class RuleVerifyOut(BaseModel):
     id: UUID
+    rule_id: UUID
+    table_id: UUID
+    batch_id: str | None = None
+    status: str
+    message: str | None = None
+    is_resolved: bool
     created_at: datetime
-    updated_at: datetime
-
+    rule: RuleOut | None = None
     model_config = ConfigDict(from_attributes=True)

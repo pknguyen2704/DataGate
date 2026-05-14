@@ -86,10 +86,83 @@ def seed_admin(db: Session, roles: dict[str, Role]) -> User:
     return admin
 
 
+def seed_test_users(db: Session, roles: dict[str, Role]) -> None:
+    # Data Engineer
+    engineer = db.query(User).filter(User.username == "engineer").first()
+    if not engineer:
+        engineer = User(
+            username="engineer",
+            email="engineer@datagate.io",
+            full_name="John Engineer",
+            hashed_password=get_hashed_password("engineer123"),
+            is_active=True,
+            roles=[roles["Data Engineer"]] if "Data Engineer" in roles else []
+        )
+        db.add(engineer)
+    
+    # Data Analyst
+    analyst = db.query(User).filter(User.username == "analyst").first()
+    if not analyst:
+        analyst = User(
+            username="analyst",
+            email="analyst@datagate.io",
+            full_name="Sarah Analyst",
+            hashed_password=get_hashed_password("analyst123"),
+            is_active=True,
+            roles=[roles["Data Analyst"]] if "Data Analyst" in roles else []
+        )
+        db.add(analyst)
+
+def seed_data_assets(db: Session) -> None:
+    from app.models import Connection, Table
+    import uuid
+
+    # Seed Sample Connection
+    conn = db.query(Connection).filter(Connection.connection_name == "Sample Data Lake").first()
+    if not conn:
+        conn = Connection(
+            id=str(uuid.uuid4()),
+            connection_name="Sample Data Lake",
+            connection_type="trino",
+            host="localhost",
+            port=8080,
+            username="admin",
+            password="password",
+            database="iceberg",
+            is_active=True
+        )
+        db.add(conn)
+        db.flush()
+
+    # Seed Sample Tables
+    samples = [
+        ("iceberg", "silver", "users"),
+        ("iceberg", "silver", "orders"),
+        ("iceberg", "gold", "customer_summary"),
+        ("iceberg", "gold", "daily_sales"),
+    ]
+    for cat, sch, tab in samples:
+        exists = db.query(Table).filter(
+            Table.catalog_name == cat,
+            Table.schema_name == sch,
+            Table.table_name == tab
+        ).first()
+        if not exists:
+            table = Table(
+                id=str(uuid.uuid4()),
+                connection_id=conn.id,
+                catalog_name=cat,
+                schema_name=sch,
+                table_name=tab,
+                is_active=True
+            )
+            db.add(table)
+
 def seed(db: Session) -> None:
     permissions = seed_permissions(db)
     roles = seed_roles(db, permissions)
     seed_admin(db, roles)
+    seed_test_users(db, roles)
     db.commit()
 
 
