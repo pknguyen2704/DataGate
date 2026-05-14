@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  Box, Button, Table, TableBody, TableCell, TableHead, TableRow, 
+import {
+  Box, Button, Table, TableBody, TableCell, TableHead, TableRow,
   Paper, Typography, CircularProgress, Stack, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Switch, FormControlLabel, Grid, Tooltip, TablePagination, TableContainer,
   MenuItem, Select, FormControl, InputLabel, Chip
 } from "@mui/material";
-import { 
-  RefreshOutlined, AddOutlined, EditOutlined, 
-  ArrowBackOutlined, VisibilityOutlined, SaveOutlined, 
+import {
+  RefreshOutlined, AddOutlined, EditOutlined,
+  ArrowBackOutlined, VisibilityOutlined, SaveOutlined,
   StorageOutlined, SearchOutlined, CheckCircleOutline, CancelOutlined,
   BugReportOutlined, PowerSettingsNewOutlined, DeleteOutline
 } from "@mui/icons-material";
@@ -38,17 +38,23 @@ const INITIAL_CONNECTION = {
 function PlatformConnection() {
   const { user } = useSelector(state => state.auth);
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const hasPerm = user?.permissions?.some(p => p === "connection:manage" || p?.code === "connection:manage");
-  const canManage = isAdmin || hasPerm;
-  
+  const canView = isAdmin || user?.permissions?.some(p => p === "connection:view" || p?.code === "connection:view");
+  const canCreate = isAdmin || user?.permissions?.some(p => p === "connection:create" || p?.code === "connection:create");
+  const canUpdate = isAdmin || user?.permissions?.some(p => p === "connection:update" || p?.code === "connection:update");
+  const canDelete = isAdmin;
+  const canTest = isAdmin || user?.permissions?.some(p => p === "connection:test" || p?.code === "connection:test");
+  const canCreateTable = isAdmin || user?.permissions?.some(p => p === "table:create" || p?.code === "table:create");
+  const canUpdateTable = isAdmin || user?.permissions?.some(p => p === "table:update" || p?.code === "table:update");
+  const canDeleteTable = isAdmin || user?.permissions?.some(p => p === "table:delete" || p?.code === "table:delete");
+
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
-  
+
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  
-  const connections = useApiResource(() => connectionsApi.list({ 
-    page: page + 1, 
-    page_size: pageSize 
+
+  const connections = useApiResource(() => connectionsApi.list({
+    page: page + 1,
+    page_size: pageSize
   }), [page, pageSize]);
 
   const [openDialog, setOpenDialog] = useState(false);
@@ -135,10 +141,13 @@ function PlatformConnection() {
 
   if (selectedConnectionId) {
     return (
-      <ConnectionDetail 
-        connectionId={selectedConnectionId} 
-        onBack={() => setSelectedConnectionId(null)} 
-        canManage={canManage}
+      <ConnectionDetail
+        connectionId={selectedConnectionId}
+        onBack={() => setSelectedConnectionId(null)}
+        canUpdate={canUpdate}
+        canUpdateTable={canUpdateTable}
+        canCreateTable={canCreateTable}
+        canDeleteTable={canDeleteTable}
         onToggleActive={handleToggleActive}
       />
     );
@@ -155,7 +164,7 @@ function PlatformConnection() {
         <Button startIcon={<RefreshOutlined />} variant="outlined" size="small" onClick={connections.reload} sx={{ borderRadius: 1.5 }}>
           Refresh
         </Button>
-        {canManage && (
+        {canCreate && (
           <Button startIcon={<AddOutlined />} variant="contained" size="small" onClick={handleOpenAdd} sx={{ borderRadius: 1.5 }}>
             Add Connection
           </Button>
@@ -180,17 +189,17 @@ function PlatformConnection() {
                   <TableCell>{row.description || "—"}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch 
-                        size="small" 
-                        checked={row.is_active} 
+                      <Switch
+                        size="small"
+                        checked={row.is_active}
                         onChange={() => handleToggleActive(row)}
                         color="success"
-                        disabled={!canManage}
+                        disabled={!canUpdate}
                       />
-                      <Chip 
-                        label={row.is_active ? "Active" : "Inactive"} 
-                        size="small" 
-                        variant="outlined" 
+                      <Chip
+                        label={row.is_active ? "Active" : "Inactive"}
+                        size="small"
+                        variant="outlined"
                         color={row.is_active ? "success" : "default"}
                         sx={{ ml: 1, border: 'none', fontWeight: 600 }}
                       />
@@ -203,7 +212,7 @@ function PlatformConnection() {
                           <VisibilityOutlined fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      {canManage && (
+                      {canUpdate && (
                         <>
                           <Tooltip title="Edit">
                             <IconButton size="small" color="info" onClick={() => handleOpenEdit(row)}>
@@ -247,46 +256,46 @@ function PlatformConnection() {
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12} md={6}>
-              <TextField label="Name" fullWidth size="small" value={form.connection_name} onChange={e => setForm({...form, connection_name: e.target.value})} />
+              <TextField label="Name" fullWidth size="small" value={form.connection_name} onChange={e => setForm({ ...form, connection_name: e.target.value })} />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField label="Description" fullWidth size="small" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+              <TextField label="Description" fullWidth size="small" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
             </Grid>
-            
+
             <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>TRINO</Typography></Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Host" fullWidth size="small" value={form.trino_host} onChange={e => setForm({...form, trino_host: e.target.value})} />
+              <TextField label="Host" fullWidth size="small" value={form.trino_host} onChange={e => setForm({ ...form, trino_host: e.target.value })} />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField label="Port" type="number" fullWidth size="small" value={form.trino_port} onChange={e => setForm({...form, trino_port: parseInt(e.target.value)})} />
+              <TextField label="Port" type="number" fullWidth size="small" value={form.trino_port} onChange={e => setForm({ ...form, trino_port: parseInt(e.target.value) })} />
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField label="User" fullWidth size="small" value={form.trino_user} onChange={e => setForm({...form, trino_user: e.target.value})} />
+              <TextField label="User" fullWidth size="small" value={form.trino_user} onChange={e => setForm({ ...form, trino_user: e.target.value })} />
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField label="Password" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.trino_password} onChange={e => setForm({...form, trino_password: e.target.value})} />
+              <TextField label="Password" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.trino_password} onChange={e => setForm({ ...form, trino_password: e.target.value })} />
             </Grid>
 
             <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>ICEBERG</Typography></Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Catalog" fullWidth size="small" value={form.iceberg_catalog_name} onChange={e => setForm({...form, iceberg_catalog_name: e.target.value})} />
+              <TextField label="Catalog" fullWidth size="small" value={form.iceberg_catalog_name} onChange={e => setForm({ ...form, iceberg_catalog_name: e.target.value })} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="REST URL" fullWidth size="small" value={form.iceberg_rest_url} onChange={e => setForm({...form, iceberg_rest_url: e.target.value})} />
+              <TextField label="REST URL" fullWidth size="small" value={form.iceberg_rest_url} onChange={e => setForm({ ...form, iceberg_rest_url: e.target.value })} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Warehouse" fullWidth size="small" value={form.iceberg_warehouse} onChange={e => setForm({...form, iceberg_warehouse: e.target.value})} />
+              <TextField label="Warehouse" fullWidth size="small" value={form.iceberg_warehouse} onChange={e => setForm({ ...form, iceberg_warehouse: e.target.value })} />
             </Grid>
 
             <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>STORAGE (MINIO/S3)</Typography></Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Endpoint" fullWidth size="small" value={form.minio_endpoint_url} onChange={e => setForm({...form, minio_endpoint_url: e.target.value})} />
+              <TextField label="Endpoint" fullWidth size="small" value={form.minio_endpoint_url} onChange={e => setForm({ ...form, minio_endpoint_url: e.target.value })} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Access Key" fullWidth size="small" value={form.minio_access_key} onChange={e => setForm({...form, minio_access_key: e.target.value})} />
+              <TextField label="Access Key" fullWidth size="small" value={form.minio_access_key} onChange={e => setForm({ ...form, minio_access_key: e.target.value })} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Secret Key" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.minio_secret_key} onChange={e => setForm({...form, minio_secret_key: e.target.value})} />
+              <TextField label="Secret Key" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.minio_secret_key} onChange={e => setForm({ ...form, minio_secret_key: e.target.value })} />
             </Grid>
           </Grid>
         </DialogContent>
@@ -310,7 +319,7 @@ function PlatformConnection() {
   );
 }
 
-function ConnectionDetail({ connectionId, onBack, canManage, onToggleActive }) {
+function ConnectionDetail({ connectionId, onBack, canUpdate, canUpdateTable, canCreateTable, canDeleteTable, onToggleActive }) {
   const [tab, setTab] = useState("config");
   const connection = useApiResource(() => connectionsApi.get(connectionId));
 
@@ -341,23 +350,23 @@ function ConnectionDetail({ connectionId, onBack, canManage, onToggleActive }) {
             <Grid item xs={12} md={4}>
               <Typography variant="caption" color="text.secondary" fontWeight={700}>STATUS</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                <Switch 
-                  size="small" 
-                  checked={connection.data.is_active} 
+                <Switch
+                  size="small"
+                  checked={connection.data.is_active}
                   onChange={() => onToggleActive(connection.data)}
                   color="success"
-                  disabled={!canManage}
+                  disabled={!canUpdate}
                 />
-                <Chip 
-                  label={connection.data.is_active ? "Active" : "Inactive"} 
-                  size="small" 
-                  variant="outlined" 
+                <Chip
+                  label={connection.data.is_active ? "Active" : "Inactive"}
+                  size="small"
+                  variant="outlined"
                   color={connection.data.is_active ? "success" : "default"}
                   sx={{ ml: 1, border: 'none', fontWeight: 600 }}
                 />
               </Box>
             </Grid>
-            
+
             <Grid item xs={12}>
               <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Trino Configuration</Typography>
             </Grid>
@@ -406,21 +415,21 @@ function ConnectionDetail({ connectionId, onBack, canManage, onToggleActive }) {
       )}
 
       {tab === "tables" && (
-        <ManagedTables connectionId={connectionId} connectionData={connection.data} canManage={canManage} />
+        <ManagedTables connectionId={connectionId} connectionData={connection.data} canUpdateTable={canUpdateTable} canCreateTable={canCreateTable} canDeleteTable={canDeleteTable} />
       )}
     </Box>
   );
 }
 
-function ManagedTables({ connectionId, connectionData, canManage }) {
+function ManagedTables({ connectionId, connectionData, canUpdateTable, canCreateTable, canDeleteTable }) {
   const [tables, setTables] = useState({ data: [], loading: true });
   const [openAdd, setOpenAdd] = useState(false);
   const [adding, setAdding] = useState(false);
-  
+
   const [schemas, setSchemas] = useState([]);
   const [loadingSchemas, setLoadingSchemas] = useState(false);
   const [selectedSchema, setSelectedSchema] = useState("");
-  
+
   const [discoveryTables, setDiscoveryTables] = useState([]);
   const [loadingDiscovery, setLoadingDiscovery] = useState(false);
   const [selectedTable, setSelectedTable] = useState("");
@@ -428,8 +437,8 @@ function ManagedTables({ connectionId, connectionData, canManage }) {
   const refreshManaged = async () => {
     setTables(prev => ({ ...prev, loading: true }));
     try {
-      const res = await connectionsApi.list(); 
-    } catch (err) {}
+      const res = await connectionsApi.list();
+    } catch (err) { }
   };
 
   const managedRes = useApiResource(() => dataAssetsApi.list({ connection_id: connectionId }), [connectionId]);
@@ -505,7 +514,7 @@ function ManagedTables({ connectionId, connectionData, canManage }) {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        {canManage && (
+        {canCreateTable && (
           <Button startIcon={<AddOutlined />} variant="contained" size="small" onClick={() => { setOpenAdd(true); fetchSchemas(); }}>
             Register Table
           </Button>
@@ -530,24 +539,24 @@ function ManagedTables({ connectionId, connectionData, canManage }) {
                   <TableCell sx={{ fontWeight: 600 }}>{row.table_name}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch 
-                        size="small" 
-                        checked={row.is_active} 
+                      <Switch
+                        size="small"
+                        checked={row.is_active}
                         onChange={() => handleToggleTableActive(row)}
                         color="success"
-                        disabled={!canManage}
+                        disabled={!canUpdateTable}
                       />
-                      <Chip 
-                        label={row.is_active ? "Active" : "Inactive"} 
-                        size="small" 
-                        variant="outlined" 
+                      <Chip
+                        label={row.is_active ? "Active" : "Inactive"}
+                        size="small"
+                        variant="outlined"
                         color={row.is_active ? "success" : "default"}
                         sx={{ ml: 1, border: 'none', fontWeight: 600 }}
                       />
                     </Box>
                   </TableCell>
                   <TableCell align="right">
-                    {canManage && (
+                    {canDeleteTable && (
                       <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}>
                         <DeleteOutline fontSize="small" />
                       </IconButton>

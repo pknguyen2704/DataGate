@@ -49,7 +49,7 @@ function App() {
 
           {/* Settings */}
           <Route path="/app/settings" element={<Settings />}>
-            <Route index element={<Navigate to="model-configs" replace />} />
+            <Route index element={null} />
             
             <Route element={<ProtectedRoute permission="connection:view" />}>
               <Route path="connections" element={<PlatformConnection />} />

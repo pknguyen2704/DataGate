@@ -87,12 +87,15 @@
 - Quản lý quyền hạn
 + Role:
 ++ Admin:
-+++ Có tất cả các quyền
++++ Có tất cả các quyền cao nhất, bao gồm quản lý người dùng và hạ tầng kết nối.
 ++ Data engineer:
-+++ Không được chỉnh sửa platform connection
-++ Data Analyst: Data Analyst
-+++ Không được chỉnh sửa platform connection
-+++ Không được chỉnh sửa các ngưỡng
++++ Có quyền xem thông tin và kiểm tra (test) kết nối nền tảng.
++++ Có quyền tích hợp bảng mới, bật/tắt trạng thái hoạt động của bảng.
++++ KHÔNG có quyền sửa đổi thông tin, xóa kết nối hoặc xóa bảng khỏi hệ thống.
+++ Data Analyst:
++++ Có quyền xem kết quả chất lượng dữ liệu, metadata và profiling.
++++ Có quyền đề xuất (tạo nháp) các luật dữ liệu để gửi phê duyệt.
++++ KHÔNG được chỉnh sửa cấu hình hệ thống, ngưỡng cảnh báo hoặc phê duyệt luật.
 - Quản lý người dùng (Thông tin, role,...)
 ## Phân quyền
 Bảng phân quyền
@@ -101,12 +104,17 @@ Bảng phân quyền
 | Đăng nhập hệ thống                |                                     Truy cập hệ thống |   Có  |       Có      |      Có      | Tất cả người dùng phải đăng nhập trước khi sử dụng hệ thống.                            |
 | Phân quyền người dùng             |      Xem, thêm, sửa, xóa người dùng, vai trò và quyền |   Có  |     Không     |     Không    | Chỉ Admin được quản lý phân quyền người dùng.                                           |
 | Quản lý kết nối nền tảng dữ liệu  |                                 Xem thông tin kết nối |   Có  |       Có      |     Không    | Data Engineer được xem để phục vụ vận hành; Data Analyst không cần truy cập connection. |
-| Quản lý kết nối nền tảng dữ liệu  |                        Thêm, sửa, vô hiệu hóa kết nối |   Có  |     Không     |     Không    | Chỉ Admin được thay đổi platform connection.                                            |
+| Quản lý kết nối nền tảng dữ liệu  |                    Thêm, sửa, xóa, bật/tắt kết nối    |   Có  |     Không     |     Không    | Chỉ Admin có quyền quản lý thông tin và trạng thái của platform connection.            |
+| Quản lý bảng tích hợp            |                           Tích hợp bảng mới vào hệ thống |   Có  |       Có      |     Không    | Data Engineer có thể chủ động thêm bảng mới để theo dõi.                               |
+| Quản lý bảng tích hợp            |                                Bật/tắt theo dõi bảng |   Có  |       Có      |     Không    | Data Engineer có quyền bật/tắt việc kiểm tra chất lượng cho từng bảng.                  |
+| Quản lý bảng tích hợp            |                         Xóa bảng khỏi hệ thống quản lý |   Có  |     Không     |     Không    | Chỉ Admin được phép xóa hoàn toàn bảng khỏi danh sách quản lý.                         |
 | Quản lý tham số mô hình           |                                   Xem tham số mô hình |   Có  |       Có      |      Có      | Các vai trò có thể xem để hiểu cấu hình phát hiện bất thường.                           |
-| Quản lý tham số mô hình           |                        Thêm, sửa, xóa tham số mô hình |   Có  |       Có      |     Không    | Tham số mô hình là cấu hình kỹ thuật, chỉ Admin và Data Engineer được chỉnh sửa.        |
+| Quản lý tham số mô hình           |                        Thêm, sửa thông tin tham số    |   Có  |       Có      |     Không    | Tham số mô hình là cấu hình kỹ thuật, chỉ Admin và Data Engineer được chỉnh sửa.        |
+| Quản lý tham số mô hình           |                            Xóa tham số mô hình        |   Có  |     Không     |     Không    | Ngăn chặn Engineer xóa các cấu hình mô hình quan trọng.                                |
 | Xem siêu dữ liệu và hồ sơ dữ liệu |              Xem metadata, profiling và lịch sử batch |   Có  |       Có      |      Có      | Cả ba vai trò đều có thể theo dõi trạng thái dữ liệu.                                   |
 | Quản lý ngưỡng cảnh báo           |                                   Xem ngưỡng cảnh báo |   Có  |       Có      |      Có      | Data Analyst được xem để hiểu tiêu chí đánh giá chất lượng dữ liệu.                     |
-| Quản lý ngưỡng cảnh báo           |                        Thêm, sửa, xóa ngưỡng cảnh báo |   Có  |       Có      |     Không    | Ngưỡng là cấu hình vận hành, chỉ Admin và Data Engineer được chỉnh sửa.                 |
+| Quản lý ngưỡng cảnh báo           |                        Thêm, sửa ngưỡng cảnh báo      |   Có  |       Có      |     Không    | Ngưỡng là cấu hình vận hành, chỉ Admin và Data Engineer được chỉnh sửa.                 |
+| Quản lý ngưỡng cảnh báo           |                            Xóa ngưỡng cảnh báo        |   Có  |     Không     |     Không    | Chỉ Admin được phép xóa hoàn toàn các ngưỡng cảnh báo.                                 |
 | Quản lý luật dữ liệu              |             Xem, thêm, sửa rule nháp và gửi phê duyệt |   Có  |       Có      |      Có      | Data Analyst được đề xuất và chỉnh sửa luật ở trạng thái nháp.                          |
 | Quản lý luật dữ liệu              |                Phê duyệt, bật/tắt và xóa luật dữ liệu |   Có  |       Có      |     Không    | Các thao tác này ảnh hưởng trực tiếp đến quy trình kiểm tra chất lượng dữ liệu.         |
 | Quản lý chất lượng dữ liệu        | Xem kết quả kiểm tra và chi tiết lỗi warning/critical |   Có  |       Có      |      Có      | Cả ba vai trò đều có thể xem kết quả để giám sát và phân tích nguyên nhân.              |

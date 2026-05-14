@@ -11,18 +11,19 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         PermissionCode.DASHBOARD_VIEW,
         PermissionCode.HOME_VIEW,
         PermissionCode.CONNECTION_VIEW,
-        # Cannot manage connections
+        PermissionCode.CONNECTION_TEST,
+        # Cannot create, update, or delete connections (Admin only)
         PermissionCode.TABLE_VIEW,
         PermissionCode.TABLE_CREATE,
         PermissionCode.TABLE_UPDATE,
-        PermissionCode.TABLE_DELETE,
+        # Cannot delete tables
         PermissionCode.METADATA_VIEW,
         PermissionCode.METADATA_COLLECT,
         PermissionCode.OBSERVABILITY_VIEW,
         PermissionCode.RULE_VIEW,
         PermissionCode.RULE_CREATE,
         PermissionCode.RULE_UPDATE,
-        PermissionCode.RULE_DELETE,
+        # Cannot delete rules
         PermissionCode.RULE_ENABLE_DISABLE,
         PermissionCode.RULE_SUGGEST,
         PermissionCode.QUALITY_VIEW,
@@ -30,7 +31,7 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         PermissionCode.THRESHOLD_VIEW,
         PermissionCode.THRESHOLD_CREATE,
         PermissionCode.THRESHOLD_UPDATE,
-        PermissionCode.THRESHOLD_DELETE,
+        # Cannot delete thresholds
         PermissionCode.ANOMALY_VIEW,
         PermissionCode.ANOMALY_RUN,
         PermissionCode.ALERT_VIEW,

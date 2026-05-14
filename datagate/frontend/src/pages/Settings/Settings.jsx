@@ -14,7 +14,9 @@ const SettingsPage = () => {
 
   const hasPermission = (permCode) => {
     if (!permCode) return true;
-    return permissions.includes(permCode);
+    const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
+    if (isAdmin) return true;
+    return permissions.some(p => p === permCode || p?.code === permCode);
   };
 
   const menuItems = [
@@ -25,6 +27,12 @@ const SettingsPage = () => {
   ];
 
   const visibleItems = menuItems.filter(item => hasPermission(item.permission));
+
+  React.useEffect(() => {
+    if (location.pathname === "/app/settings" && visibleItems.length > 0) {
+      navigate(visibleItems[0].path, { replace: true });
+    }
+  }, [location.pathname, visibleItems, navigate]);
 
   return (
     <Box sx={{ display: 'flex', height: '100%', p: 3, gap: 3 }}>

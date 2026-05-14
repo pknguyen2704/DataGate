@@ -193,7 +193,7 @@ function ModelParameter() {
                           <EditOutlined fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      {canManage && (
+                      {isAdmin && (
                         <Tooltip title="Delete">
                           <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}>
                             <DeleteOutline fontSize="small" />
