@@ -9,7 +9,7 @@ export { homeApi } from "./homeApi";
 export { observabilityApi } from "./observabilityApi";
 export { metricsApi } from "./metricsApi";
 export { dataQualityApi } from "./dataQualityApi";
-export { modelParametersApi } from "./modelConfigsApi";
+export { anomalyJobConfigsApi, modelParametersApi } from "./modelConfigsApi";
 
 const getDefaultApiUrl = () => {
   const { protocol, hostname } = window.location;

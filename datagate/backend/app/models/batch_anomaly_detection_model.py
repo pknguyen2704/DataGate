@@ -48,6 +48,39 @@ class LightGBMParameter(Base):
         Index("ix_lgbm_params__table_id", "table_id", unique=True),
     )
 
+class LightGBMAnomalyConfig(Base):
+    __tablename__ = "lightgbm_anomaly_configs"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
+    batch_time_col = Column(String(255), nullable=False)
+
+    required_history_days = Column(Integer, nullable=False)
+    previous_batch_hours = Column(Integer, nullable=False)
+    history_days = Column(JSONB, nullable=False)
+    target_sample_per_group = Column(Integer, nullable=False)
+    test_size = Column(Float, nullable=False)
+    random_state = Column(Integer, nullable=False)
+    p_value_alpha = Column(Float, nullable=False)
+    min_history_auc_points = Column(Integer, nullable=False)
+    exclude_cols = Column(JSONB, default=list, nullable=False)
+    categorical_cols = Column(JSONB, default=list, nullable=False)
+    numeric_cols = Column(JSONB, default=list, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    created_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    last_modified_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    table = relationship("Table", back_populates="lightgbm_anomaly_config")
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    last_modified_by_user = relationship("User", foreign_keys=[last_modified_by])
+
+    __table_args__ = (
+        Index("ix_lgbm_anomaly_configs__table_id", "table_id", unique=True),
+    )
+
 class LightGBMAUC(Base):
     __tablename__ = "lightgbm_auc"
 
@@ -60,7 +93,7 @@ class LightGBMAUC(Base):
     auc_score = Column(Float, nullable=True)
     p_value = Column(Float, nullable=True)
     parameter_snapshot = Column(JSONB, nullable=True)
-
+    feature_config_snapshot = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     table = relationship("Table", back_populates="lightgbm_auc")

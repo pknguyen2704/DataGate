@@ -25,9 +25,9 @@ const Metric = () => {
   const [addTrigger, setAddTrigger] = useState(0); // Counter to trigger add in children
   const { user } = useSelector(state => state.auth);
 
-  // Check permission: threshold:update
+  // Check permission: threshold:manage
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const hasThresholdPerm = user?.permissions?.some(p => p === "threshold:update" || p?.code === "threshold:update");
+  const hasThresholdPerm = user?.permissions?.some(p => p === "threshold:manage" || p?.code === "threshold:manage");
   const canManage = isAdmin || hasThresholdPerm;
 
   // API Resources (only for schema check)

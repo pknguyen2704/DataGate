@@ -158,10 +158,12 @@ class DashboardService:
     def grafana_variables(self) -> dict:
         from app.models import Connection
         rows = self.db.query(Table).join(Connection).filter(Table.is_active.is_(True), Connection.is_active.is_(True)).all()
+        connections = self.db.query(Connection).filter(Connection.is_active.is_(True)).all()
         return {
             "catalogs": sorted({row.catalog_name for row in rows if row.catalog_name}),
             "schemas": sorted({row.schema_name for row in rows if row.schema_name}), 
             "tables": sorted({row.table_name for row in rows if row.table_name}), 
+            "connections": [{"id": str(c.id), "name": c.connection_name} for c in connections],
             "processing_date_hours": self.processing_hours()
         }
 

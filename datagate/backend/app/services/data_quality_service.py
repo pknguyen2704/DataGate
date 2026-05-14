@@ -283,7 +283,7 @@ class DataQualityService:
         if not r: raise HTTPException(status_code=404, detail="Result not found")
         
         # Get SHAP
-        shap = self.db.query(SHAPResult).filter(SHAPResult.lightgbm_result_id == r.lightgbm_result_id).order_by(SHAPResult.shap_rank).limit(10).all()
+        shap = self.db.query(SHAPResult).filter(SHAPResult.lightgbm_result_id == r.lightgbm_result_id).order_by(SHAPResult.shap_rank).all()
         top_features = [{"feature_name": s.feature_name, "shap_score": s.shap_score, "shap_rank": s.shap_rank} for s in shap]
         
         # Get Model Config

@@ -1,0 +1,98 @@
+./api/v1/endpoints/home_router.py:    _user: User = Depends(require_permission(PermissionCode.HOME_VIEW)),
+./api/v1/endpoints/home_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/home_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/home_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/home_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/home_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/home_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/observability_router.py:    _user: User = Depends(require_permission(PermissionCode.DASHBOARD_VIEW)),
+./api/v1/endpoints/observability_router.py:    _user: User = Depends(require_permission(PermissionCode.DASHBOARD_VIEW)),
+./api/v1/endpoints/observability_router.py:    _user: User = Depends(require_permission(PermissionCode.DASHBOARD_VIEW)),
+./api/v1/endpoints/observability_router.py:    _user: User = Depends(require_permission(PermissionCode.DASHBOARD_VIEW)),
+./api/v1/endpoints/anomaly_router.py:def list_auc_results(service: LightGBMService = Depends(get_lightgbm_service), _user: User = Depends(require_permission(PermissionCode.ANOMALY_VIEW))):
+./api/v1/endpoints/anomaly_router.py:def get_auc_result(auc_result_id: UUID, service: LightGBMService = Depends(get_lightgbm_service), _user: User = Depends(require_permission(PermissionCode.ANOMALY_VIEW))):
+./api/v1/endpoints/anomaly_router.py:def auc_timeline(table_id: UUID, service: LightGBMService = Depends(get_lightgbm_service), _user: User = Depends(require_permission(PermissionCode.ANOMALY_VIEW))):
+./api/v1/endpoints/anomaly_router.py:def shap_results(auc_result_id: UUID, service: LightGBMService = Depends(get_lightgbm_service), _user: User = Depends(require_permission(PermissionCode.ANOMALY_VIEW))):
+./api/v1/endpoints/anomaly_router.py:def verify_results(db: Session = Depends(get_db), _user: User = Depends(require_permission(PermissionCode.ANOMALY_VIEW))):
+./api/v1/endpoints/anomaly_router.py:def resolve_verify_result(verify_id: UUID, db: Session = Depends(get_db), _user: User = Depends(require_permission(PermissionCode.ANOMALY_RUN))):
+./api/v1/endpoints/anomaly_router.py:def unresolve_verify_result(verify_id: UUID, db: Session = Depends(get_db), _user: User = Depends(require_permission(PermissionCode.ANOMALY_RUN))):
+./api/v1/endpoints/permission_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/permission_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+./api/v1/endpoints/data_assets_router.py:    current_user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+./api/v1/endpoints/data_assets_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_DELETE)),
+./api/v1/endpoints/data_quality_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/data_quality_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/data_quality_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/data_quality_router.py:    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)), # Mapping resolve to quality:resolve
+./api/v1/endpoints/data_quality_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/data_quality_router.py:    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
+./api/v1/endpoints/data_quality_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/data_quality_router.py:    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
+./api/v1/endpoints/data_quality_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_VIEW)),
+./api/v1/endpoints/data_quality_router.py:    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
+./api/v1/endpoints/model_configs_router.py:    _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW))
+./api/v1/endpoints/model_configs_router.py:    _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW))
+./api/v1/endpoints/model_configs_router.py:    current_user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_UPDATE))
+./api/v1/endpoints/model_configs_router.py:    _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW))
+./api/v1/endpoints/model_configs_router.py:    current_user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_UPDATE))
+./api/v1/endpoints/model_configs_router.py:    current_user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_UPDATE))
+./api/v1/endpoints/model_configs_router.py:    _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_DELETE))
+./api/v1/endpoints/model_configs_router.py:    _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW))
+./api/v1/endpoints/model_configs_router.py:def get_auc_result(auc_result_id: UUID, service: LightGBMService = Depends(get_lightgbm_service), _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW))):
+./api/v1/endpoints/model_configs_router.py:def shap_results(auc_result_id: UUID, service: LightGBMService = Depends(get_lightgbm_service), _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW))):
+./api/v1/endpoints/roles_router.py:    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
+./api/v1/endpoints/roles_router.py:    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
+./api/v1/endpoints/roles_router.py:    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
+./api/v1/endpoints/roles_router.py:    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
+./api/v1/endpoints/roles_router.py:    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
+./api/v1/endpoints/roles_router.py:    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
+./api/v1/endpoints/users_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/users_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/users_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/users_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/users_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/users_router.py:    current_user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/users_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/users_router.py:    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
+./api/v1/endpoints/connections_router.py:    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
+./api/v1/endpoints/connections_router.py:    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+./api/v1/endpoints/connections_router.py:    _user: User = Depends(require_permission(PermissionCode.TABLE_DELETE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+./api/v1/endpoints/metrics_router.py:    current_user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+./api/v1/endpoints/metrics_router.py:    current_user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_DELETE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+./api/v1/endpoints/metrics_router.py:    current_user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+./api/v1/endpoints/metrics_router.py:    current_user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_DELETE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+./api/v1/endpoints/metrics_router.py:    current_user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+./api/v1/endpoints/metrics_router.py:    current_user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
+./api/v1/endpoints/metrics_router.py:    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_DELETE)),
+./api/v1/endpoints/rules_router.py:    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+./api/v1/endpoints/rules_router.py:    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+./api/v1/endpoints/rules_router.py:    current_user: User = Depends(require_permission(PermissionCode.RULE_SUGGEST)),
+./api/v1/endpoints/rules_router.py:    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+./api/v1/endpoints/rules_router.py:    current_user: User = Depends(require_permission(PermissionCode.RULE_SUGGEST)),
+./api/v1/endpoints/rules_router.py:    current_user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
+./api/v1/endpoints/rules_router.py:    current_user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
+./api/v1/endpoints/rules_router.py:    _user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
+./api/v1/endpoints/rules_router.py:    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+./api/v1/endpoints/rules_router.py:    _user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),

@@ -3,11 +3,20 @@ import { Box, Typography, Paper, Stack, Divider, Grid } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const AnomalyDetection = ({ detailData }) => {
-  // Prepare data for SHAP Chart with guard rails
-  const topFeatures = detailData?.top_features || [];
-  const shapData = [...topFeatures]
-    .sort((a, b) => Math.abs(b.shap_score || 0) - Math.abs(a.shap_score || 0))
-    .slice(0, 10);
+  // Prepare all SHAP rows with guard rails
+  const shapFeatures = detailData?.top_features || [];
+  const shapData = [...shapFeatures]
+    .sort((a, b) => {
+      const rankA = Number.isFinite(a.shap_rank) ? a.shap_rank : Number.MAX_SAFE_INTEGER;
+      const rankB = Number.isFinite(b.shap_rank) ? b.shap_rank : Number.MAX_SAFE_INTEGER;
+
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+
+      return Math.abs(b.shap_score || 0) - Math.abs(a.shap_score || 0);
+    });
+  const shapChartHeight = Math.max(400, shapData.length * 34 + 80);
 
   const aucScore = detailData?.auc_score ?? 0;
   const aucThreshold = detailData?.auc_threshold ?? 0;
@@ -48,9 +57,9 @@ const AnomalyDetection = ({ detailData }) => {
 
       <Grid item xs={12} md={8}>
         <Typography variant="caption" color="text.secondary" fontWeight={700}>FEATURE IMPORTANCE (SHAP VALUES)</Typography>
-        <Paper variant="outlined" sx={{ mt: 1, p: 2, borderRadius: 3, height: 400 }}>
+        <Paper variant="outlined" sx={{ mt: 1, p: 2, borderRadius: 3, minHeight: 400 }}>
           {shapData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={shapChartHeight}>
               <BarChart
                 layout="vertical"
                 data={shapData}

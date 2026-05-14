@@ -39,12 +39,13 @@ function PlatformConnection() {
   const { user } = useSelector(state => state.auth);
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
   const canView = isAdmin || user?.permissions?.some(p => p === "connection:view" || p?.code === "connection:view");
-  const canCreate = isAdmin || user?.permissions?.some(p => p === "connection:create" || p?.code === "connection:create");
-  const canUpdate = isAdmin || user?.permissions?.some(p => p === "connection:update" || p?.code === "connection:update");
-  const canDelete = isAdmin;
-  const canTest = isAdmin || user?.permissions?.some(p => p === "connection:test" || p?.code === "connection:test");
-  const canCreateTable = isAdmin || user?.permissions?.some(p => p === "table:create" || p?.code === "table:create");
-  const canUpdateTable = isAdmin || user?.permissions?.some(p => p === "table:update" || p?.code === "table:update");
+  const canManage = isAdmin || user?.permissions?.some(p => p === "connection:manage" || p?.code === "connection:manage");
+  const canCreate = canManage;
+  const canUpdate = canManage;
+  const canDelete = canManage;
+  const canTest = canManage;
+  const canCreateTable = isAdmin || user?.permissions?.some(p => p === "table:manage" || p?.code === "table:manage");
+  const canUpdateTable = isAdmin || user?.permissions?.some(p => p === "table:manage" || p?.code === "table:manage");
   const canDeleteTable = isAdmin || user?.permissions?.some(p => p === "table:delete" || p?.code === "table:delete");
 
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);

@@ -72,7 +72,7 @@ def get_metadata_detail(
 def resolve_metadata(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),
-    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RUN)), # Mapping resolve to quality:run/update
+    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)), # Mapping resolve to quality:resolve
 ):
     return service.resolve_result("metadata", str(result_id), str(current_user.id))
 
@@ -90,7 +90,7 @@ def get_profiling_detail(
 def resolve_profiling(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),
-    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RUN)),
+    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
 ):
     return service.resolve_result("profiling", str(result_id), str(current_user.id))
 
@@ -108,7 +108,7 @@ def get_rule_detail(
 def resolve_rule(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),
-    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RUN)),
+    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
 ):
     return service.resolve_result("rule", str(result_id), str(current_user.id))
 
@@ -126,6 +126,6 @@ def get_anomaly_detail(
 def resolve_anomaly(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),
-    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RUN)),
+    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
 ):
     return service.resolve_result("anomaly", str(result_id), str(current_user.id))

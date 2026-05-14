@@ -58,7 +58,7 @@ def list_rules(
 def create_rule(
     data: RuleCreate,
     service: RuleService = Depends(get_rule_service),
-    current_user: User = Depends(require_permission(PermissionCode.RULE_CREATE)),
+    current_user: User = Depends(require_permission(PermissionCode.RULE_SUGGEST)),
 ):
     return service.create_rule(data, str(current_user.id))
 
@@ -77,7 +77,7 @@ def update_rule(
     rule_id: UUID,
     data: RuleUpdate,
     service: RuleService = Depends(get_rule_service),
-    current_user: User = Depends(require_permission(PermissionCode.RULE_UPDATE)),
+    current_user: User = Depends(require_permission(PermissionCode.RULE_SUGGEST)),
 ):
     return service.update_rule(str(rule_id), data, str(current_user.id))
 
@@ -86,7 +86,7 @@ def update_rule(
 def approve_rule(
     rule_id: UUID,
     service: RuleService = Depends(get_rule_service),
-    current_user: User = Depends(require_permission(PermissionCode.RULE_ENABLE_DISABLE)),
+    current_user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.set_rule_status(str(rule_id), "active", str(current_user.id))
 
@@ -95,7 +95,7 @@ def approve_rule(
 def deactivate_rule(
     rule_id: UUID,
     service: RuleService = Depends(get_rule_service),
-    current_user: User = Depends(require_permission(PermissionCode.RULE_ENABLE_DISABLE)),
+    current_user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.set_rule_status(str(rule_id), "inactive", str(current_user.id))
 
@@ -104,7 +104,7 @@ def deactivate_rule(
 def delete_rule(
     rule_id: UUID,
     service: RuleService = Depends(get_rule_service),
-    _user: User = Depends(require_permission(PermissionCode.RULE_DELETE)),
+    _user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     service.delete_rule(str(rule_id))
     return None
@@ -124,6 +124,6 @@ def list_rule_verify_results(
 def resolve_rule_verify_result(
     verify_id: UUID,
     service: RuleService = Depends(get_rule_service),
-    _user: User = Depends(require_permission(PermissionCode.RULE_UPDATE)),
+    _user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
 ):
     return service.set_verify_resolved(str(verify_id), True)

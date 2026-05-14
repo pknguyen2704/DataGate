@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import BatchTableMetadata, BatchTableProfiling, Connection, LightGBMAUC, RuleVerify, Table, Rule, LightGBMParameter
+from app.models import BatchTableMetadata, BatchTableProfiling, Connection, LightGBMAUC, LightGBMAnomalyConfig, RuleVerify, Table, Rule
 from app.schemas.table_schema import TableCreate, TableUpdate
 
 
@@ -158,8 +158,8 @@ class TableService:
 
         # Batch fetch anomaly configs
         anomaly_configs = (
-            self.db.query(LightGBMParameter.table_id)
-            .filter(LightGBMParameter.table_id.in_(table_ids))
+            self.db.query(LightGBMAnomalyConfig.table_id)
+            .filter(LightGBMAnomalyConfig.table_id.in_(table_ids))
             .all()
         )
         anomaly_table_ids = {str(r[0]) for r in anomaly_configs}
@@ -185,7 +185,12 @@ class TableService:
         )
         if table:
             table.latest_processing_date_hour = self.get_latest_processing_hour(table_id)
-            table.has_anomaly_config = self.db.query(LightGBMParameter).filter(LightGBMParameter.table_id == table_id).first() is not None
+            table.has_anomaly_config = (
+                self.db.query(LightGBMAnomalyConfig)
+                .filter(LightGBMAnomalyConfig.table_id == table_id)
+                .first()
+                is not None
+            )
         return table
 
     def get_table_or_404(self, table_id: str) -> Table:

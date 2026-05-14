@@ -4,7 +4,7 @@ const BASE_URL = "/settings/model-configs";
 
 export const modelParametersApi = {
   // Settings CRUD
-  list: () => api.get(BASE_URL),
+  list: (params) => api.get(BASE_URL, { params }),
   get: (id) => api.get(`${BASE_URL}/${id}`),
   create: (data) => api.post(BASE_URL, data),
   update: (id, data) => api.patch(`${BASE_URL}/${id}`, data),
@@ -18,4 +18,14 @@ export const modelParametersApi = {
   aucTimeline: (tableId) => api.get(`${BASE_URL}/auc-results`, { params: { table_id: tableId } }),
   shap: (aucResultId) => api.get(`${BASE_URL}/auc-results/${aucResultId}/shap`),
   tableParameters: (tableId) => api.get(`${BASE_URL}`, { params: { table_id: tableId } }),
+};
+
+export const anomalyJobConfigsApi = {
+  list: (params) => api.get(`${BASE_URL}/configs`, { params }),
+  get: (id) => api.get(`${BASE_URL}/configs/${id}`),
+  create: (data) => api.post(`${BASE_URL}/configs`, data),
+  update: (id, data) => api.patch(`${BASE_URL}/configs/${id}`, data),
+  delete: (id) => api.delete(`${BASE_URL}/configs/${id}`),
+  getTemplate: () => api.get(`${BASE_URL}/configs/template`),
+  uploadJson: (tableId, data) => api.post(`${BASE_URL}/configs/upload-json`, data, { params: { table_id: tableId } }),
 };

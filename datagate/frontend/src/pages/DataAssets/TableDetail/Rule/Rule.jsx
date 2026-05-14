@@ -47,20 +47,12 @@ const Rule = () => {
   // Permissions
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
   
-  const hasCreateUpdatePerm = user?.permissions?.some(
-    p => p === "rule:create" || p?.code === "rule:create" || 
-         p === "rule:update" || p?.code === "rule:update"
-  );
-  const canCreateUpdate = isAdmin || hasCreateUpdatePerm;
+  const canSuggest = isAdmin || user?.permissions?.some(p => p === "rule:suggest" || p?.code === "rule:suggest");
+  const canCreateUpdate = canSuggest;
 
-  const hasApprovePerm = user?.permissions?.some(
-    p => p === "rule:enable_disable" || p?.code === "rule:enable_disable"
-  );
-  const canApproveDeactivate = isAdmin || hasApprovePerm;
-  const hasDeletePerm = user?.permissions?.some(
-    p => p === "rule:delete" || p?.code === "rule:delete"
-  );
-  const canDelete = isAdmin || hasDeletePerm;
+  const canManage = isAdmin || user?.permissions?.some(p => p === "rule:manage" || p?.code === "rule:manage");
+  const canApproveDeactivate = canManage;
+  const canDelete = canManage;
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -297,7 +289,7 @@ const Rule = () => {
                           disabled={!canApproveDeactivate}
                         />
                         <Typography variant="caption" sx={{ ml: 0.5, fontWeight: 600, color: rule.is_active ? 'success.main' : 'text.disabled' }}>
-                          {rule.is_active ? "ON" : "OFF"}
+                          {rule.is_active ? "Active" : "Inactive"}
                         </Typography>
                       </Box>
                     </TableCell>

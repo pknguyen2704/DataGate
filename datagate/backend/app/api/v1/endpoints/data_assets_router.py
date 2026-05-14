@@ -48,7 +48,7 @@ def list_tables(
 def create_table(
     data: TableCreate,
     service: TableService = Depends(get_table_service),
-    current_user: User = Depends(require_permission(PermissionCode.TABLE_CREATE)),
+    current_user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
 ):
     return service.create_table(data=data, owner_id=str(current_user.id))
 
@@ -69,7 +69,7 @@ def update_table(
     table_id: UUID,
     data: TableUpdate,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_UPDATE)),
+    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
 ):
     return service.update_table(table_id=str(table_id), data=data)
 
@@ -100,7 +100,7 @@ def list_table_processing_hours(
 def activate_table(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_UPDATE)),
+    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
 ):
     return service.activate_table(str(table_id))
 
@@ -109,7 +109,7 @@ def activate_table(
 def deactivate_table(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_UPDATE)),
+    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
 ):
     return service.deactivate_table(str(table_id))
 

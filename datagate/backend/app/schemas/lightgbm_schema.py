@@ -52,6 +52,55 @@ class LightGBMParameterListOut(PaginatedResponse[LightGBMParameterOut]):
     pass
 
 
+class LightGBMAnomalyConfigBase(BaseModel):
+    table_id: UUID
+    batch_time_col: str = Field(..., min_length=1, max_length=255)
+    required_history_days: int = Field(..., ge=1)
+    previous_batch_hours: int = Field(..., ge=1)
+    history_days: list[int] = Field(..., min_length=1)
+    target_sample_per_group: int = Field(default=10000, ge=1)
+    test_size: float = Field(..., gt=0, lt=1)
+    random_state: int = Field(..., ge=0)
+    p_value_alpha: float = Field(default=0.05, gt=0, lt=1)
+    min_history_auc_points: int = Field(default=20, ge=1)
+    exclude_cols: list[str] = Field(default_factory=list)
+    categorical_cols: list[str] = Field(default_factory=list)
+    numeric_cols: list[str] = Field(default_factory=list)
+    description: str | None = None
+
+
+class LightGBMAnomalyConfigCreate(LightGBMAnomalyConfigBase):
+    pass
+
+
+class LightGBMAnomalyConfigUpdate(BaseModel):
+    batch_time_col: str | None = Field(default=None, min_length=1, max_length=255)
+    required_history_days: int | None = Field(default=None, ge=1)
+    previous_batch_hours: int | None = Field(default=None, ge=1)
+    history_days: list[int] | None = Field(default=None, min_length=1)
+    target_sample_per_group: int | None = Field(default=None, ge=1)
+    test_size: float | None = Field(default=None, gt=0, lt=1)
+    random_state: int | None = Field(default=None, ge=0)
+    p_value_alpha: float | None = Field(default=None, gt=0, lt=1)
+    min_history_auc_points: int | None = Field(default=None, ge=1)
+    exclude_cols: list[str] | None = None
+    categorical_cols: list[str] | None = None
+    numeric_cols: list[str] | None = None
+    description: str | None = None
+
+
+class LightGBMAnomalyConfigOut(LightGBMAnomalyConfigBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LightGBMAnomalyConfigListOut(PaginatedResponse[LightGBMAnomalyConfigOut]):
+    pass
+
+
 class LightGBMAUCManualThresholdBase(BaseModel):
     lightgbm_parameter_id: UUID
     auc_threshold: float = Field(..., ge=0, le=1)

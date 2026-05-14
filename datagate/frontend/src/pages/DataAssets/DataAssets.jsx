@@ -28,7 +28,6 @@ const DataAssets = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
-  const connectionsRes = useApiResource(() => connectionsApi.list(), []);
   const variablesRes = useApiResource(() => observabilityApi.getGrafanaVariables(), []);
   
   const tablesRes = useApiResource(() => dataAssetsApi.list({
@@ -39,8 +38,8 @@ const DataAssets = () => {
   }), [filters, page, pageSize]);
 
   let connections = [];
-  if (connectionsRes.data && connectionsRes.data.items) {
-    connections = connectionsRes.data.items;
+  if (variablesRes.data && variablesRes.data.connections) {
+    connections = variablesRes.data.connections;
   }
 
   let catalogs = [];
@@ -122,7 +121,7 @@ const DataAssets = () => {
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
               >
                 <MenuItem value="">All Connections</MenuItem>
-                {connections.map(c => <MenuItem key={c.id} value={c.id}>{c.connection_name}</MenuItem>)}
+                {connections.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
               </TextField>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>

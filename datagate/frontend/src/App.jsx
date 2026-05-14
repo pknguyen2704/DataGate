@@ -15,7 +15,7 @@ import TableDetail from "~/pages/DataAssets/TableDetail/index.jsx";
 import Settings from "~/pages/Settings/Settings";
 import { ObservabilityTab, MetricsTab, RulesTab, QualityTab } from "~/pages/DataAssets/TableDetail/index.jsx";
 import PlatformConnection from "~/pages/Settings/PlatformConnection/PlatformConnection";
-import ModelParameter from "~/pages/Settings/ModelParameter/ModelParameter";
+import ModelConfig from "~/pages/Settings/ModelConfig/ModelConfig";
 import UserManagement from "~/pages/Settings/UserManagement/UserManagement";
 import RoleManagement from "~/pages/Settings/RoleManagement/RoleManagement";
 
@@ -55,9 +55,9 @@ function App() {
               <Route path="connections" element={<PlatformConnection />} />
             </Route>
 
-            <Route path="model-configs" element={<ModelParameter />} />
+            <Route path="model-configs" element={<ModelConfig />} />
             
-            <Route element={<ProtectedRoute permission="user:view" />}>
+            <Route element={<ProtectedRoute permission="user:manage" />}>
               <Route path="users" element={<UserManagement />} />
               <Route path="roles" element={<RoleManagement />} />
             </Route>

@@ -7,7 +7,7 @@ import {
   Tabs, Tab
 } from "@mui/material";
 import {
-  CheckCircle, Refresh, Visibility, CheckCircleOutline
+  ArrowBack, CheckCircle, Refresh, CheckCircleOutline
 } from "@mui/icons-material";
 import { useParams } from "react-router-dom";
 import { dataQualityApi } from "~/apis/dataQualityApi";
@@ -35,7 +35,7 @@ const DataQuality = () => {
 
   // Permissions
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const hasResolvePerm = user?.permissions?.some(p => p === "quality:run" || p?.code === "quality:run");
+  const hasResolvePerm = user?.permissions?.some(p => p === "quality:resolve" || p?.code === "quality:resolve");
   const canResolve = isAdmin || hasResolvePerm;
 
   // API Resources
@@ -81,7 +81,7 @@ const DataQuality = () => {
   const summary = summaryRes.data || { total_checks: 0, total_pass: 0, total_fail: 0, warning_fail: 0, critical_fail: 0, unresolved_alerts: 0 };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: "background.default", flexGrow: 1, overflow: "auto", display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+    <Box sx={{ p: 3 }}>
       <Stack spacing={3} sx={{ width: '100%' }}>
         
         {/* Statistics Section */}
@@ -112,7 +112,7 @@ const DataQuality = () => {
 
         {/* Filter Bar */}
         {currentType !== "anomaly" && (
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'white' }}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default' }}>
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} md={4}>
                 <TextField
@@ -303,7 +303,7 @@ const AnomalyTab = ({ results, handleResolve, canResolve }) => {
       </Grid>
 
       {selectedId && (
-        <Grid item xs={8}>
+        <Grid item xs={8} sx={{ pr: { xs: 0, md: 2 } }}>
           <Box sx={{ position: 'sticky', top: 20 }}>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
@@ -311,7 +311,11 @@ const AnomalyTab = ({ results, handleResolve, canResolve }) => {
               <Box>
                 <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="h6" fontWeight={800}>Analysis: {format(new Date(detailData.processing_date_hour), "yyyy-MM-dd HH:mm")}</Typography>
-                  <IconButton onClick={() => setSelectedId(null)} size="small"><Visibility /></IconButton>
+                  <Tooltip title="Back to anomaly results">
+                    <IconButton onClick={() => setSelectedId(null)} size="small">
+                      <ArrowBack fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
                 <AnomalyDetection detailData={detailData} />
               </Box>

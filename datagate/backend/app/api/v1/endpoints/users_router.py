@@ -23,7 +23,7 @@ def list_users(
     page_size: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None),
     service: UserService = Depends(get_user_service),
-    _user: User = Depends(require_permission(PermissionCode.USER_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
 ):
     return service.list_users(page=page, page_size=page_size, search=search)
 
@@ -41,7 +41,7 @@ def create_user(
 def get_user(
     user_id: UUID,
     service: UserService = Depends(get_user_service),
-    _user: User = Depends(require_permission(PermissionCode.USER_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
 ):
     return service.to_user_out(service.get_user_or_404(str(user_id)))
 

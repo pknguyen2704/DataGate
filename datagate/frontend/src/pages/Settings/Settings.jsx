@@ -21,9 +21,9 @@ const SettingsPage = () => {
 
   const menuItems = [
     { text: "Platform Connections", icon: <SettingsInputComponentOutlined />, path: "/app/settings/connections", permission: "connection:view" },
-    { text: "Model parameters", icon: <ModelTrainingOutlined />, path: "/app/settings/model-configs", permission: "model_config:view" },
-    { text: "Users", icon: <PeopleOutlined />, path: "/app/settings/users", permission: "user:view" },
-    { text: "Roles", icon: <ShieldOutlined />, path: "/app/settings/roles", permission: "user:view" },
+    { text: "Model Configurations", icon: <ModelTrainingOutlined />, path: "/app/settings/model-configs", permission: "model_config:view" },
+    { text: "Users", icon: <PeopleOutlined />, path: "/app/settings/users", permission: "user:manage" },
+    { text: "Roles", icon: <ShieldOutlined />, path: "/app/settings/roles", permission: "user:manage" },
   ];
 
   const visibleItems = menuItems.filter(item => hasPermission(item.permission));

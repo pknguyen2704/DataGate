@@ -26,7 +26,7 @@ RoleServiceDep = Annotated[RoleService, Depends(get_role_service)]
 @roles_router.get("", response_model=RoleListOut)
 def list_roles(
     service: RoleServiceDep,
-    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_VIEW))],
+    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
 ):
@@ -50,7 +50,7 @@ def create_role(
 def get_role(
     role_id: str,
     service: RoleServiceDep,
-    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_VIEW))],
+    _user: Annotated[User, Depends(require_permission(PermissionCode.USER_MANAGE))],
 ):
     return service.get_role_or_404(role_id)
 

@@ -1,0 +1,30 @@
+{
+  "batch_time_col": "processing_date_hour",
+  "required_history_days": 14,
+  "previous_batch_hours": 12,
+  "history_days": [
+    1,
+    7,
+    14
+  ],
+  "target_sample_per_group": 10000,
+  "test_size": 0.2,
+  "random_state": 42,
+  "p_value_alpha": 0.05,
+  "min_history_auc_points": 20,
+  "exclude_cols": [
+    "label",
+    "date_hour",
+    "processing_date_hour",
+    "tpep_pickup_datetime",
+    "tpep_dropoff_datetime"
+  ],
+  "categorical_cols": [
+    "vendor_id",
+    "ratecode_id",
+    "store_and_fwd_flag",
+    "payment_type"
+  ],
+  "numeric_cols": [],
+  "description": "Config migrated from old hard-coded TLC trip record anomaly detection job"
+}

@@ -35,7 +35,7 @@ def list_connections(
 def create_connection(
     body: ConnectionCreate,
     service: ConnectionService = Depends(get_connection_service),
-    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_CREATE)),
+    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.create_connection(body, str(current_user.id))
 
@@ -54,7 +54,7 @@ def update_connection(
     connection_id: UUID,
     body: ConnectionUpdate,
     service: ConnectionService = Depends(get_connection_service),
-    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_UPDATE)),
+    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.update_connection(str(connection_id), body, str(current_user.id))
 
@@ -63,7 +63,7 @@ def update_connection(
 def test_connection(
     connection_id: UUID,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_TEST)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.test_connection(str(connection_id))
 
@@ -72,7 +72,7 @@ def test_connection(
 def deactivate_connection(
     connection_id: UUID,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_UPDATE)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.deactivate_connection(str(connection_id))
 
@@ -81,7 +81,7 @@ def deactivate_connection(
 def activate_connection(
     connection_id: UUID,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_UPDATE)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.activate_connection(str(connection_id))
 
@@ -105,7 +105,7 @@ def add_managed_table(
     schema: str,
     table_name: str,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_CREATE)),
+    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
 ):
     # This logic should be in ConnectionService, I'll add it there.
     return service.add_managed_table(str(connection_id), catalog, schema, table_name)

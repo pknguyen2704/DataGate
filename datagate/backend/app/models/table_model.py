@@ -34,7 +34,8 @@ class Table(Base):
     rules = relationship("Rule", back_populates="table", cascade="all, delete-orphan")
     lightgbm_parameter = relationship("LightGBMParameter", back_populates="table", uselist=False, cascade="all, delete-orphan")
     lightgbm_auc = relationship("LightGBMAUC", back_populates="table", cascade="all, delete-orphan")
-
+    lightgbm_anomaly_config = relationship("LightGBMAnomalyConfig", back_populates="table",uselist=False,cascade="all, delete-orphan")
+    
     __table_args__ = (
         Index("ix_tables__connection_catalog_schema_table", "connection_id", "catalog_name", "schema_name", "table_name", unique=True),
         Index("ix_tables__connection_id", "connection_id"),

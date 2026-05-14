@@ -38,8 +38,10 @@ const INITIAL_PARAMS = {
 function ModelParameter() {
   const { user } = useSelector(state => state.auth);
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const hasPerm = user?.permissions?.some(p => p === "model_config:manage" || p?.code === "model_config:manage");
-  const canManage = isAdmin || hasPerm;
+  const canView = isAdmin || user?.permissions?.some(p => p === "model_config:view" || p?.code === "model_config:view");
+  const canUpdate = isAdmin || user?.permissions?.some(p => p === "model_config:update" || p?.code === "model_config:update");
+  const canDelete = isAdmin || user?.permissions?.some(p => p === "model_config:delete" || p?.code === "model_config:delete");
+  const canManage = canUpdate; // Use update as the base for manage UI elements
   
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);

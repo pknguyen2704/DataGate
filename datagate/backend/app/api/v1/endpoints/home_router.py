@@ -29,7 +29,7 @@ def home_summary(
     from_time: datetime | None = Query(default=None),
     to_time: datetime | None = Query(default=None),
     service: DashboardService = Depends(get_dashboard_service),
-    _user: User = Depends(require_permission(PermissionCode.HOME_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.DASHBOARD_VIEW)),
 ):
     # Handle empty string from filters
     conn_id = connection_id if connection_id and connection_id.strip() != "" else None

@@ -17,8 +17,8 @@ from data_quality_gate import check_data_quality_gate
 LOCAL_TZ = pendulum.timezone("Asia/Ho_Chi_Minh")
 
 
-SIM_START = "2025-01-02 12:00:00"
-SIM_END = "2025-01-15 12:00:00"
+SIM_START = "2025-01-17 00:00:00"
+SIM_END = "2025-01-27 12:00:00"
 SIM_STEP_HOURS = 12
 SIM_VAR_NAME = "yellow_tripdata_next_processing_date_hour"
 
@@ -241,9 +241,9 @@ with DAG(
         ],
     )
 
-    silver_batch_anomaly_detection_tlc_trip_record = SparkSubmitOperator(
-        task_id="silver_batch_anomaly_detection_tlc_trip_record",
-        application=f"{DATAGATE_JOB_PATH}/batch_anomaly_detection_tlc_trip_record.py",
+    silver_batch_anomaly_detection = SparkSubmitOperator(
+        task_id="silver_batch_anomaly_detection",
+        application=f"{DATAGATE_JOB_PATH}/batch_anomaly_detection.py",
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
@@ -394,7 +394,7 @@ with DAG(
     [
         silver_tables_metadata_metrics_verify,
         silver_tables_profiling_metrics_verify,
-    ] >> silver_batch_rule_verification >> silver_batch_anomaly_detection_tlc_trip_record >> silver_data_quality_gate >> transform_data
+    ] >> silver_batch_rule_verification >> silver_batch_anomaly_detection >> silver_data_quality_gate >> transform_data
 
     # ----------------------------
     # Gold layer

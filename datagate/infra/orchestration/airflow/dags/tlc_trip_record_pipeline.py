@@ -61,7 +61,7 @@ with DAG(
     catchup=False,
     tags=["datagate", "iceberg", "yellow_tripdata"],
     params={
-        "processing_date_hour": "2025-01-02 00:00:00",
+        "processing_date_hour": "2025-01-16 12:00:00",
     },
 ) as dag:
     ingest_data = SparkSubmitOperator(
@@ -204,9 +204,9 @@ with DAG(
         ],
     )
 
-    silver_batch_anomaly_detection_tlc_trip_record = SparkSubmitOperator(
-        task_id="silver_batch_anomaly_detection_tlc_trip_record",
-        application=f"{DATAGATE_JOB_PATH}/batch_anomaly_detection_tlc_trip_record.py",
+    silver_batch_anomaly_detection = SparkSubmitOperator(
+        task_id="silver_batch_anomaly_detection",
+        application=f"{DATAGATE_JOB_PATH}/batch_anomaly_detection.py",
         conn_id="spark_default",
         deploy_mode="client",
         application_args=[
@@ -355,7 +355,7 @@ with DAG(
     [
         silver_tables_metadata_metrics_verify,
         silver_tables_profiling_metrics_verify,
-    ] >> silver_batch_rule_verification >> silver_batch_anomaly_detection_tlc_trip_record >> silver_data_quality_gate >> transform_data
+    ] >> silver_batch_rule_verification >> silver_batch_anomaly_detection >> silver_data_quality_gate >> transform_data
 
     # ----------------------------
     # Gold layer

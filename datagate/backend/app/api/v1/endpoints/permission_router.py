@@ -13,7 +13,7 @@ from app.services.role_service import RoleService
 @permission_router.get("")
 def list_permissions(
     service: RoleService = Depends(lambda db: RoleService(db)),
-    _user: User = Depends(require_permission(PermissionCode.USER_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
     db: Session = Depends(get_db)
 ):
     """
@@ -23,7 +23,7 @@ def list_permissions(
 
 @permission_router.get("/grouped")
 def list_permissions_grouped(
-    _user: User = Depends(require_permission(PermissionCode.USER_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
     db: Session = Depends(get_db)
 ):
     """

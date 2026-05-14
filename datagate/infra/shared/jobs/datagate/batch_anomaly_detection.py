@@ -5,6 +5,7 @@ from contextlib import suppress
 import argparse
 import logging
 import uuid
+import threading
 from datetime import datetime, timedelta
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -33,7 +34,7 @@ from synapse.ml.lightgbm import LightGBMClassifier
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-JOB_NAME = "batch_anomaly_detection_tlc_trip_record"
+JOB_NAME = "batch_anomaly_detection"
 
 SPARK_DRIVER_CORES = "2"
 SPARK_DRIVER_MEMORY = "4g"
@@ -44,17 +45,6 @@ SPARK_SQL_SHUFFLE_PARTITIONS = "24"
 SPARK_DEFAULT_PARALLELISM = "24"
 SPARK_TIMEZONE = "Asia/Ho_Chi_Minh"
 
-REQUIRED_HISTORY_DAYS = 14
-TARGET_SAMPLE_PER_GROUP = 10000
-TEST_SIZE = 0.20
-RANDOM_STATE = 42
-
-PREVIOUS_BATCH_HOURS = 12
-HISTORY_DAYS = [1, 7, 14]
-
-P_VALUE_ALPHA = 0.05
-MIN_HISTORY_AUC_POINTS = 20
-
 USE_BARRIER_EXECUTION_MODE = True
 LGBM_NUM_TASKS = 4
 LGBM_NUM_THREADS = 3
@@ -62,20 +52,11 @@ LGBM_TIMEOUT = 1200
 LGBM_USE_SINGLE_DATASET_MODE = True
 LGBM_DATA_TRANSFER_MODE = "streaming"
 LGBM_VERBOSITY = -1
+SPARK_CLEANUP_TIMEOUT_SECONDS = 30
+DB_CLEANUP_TIMEOUT_SECONDS = 10
 
-CATEGORY_COLS = [
-    "vendorid",
-    "ratecodeid",
-    "store_and_fwd_flag",
-    "payment_type",
-]
-
-EXCLUDE_COLS = {
+DEFAULT_EXCLUDE_COLS = {
     "label",
-    "date_hour",
-    "processing_date_hour",
-    "tpep_pickup_datetime",
-    "tpep_dropoff_datetime",
 }
 
 NUMERIC_TYPES = (
@@ -108,6 +89,16 @@ def validate_name(value, field_name):
     return value
 
 
+def validate_identifier(value, field_name):
+    value = str(value or "").strip()
+    if not value:
+        raise ValueError(f"{field_name} must not be empty.")
+    for char in value:
+        if not (char.isalnum() or char == "_"):
+            raise ValueError(f"Invalid SQL identifier {field_name}: {value}.")
+    return value
+
+
 def normalize_hour(value):
     value = str(value or "").strip().replace("T", " ")
     if not value:
@@ -121,6 +112,14 @@ def to_dt(value):
 
 def to_ts(value):
     return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def as_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return list(value)
 
 
 def get_connection_config(pg_hook, connection_name):
@@ -143,7 +142,7 @@ def get_connection_config(pg_hook, connection_name):
         "connection_name": row[0],
         "iceberg_rest_url": row[1],
         "iceberg_warehouse": row[2],
-        "catalog_name": validate_name(row[3], "iceberg_catalog_name"),
+        "catalog_name": validate_identifier(row[3], "iceberg_catalog_name"),
         "minio_endpoint_url": row[4],
         "minio_access_key": row[5],
         "minio_secret_key": row[6],
@@ -151,7 +150,8 @@ def get_connection_config(pg_hook, connection_name):
 
 
 def get_active_tables(pg_hook, catalog_name, schema_name):
-    schema_name = validate_name(schema_name, "schema_name")
+    catalog_name = validate_identifier(catalog_name, "catalog_name")
+    schema_name = validate_identifier(schema_name, "schema_name")
 
     rows = pg_hook.get_records(
         """
@@ -168,11 +168,85 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
     return [
         {
             "table_id": str(row[0]),
-            "table_name": validate_name(row[1], "table_name"),
-            "full_table_name": f"{catalog_name}.{schema_name}.{row[1]}",
+            "table_name": validate_identifier(row[1], "table_name"),
+            "full_table_name": f"{catalog_name}.{schema_name}.{validate_identifier(row[1], 'table_name')}",
         }
         for row in rows
     ]
+
+
+def get_anomaly_config(pg_hook, table_id):
+    row = pg_hook.get_first(
+        """
+        SELECT
+            batch_time_col,
+            required_history_days,
+            previous_batch_hours,
+            history_days,
+            target_sample_per_group,
+            test_size,
+            random_state,
+            p_value_alpha,
+            min_history_auc_points,
+            exclude_cols,
+            categorical_cols,
+            numeric_cols
+        FROM lightgbm_anomaly_configs
+        WHERE table_id = %s
+        LIMIT 1
+        """,
+        parameters=(table_id,),
+    )
+
+    if row is None:
+        return None
+
+    cfg = {
+        "batch_time_col": validate_identifier(row[0], "batch_time_col"),
+        "required_history_days": int(row[1]),
+        "previous_batch_hours": int(row[2]),
+        "history_days": [int(x) for x in as_list(row[3])],
+        "target_sample_per_group": int(row[4]),
+        "test_size": float(row[5]),
+        "random_state": int(row[6]),
+        "p_value_alpha": float(row[7]),
+        "min_history_auc_points": int(row[8]),
+        "exclude_cols": [
+            validate_identifier(col, "exclude_col")
+            for col in as_list(row[9])
+        ],
+        "categorical_cols": [
+            validate_identifier(col, "categorical_col")
+            for col in as_list(row[10])
+        ],
+        "numeric_cols": [
+            validate_identifier(col, "numeric_col")
+            for col in as_list(row[11])
+        ],
+    }
+
+    if cfg["required_history_days"] <= 0:
+        raise ValueError("required_history_days must be greater than 0.")
+
+    if cfg["previous_batch_hours"] <= 0:
+        raise ValueError("previous_batch_hours must be greater than 0.")
+
+    if not cfg["history_days"]:
+        raise ValueError("history_days must not be empty.")
+
+    if cfg["target_sample_per_group"] <= 0:
+        raise ValueError("target_sample_per_group must be greater than 0.")
+
+    if cfg["test_size"] <= 0 or cfg["test_size"] >= 1:
+        raise ValueError("test_size must be between 0 and 1.")
+
+    if cfg["p_value_alpha"] <= 0 or cfg["p_value_alpha"] >= 1:
+        raise ValueError("p_value_alpha must be between 0 and 1.")
+
+    if cfg["min_history_auc_points"] <= 0:
+        raise ValueError("min_history_auc_points must be greater than 0.")
+
+    return cfg
 
 
 def get_lgbm_config(pg_hook, table_id):
@@ -215,6 +289,7 @@ def get_auc_threshold(pg_hook, parameter_id):
         SELECT id, auc_threshold, severity_level
         FROM lightgbm_auc_manual_thresholds
         WHERE lightgbm_parameter_id = %s
+          AND is_active = TRUE
         ORDER BY
             CASE severity_level
                 WHEN 'critical' THEN 1
@@ -297,22 +372,26 @@ def create_spark_session(connection_config):
     )
 
 
-def batch_exists(spark, table_name, hour):
+def batch_exists(spark, table_name, batch_time_col, hour):
+    batch_time_col = validate_identifier(batch_time_col, "batch_time_col")
+
     row = spark.sql(
         f"""
         SELECT COUNT(*) AS n
         FROM {table_name}
-        WHERE processing_date_hour = TIMESTAMP '{hour}'
+        WHERE {batch_time_col} = TIMESTAMP '{hour}'
         """
     ).first()
 
     return int(row["n"] or 0) > 0
 
 
-def has_enough_14_day_history(spark, table_name, target_hour):
-    required_hour = to_ts(to_dt(target_hour) - timedelta(days=REQUIRED_HISTORY_DAYS))
+def has_enough_history(spark, table_name, target_hour, anomaly_cfg):
+    batch_time_col = anomaly_cfg["batch_time_col"]
+    required_history_days = anomaly_cfg["required_history_days"]
+    required_hour = to_ts(to_dt(target_hour) - timedelta(days=required_history_days))
 
-    if not batch_exists(spark, table_name, target_hour):
+    if not batch_exists(spark, table_name, batch_time_col, target_hour):
         logger.info(
             "Skip anomaly detection: target batch not found | table=%s | hour=%s",
             table_name,
@@ -320,9 +399,9 @@ def has_enough_14_day_history(spark, table_name, target_hour):
         )
         return False
 
-    if not batch_exists(spark, table_name, required_hour):
+    if not batch_exists(spark, table_name, batch_time_col, required_hour):
         logger.info(
-            "Skip anomaly detection: not enough exact 14-day history | table=%s | target=%s | required_history=%s",
+            "Skip anomaly detection: not enough exact history | table=%s | target=%s | required_history=%s",
             table_name,
             target_hour,
             required_hour,
@@ -338,30 +417,48 @@ def has_enough_14_day_history(spark, table_name, target_hour):
     return True
 
 
-def read_batch(spark, table_name, hour, label, seed):
+def read_batch(spark, table_name, hour, label, seed, anomaly_cfg):
+    batch_time_col = anomaly_cfg["batch_time_col"]
+    sample_size = anomaly_cfg["target_sample_per_group"]
+
     return (
         spark.sql(
             f"""
             SELECT *
             FROM {table_name}
-            WHERE processing_date_hour = TIMESTAMP '{hour}'
+            WHERE {batch_time_col} = TIMESTAMP '{hour}'
             """
         )
         .orderBy(F.rand(seed))
-        .limit(TARGET_SAMPLE_PER_GROUP)
+        .limit(sample_size)
         .withColumn("label", F.lit(float(label)))
     )
 
 
-def comparison_hours(target_hour):
+def comparison_hours(target_hour, anomaly_cfg):
     target_dt = to_dt(target_hour)
-    hours = [target_dt - timedelta(hours=PREVIOUS_BATCH_HOURS)]
-    hours += [target_dt - timedelta(days=days) for days in HISTORY_DAYS]
+
+    hours = [target_dt - timedelta(hours=anomaly_cfg["previous_batch_hours"])]
+    hours += [
+        target_dt - timedelta(days=days)
+        for days in anomaly_cfg["history_days"]
+    ]
+
     return [to_ts(hour) for hour in sorted(set(hours))]
 
 
-def build_work_df(spark, table_name, target_hour):
-    pos = read_batch(spark, table_name, target_hour, 1, RANDOM_STATE)
+def build_work_df(spark, table_name, target_hour, anomaly_cfg):
+    seed = anomaly_cfg["random_state"]
+
+    pos = read_batch(
+        spark=spark,
+        table_name=table_name,
+        hour=target_hour,
+        label=1,
+        seed=seed,
+        anomaly_cfg=anomaly_cfg,
+    )
+
     pos_count = pos.count()
 
     if pos_count == 0:
@@ -374,8 +471,8 @@ def build_work_df(spark, table_name, target_hour):
 
     neg_parts = []
 
-    for index, hour in enumerate(comparison_hours(target_hour)):
-        if not batch_exists(spark, table_name, hour):
+    for index, hour in enumerate(comparison_hours(target_hour, anomaly_cfg)):
+        if not batch_exists(spark, table_name, anomaly_cfg["batch_time_col"], hour):
             logger.info(
                 "Historical batch skipped: not found | table=%s | hour=%s",
                 table_name,
@@ -383,13 +480,22 @@ def build_work_df(spark, table_name, target_hour):
             )
             continue
 
-        part = read_batch(spark, table_name, hour, 0, RANDOM_STATE + index + 1)
+        part = read_batch(
+            spark=spark,
+            table_name=table_name,
+            hour=hour,
+            label=0,
+            seed=seed + index + 1,
+            anomaly_cfg=anomaly_cfg,
+        )
+
         logger.info(
             "Historical batch loaded | table=%s | hour=%s | rows=%s",
             table_name,
             hour,
             part.count(),
         )
+
         neg_parts.append(part)
 
     if not neg_parts:
@@ -412,11 +518,14 @@ def build_work_df(spark, table_name, target_hour):
     return df
 
 
-def split_df(df):
-    df = df.withColumn("_r", F.rand(RANDOM_STATE))
+def split_df(df, anomaly_cfg):
+    random_state = anomaly_cfg["random_state"]
+    test_size = anomaly_cfg["test_size"]
 
-    test = df.filter(F.col("_r") < TEST_SIZE).drop("_r")
-    train = df.filter(F.col("_r") >= TEST_SIZE).drop("_r")
+    df = df.withColumn("_r", F.rand(random_state))
+
+    test = df.filter(F.col("_r") < test_size).drop("_r")
+    train = df.filter(F.col("_r") >= test_size).drop("_r")
 
     for name, part in [("train", train), ("test", test)]:
         labels = part.select("label").distinct().count()
@@ -429,6 +538,9 @@ def split_df(df):
             labels,
         )
 
+        if rows == 0:
+            raise ValueError(f"{name} split is empty.")
+
         if labels < 2:
             raise ValueError(f"{name} split does not contain both labels.")
 
@@ -436,29 +548,62 @@ def split_df(df):
 
 
 class FeaturePipeline:
+    def __init__(self, anomaly_cfg):
+        self.anomaly_cfg = anomaly_cfg
+        self.num_cols = []
+        self.cat_cols = []
+        self.indexers = []
+        self.idx_cols = []
+        self.feature_cols = []
+        self.output_feature_cols = []
+        self.categorical_slots = []
+        self.assembler = None
+
     def fit(self, df):
         schema = {field.name: field.dataType for field in df.schema.fields}
+
+        exclude_cols = set(DEFAULT_EXCLUDE_COLS)
+        exclude_cols.update(self.anomaly_cfg.get("exclude_cols", []))
+        exclude_cols.add(self.anomaly_cfg["batch_time_col"])
+
+        configured_cat_cols = set(self.anomaly_cfg.get("categorical_cols", []))
+        configured_num_cols = set(self.anomaly_cfg.get("numeric_cols", []))
 
         cols = [
             field.name
             for field in df.schema.fields
-            if field.name not in EXCLUDE_COLS
+            if field.name not in exclude_cols
             and not isinstance(field.dataType, (DateType, TimestampType))
         ]
 
-        self.num_cols = [
+        self.cat_cols = [
             col
-            for col in cols
-            if isinstance(schema[col], NUMERIC_TYPES) and col not in CATEGORY_COLS
+            for col in configured_cat_cols
+            if col in cols
         ]
 
-        self.cat_cols = [col for col in CATEGORY_COLS if col in cols]
+        if configured_num_cols:
+            self.num_cols = [
+                col
+                for col in configured_num_cols
+                if col in cols
+            ]
+        else:
+            self.num_cols = [
+                col
+                for col in cols
+                if isinstance(schema[col], NUMERIC_TYPES)
+                and col not in configured_cat_cols
+            ]
+
         self.indexers = []
         self.idx_cols = []
         out = df
 
         for col in self.cat_cols:
             idx_col = f"{col}__idx"
+
+            out = out.withColumn(col, F.col(col).cast("string"))
 
             model = StringIndexer(
                 inputCol=col,
@@ -471,9 +616,13 @@ class FeaturePipeline:
             self.idx_cols.append(idx_col)
 
         self.feature_cols = self.num_cols + self.idx_cols
+        self.output_feature_cols = self.num_cols + self.cat_cols
 
         if not self.feature_cols:
-            raise ValueError("No usable feature columns found.")
+            raise ValueError(
+                "No usable feature columns found. "
+                "Please check numeric_cols, categorical_cols, exclude_cols, and table schema."
+            )
 
         self.categorical_slots = [
             self.feature_cols.index(col)
@@ -487,10 +636,11 @@ class FeaturePipeline:
         )
 
         logger.info(
-            "Features prepared | numeric=%s | categorical=%s | total_features=%s",
+            "Features prepared | numeric=%s | categorical=%s | total_features=%s | feature_cols=%s",
             len(self.num_cols),
             len(self.cat_cols),
             len(self.feature_cols),
+            self.output_feature_cols,
         )
 
         return self
@@ -498,6 +648,10 @@ class FeaturePipeline:
     def transform(self, df):
         for col in self.num_cols:
             df = df.withColumn(col, F.col(col).cast("double"))
+
+        for col in self.cat_cols:
+            df = df.withColumn(col, F.col(col).cast("string"))
+
         for model in self.indexers:
             df = model.transform(df)
 
@@ -507,19 +661,24 @@ class FeaturePipeline:
         )
 
 
-def build_features(train, test):
-    pipeline = FeaturePipeline().fit(train)
+def build_features(train, test, anomaly_cfg):
+    pipeline = FeaturePipeline(anomaly_cfg).fit(train)
+
     train_f = pipeline.transform(train).persist(StorageLevel.MEMORY_AND_DISK)
     test_f = pipeline.transform(test).persist(StorageLevel.MEMORY_AND_DISK)
+
     logger.info(
         "Feature data cached | train=%s | test=%s",
         train_f.count(),
         test_f.count(),
     )
+
     return pipeline, train_f, test_f
+
 
 def train_lgbm(train, test, cfg, cat_slots):
     lgbm_train = train.repartition(LGBM_NUM_TASKS).persist(StorageLevel.MEMORY_AND_DISK)
+
     try:
         logger.info("Start LightGBM training | train_rows=%s", lgbm_train.count())
 
@@ -562,7 +721,8 @@ def train_lgbm(train, test, cfg, cat_slots):
 
     finally:
         with suppress(Exception):
-            lgbm_train.unpersist(blocking=True)
+            lgbm_train.unpersist(blocking=False)
+
 
 def evaluate_auc(pred):
     return float(
@@ -578,9 +738,11 @@ def shap_summary(pred, feature_cols):
     if "featuresShap" not in pred.columns:
         logger.info("SHAP skipped: featuresShap column not found")
         return []
+
     pairs = []
     for index, name in enumerate(feature_cols):
         pairs += [F.lit(index), F.lit(name)]
+
     name_map = F.create_map(*pairs)
 
     df = (
@@ -594,7 +756,9 @@ def shap_summary(pred, feature_cols):
             "shap_rank",
             F.row_number().over(Window.orderBy(F.col("shap_score").desc())),
         )
+        .orderBy("shap_rank")
     )
+
     return [
         {
             "feature_name": row["feature_name"],
@@ -605,32 +769,57 @@ def shap_summary(pred, feature_cols):
     ]
 
 
-def build_parameter_snapshot(cfg):
+def build_parameter_snapshot(cfg, anomaly_cfg, feature_cols):
     return {
-        "learning_rate": cfg["learningRate"],
-        "num_leaves": cfg["numLeaves"],
-        "max_depth": cfg["maxDepth"],
-        "min_data_in_leaf": cfg["minDataInLeaf"],
-        "bagging_fraction": cfg["baggingFraction"],
-        "bagging_freq": cfg["baggingFreq"],
-        "feature_fraction": cfg["featureFraction"],
-        "lambda_l1": cfg["lambdaL1"],
-        "lambda_l2": cfg["lambdaL2"],
-        "min_gain_to_split": cfg["minGainToSplit"],
-        "max_bin": cfg["maxBin"],
-        "num_iterations": cfg["numIterations"],
-        "use_barrier_execution_mode": USE_BARRIER_EXECUTION_MODE,
-        "num_tasks": LGBM_NUM_TASKS,
-        "num_threads": LGBM_NUM_THREADS,
-        "max_streaming_omp_threads": LGBM_NUM_THREADS,
-        "timeout": LGBM_TIMEOUT,
-        "use_single_dataset_mode": LGBM_USE_SINGLE_DATASET_MODE,
-        "data_transfer_mode": LGBM_DATA_TRANSFER_MODE,
-        "p_value_alpha": P_VALUE_ALPHA,
-        "min_history_auc_points": MIN_HISTORY_AUC_POINTS,
+        "lightgbm": {
+            "learning_rate": cfg["learningRate"],
+            "num_leaves": cfg["numLeaves"],
+            "max_depth": cfg["maxDepth"],
+            "min_data_in_leaf": cfg["minDataInLeaf"],
+            "bagging_fraction": cfg["baggingFraction"],
+            "bagging_freq": cfg["baggingFreq"],
+            "feature_fraction": cfg["featureFraction"],
+            "lambda_l1": cfg["lambdaL1"],
+            "lambda_l2": cfg["lambdaL2"],
+            "min_gain_to_split": cfg["minGainToSplit"],
+            "max_bin": cfg["maxBin"],
+            "num_iterations": cfg["numIterations"],
+            "use_barrier_execution_mode": USE_BARRIER_EXECUTION_MODE,
+            "num_tasks": LGBM_NUM_TASKS,
+            "num_threads": LGBM_NUM_THREADS,
+            "max_streaming_omp_threads": LGBM_NUM_THREADS,
+            "timeout": LGBM_TIMEOUT,
+            "use_single_dataset_mode": LGBM_USE_SINGLE_DATASET_MODE,
+            "data_transfer_mode": LGBM_DATA_TRANSFER_MODE,
+        },
+        "anomaly_config": {
+            "batch_time_col": anomaly_cfg["batch_time_col"],
+            "required_history_days": anomaly_cfg["required_history_days"],
+            "previous_batch_hours": anomaly_cfg["previous_batch_hours"],
+            "history_days": anomaly_cfg["history_days"],
+            "target_sample_per_group": anomaly_cfg["target_sample_per_group"],
+            "test_size": anomaly_cfg["test_size"],
+            "random_state": anomaly_cfg["random_state"],
+            "p_value_alpha": anomaly_cfg["p_value_alpha"],
+            "min_history_auc_points": anomaly_cfg["min_history_auc_points"],
+            "exclude_cols": anomaly_cfg["exclude_cols"],
+            "categorical_cols": anomaly_cfg["categorical_cols"],
+            "numeric_cols": anomaly_cfg["numeric_cols"],
+            "feature_cols": feature_cols,
+        },
     }
 
-def save_lgbm_result(pg_hook, table_id, cfg, processing_hour, auc_score, p_value):
+
+def save_lgbm_result(
+    pg_hook,
+    table_id,
+    cfg,
+    anomaly_cfg,
+    feature_cols,
+    processing_hour,
+    auc_score,
+    p_value,
+):
     sql = """
         INSERT INTO lightgbm_auc (
             id,
@@ -653,7 +842,9 @@ def save_lgbm_result(pg_hook, table_id, cfg, processing_hour, auc_score, p_value
             updated_at = NOW()
         RETURNING id
     """
+
     conn = pg_hook.get_conn()
+
     with conn.cursor() as cur:
         cur.execute(
             sql,
@@ -664,7 +855,7 @@ def save_lgbm_result(pg_hook, table_id, cfg, processing_hour, auc_score, p_value
                 processing_hour,
                 auc_score,
                 p_value,
-                Json(build_parameter_snapshot(cfg)),
+                Json(build_parameter_snapshot(cfg, anomaly_cfg, feature_cols)),
             ),
         )
         result_id = str(cur.fetchone()[0])
@@ -677,11 +868,14 @@ def save_lgbm_result(pg_hook, table_id, cfg, processing_hour, auc_score, p_value
         auc_score,
         p_value,
     )
+
     return result_id
+
 
 def save_shap(pg_hook, result_id, processing_hour, rows):
     if not rows:
         return
+
     sql = """
         INSERT INTO shap_results (
             id,
@@ -701,6 +895,7 @@ def save_shap(pg_hook, result_id, processing_hour, rows):
             processing_date_hour = EXCLUDED.processing_date_hour,
             updated_at = NOW()
     """
+
     values = [
         (
             str(uuid.uuid4()),
@@ -712,7 +907,9 @@ def save_shap(pg_hook, result_id, processing_hour, rows):
         )
         for row in rows
     ]
+
     conn = pg_hook.get_conn()
+
     with conn.cursor() as cur:
         execute_values(
             cur,
@@ -722,31 +919,39 @@ def save_shap(pg_hook, result_id, processing_hour, rows):
         )
 
     conn.commit()
+
     logger.info("Saved SHAP rows | result_id=%s | rows=%s", result_id, len(rows))
 
-def get_auc_p_value(threshold, history_scores, auc_score):
+
+def get_auc_p_value(threshold, history_scores, auc_score, anomaly_cfg):
     if threshold:
         return None
-    if len(history_scores) < MIN_HISTORY_AUC_POINTS:
+
+    min_history_auc_points = anomaly_cfg["min_history_auc_points"]
+
+    if len(history_scores) < min_history_auc_points:
         logger.info(
             "Skip p-value: not enough historical AUC points | current=%s | required=%s",
             len(history_scores),
-            MIN_HISTORY_AUC_POINTS,
+            min_history_auc_points,
         )
         return None
+
     return empirical_p_value(history_scores, auc_score)
+
 
 def should_write_auc_verify(threshold, p_value):
     return bool(threshold) or p_value is not None
 
-def save_auc_verify(pg_hook, result_id, threshold, auc_score, p_value, processing_hour):
+
+def save_auc_verify(pg_hook, result_id, threshold, auc_score, p_value, processing_hour, anomaly_cfg):
     if threshold:
         status = "fail" if auc_score >= threshold["auc_threshold"] else "pass"
         manual_threshold_id = threshold["manual_threshold_id"]
         auc_threshold = threshold["auc_threshold"]
         severity_level = threshold["severity_level"] if status == "fail" else None
     else:
-        status = "fail" if p_value < P_VALUE_ALPHA else "pass"
+        status = "fail" if p_value < anomaly_cfg["p_value_alpha"] else "pass"
         manual_threshold_id = None
         auc_threshold = None
         severity_level = "warning" if status == "fail" else None
@@ -779,6 +984,7 @@ def save_auc_verify(pg_hook, result_id, threshold, auc_score, p_value, processin
     """
 
     conn = pg_hook.get_conn()
+
     with conn.cursor() as cur:
         cur.execute(
             sql,
@@ -794,6 +1000,7 @@ def save_auc_verify(pg_hook, result_id, threshold, auc_score, p_value, processin
             ),
         )
         verify_id = str(cur.fetchone()[0])
+
     conn.commit()
 
     logger.info(
@@ -806,18 +1013,38 @@ def save_auc_verify(pg_hook, result_id, threshold, auc_score, p_value, processin
         p_value,
     )
 
+
 def run_table(spark, pg_hook, table, processing_hour):
     logger.info(
         "Start anomaly detection | table=%s | hour=%s",
         table["full_table_name"],
         processing_hour,
     )
-    cfg = get_lgbm_config(pg_hook, table["table_id"])
-    if not cfg:
-        logger.info("Skip anomaly detection: no LightGBM parameter | table=%s", table["full_table_name"])
+
+    anomaly_cfg = get_anomaly_config(pg_hook, table["table_id"])
+
+    if anomaly_cfg is None:
+        logger.info(
+            "Skip anomaly detection: no anomaly config | table=%s",
+            table["full_table_name"],
+        )
         return
 
-    if not has_enough_14_day_history(spark, table["full_table_name"], processing_hour):
+    cfg = get_lgbm_config(pg_hook, table["table_id"])
+
+    if not cfg:
+        logger.info(
+            "Skip anomaly detection: no LightGBM parameter | table=%s",
+            table["full_table_name"],
+        )
+        return
+
+    if not has_enough_history(
+        spark=spark,
+        table_name=table["full_table_name"],
+        target_hour=processing_hour,
+        anomaly_cfg=anomaly_cfg,
+    ):
         return
 
     work_df = None
@@ -827,23 +1054,48 @@ def run_table(spark, pg_hook, table, processing_hour):
 
     try:
         threshold = get_auc_threshold(pg_hook, cfg["parameter_id"])
-        work_df = build_work_df(spark, table["full_table_name"], processing_hour)
+
+        work_df = build_work_df(
+            spark=spark,
+            table_name=table["full_table_name"],
+            target_hour=processing_hour,
+            anomaly_cfg=anomaly_cfg,
+        )
 
         if work_df is None:
             return
 
-        train_df, test_df = split_df(work_df)
-        pipeline, train_f, test_f = build_features(train_df, test_df)
-        pred = train_lgbm(train_f, test_f, cfg, pipeline.categorical_slots)
+        train_df, test_df = split_df(work_df, anomaly_cfg)
+        pipeline, train_f, test_f = build_features(train_df, test_df, anomaly_cfg)
+
+        pred = train_lgbm(
+            train=train_f,
+            test=test_f,
+            cfg=cfg,
+            cat_slots=pipeline.categorical_slots,
+        )
 
         auc_score = evaluate_auc(pred)
-        history_scores = get_historical_auc_scores(pg_hook, table["table_id"], processing_hour)
-        p_value = get_auc_p_value(threshold, history_scores, auc_score)
+
+        history_scores = get_historical_auc_scores(
+            pg_hook=pg_hook,
+            table_id=table["table_id"],
+            processing_hour=processing_hour,
+        )
+
+        p_value = get_auc_p_value(
+            threshold=threshold,
+            history_scores=history_scores,
+            auc_score=auc_score,
+            anomaly_cfg=anomaly_cfg,
+        )
 
         result_id = save_lgbm_result(
             pg_hook=pg_hook,
             table_id=table["table_id"],
             cfg=cfg,
+            anomaly_cfg=anomaly_cfg,
+            feature_cols=pipeline.output_feature_cols,
             processing_hour=processing_hour,
             auc_score=auc_score,
             p_value=p_value,
@@ -853,7 +1105,7 @@ def run_table(spark, pg_hook, table, processing_hour):
             pg_hook=pg_hook,
             result_id=result_id,
             processing_hour=processing_hour,
-            rows=shap_summary(pred, pipeline.feature_cols),
+            rows=shap_summary(pred, pipeline.output_feature_cols),
         )
 
         if should_write_auc_verify(threshold, p_value):
@@ -864,13 +1116,14 @@ def run_table(spark, pg_hook, table, processing_hour):
                 auc_score=auc_score,
                 p_value=p_value,
                 processing_hour=processing_hour,
+                anomaly_cfg=anomaly_cfg,
             )
         else:
             logger.info(
                 "Skip AUC verify | result_id=%s | no_threshold=True | history_auc_points=%s | required=%s",
                 result_id,
                 len(history_scores),
-                MIN_HISTORY_AUC_POINTS,
+                anomaly_cfg["min_history_auc_points"],
             )
 
         logger.info(
@@ -886,32 +1139,78 @@ def run_table(spark, pg_hook, table, processing_hour):
         for df in [pred, train_f, test_f, work_df]:
             if df is not None:
                 with suppress(Exception):
-                    df.unpersist(blocking=True)
+                    df.unpersist(blocking=False)
+
+
+def run_with_timeout(name, timeout_seconds, fn):
+    error = {}
+
+    def target():
+        try:
+            fn()
+        except Exception as exc:
+            error["exception"] = exc
+
+    thread = threading.Thread(target=target, name=name, daemon=True)
+    thread.start()
+    thread.join(timeout_seconds)
+
+    if thread.is_alive():
+        logger.warning(
+            "Cleanup timed out and will be abandoned | step=%s | timeout_seconds=%s",
+            name,
+            timeout_seconds,
+        )
+        return False
+
+    if "exception" in error:
+        logger.warning(
+            "Cleanup failed | step=%s | error=%s",
+            name,
+            error["exception"],
+        )
+        return False
+
+    return True
+
 
 def close_pg_hook(pg_hook):
     if pg_hook is None:
         return
 
-    with suppress(Exception):
+    def close_conn():
         conn = getattr(pg_hook, "conn", None)
         if conn is not None and not conn.closed:
             conn.close()
+
+    run_with_timeout("postgres-close", DB_CLEANUP_TIMEOUT_SECONDS, close_conn)
 
 
 def stop_spark_session(spark):
     if spark is None:
         return
-    with suppress(Exception):
+
+    def clear_cache():
         spark.catalog.clearCache()
-    with suppress(Exception):
+
+    def cancel_jobs():
         spark.sparkContext.cancelAllJobs()
-    with suppress(Exception):
+
+    def stop_spark():
         spark.stop()
+
+    run_with_timeout("spark-clear-cache", SPARK_CLEANUP_TIMEOUT_SECONDS, clear_cache)
+    run_with_timeout("spark-cancel-jobs", SPARK_CLEANUP_TIMEOUT_SECONDS, cancel_jobs)
+    stopped = run_with_timeout("spark-stop", SPARK_CLEANUP_TIMEOUT_SECONDS, stop_spark)
+
+    if not stopped:
+        with suppress(Exception):
+            spark.sparkContext._gateway.shutdown()
 
 
 def main():
     args = parse_args()
-    schema_name = validate_name(args.schema_name, "schema_name")
+    schema_name = validate_identifier(args.schema_name, "schema_name")
     processing_hour = normalize_hour(args.processing_date_hour)
 
     logger.info(
@@ -927,8 +1226,17 @@ def main():
 
     try:
         pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
-        connection_config = get_connection_config(pg_hook, args.connection_name)
-        tables = get_active_tables(pg_hook, connection_config["catalog_name"], schema_name)
+
+        connection_config = get_connection_config(
+            pg_hook=pg_hook,
+            connection_name=args.connection_name,
+        )
+
+        tables = get_active_tables(
+            pg_hook=pg_hook,
+            catalog_name=connection_config["catalog_name"],
+            schema_name=schema_name,
+        )
 
         if not tables:
             logger.info("Job pass: no active tables found | schema=%s", schema_name)
@@ -949,6 +1257,7 @@ def main():
             schema_name,
             processing_hour,
         )
+
         return 0
 
     except Exception:
@@ -967,9 +1276,12 @@ def main():
 
 if __name__ == "__main__":
     exit_code = main()
+
     with suppress(Exception):
         sys.stdout.flush()
+
     with suppress(Exception):
         sys.stderr.flush()
+
     logging.shutdown()
     os._exit(exit_code)
