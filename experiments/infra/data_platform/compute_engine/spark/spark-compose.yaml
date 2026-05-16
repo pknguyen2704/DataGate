@@ -1,0 +1,98 @@
+services:
+  spark-master:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: spark-master
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    volumes:
+      - ../../shared/config:/opt/spark/conf
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.master.Master
+      --host spark-master
+      --port 7077
+      --webui-port 8080
+    networks:
+      - datagate-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  spark-worker-1:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: spark-worker-1
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8081:8081"
+    volumes:
+      - ../../shared/config:/opt/spark/conf
+      - ../../../../etl:/opt/spark/work-dir/etl
+      - ../../../../training_model:/opt/spark/work-dir/training_model
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+      --cores 6
+      --memory 14G
+      --webui-port 8081
+    networks:
+      - datagate-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  spark-worker-2:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: spark-worker-2
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8082:8081"
+    volumes:
+      - ../../shared/config:/opt/spark/conf
+      - ../../../../etl:/opt/spark/work-dir/etl
+      - ../../../../training_model:/opt/spark/work-dir/training_model
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+      --cores 6
+      --memory 14G
+      --webui-port 8081
+    networks:
+      - datagate-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+networks:
+  datagate-net:
+    external: true
