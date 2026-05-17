@@ -10,15 +10,15 @@ class RuleService:
         self.db = db
 
     def list_rules(
-        self, 
-        table_id: str | None = None, 
+        self,
+        table_id: str | None = None,
         column_name: str | None = None,
         source: str | None = None,
-        rule_status: str | None = None, 
+        rule_status: str | None = None,
         severity_level: str | None = None,
         search: str | None = None,
         page: int = 1,
-        page_size: int = 50
+        page_size: int = 50,
     ) -> dict:
         query = self.db.query(Rule)
         if table_id:
@@ -27,19 +27,20 @@ class RuleService:
             query = query.filter(Rule.column_name == column_name)
         if source:
             query = query.filter(Rule.source == source)
-        
+
         if search:
             from sqlalchemy import or_
+
             search_filter = f"%{search}%"
             query = query.filter(
                 or_(
                     Rule.column_name.ilike(search_filter),
                     Rule.constraint_name.ilike(search_filter),
                     Rule.description.ilike(search_filter),
-                    Rule.code_for_constraint.ilike(search_filter)
+                    Rule.code_for_constraint.ilike(search_filter),
                 )
             )
-            
+
         # Map status to is_active/source
         if rule_status:
             if rule_status == "active":
@@ -48,56 +49,54 @@ class RuleService:
                 query = query.filter(Rule.is_active.is_(False), Rule.source == "system")
             elif rule_status == "inactive":
                 query = query.filter(Rule.is_active.is_(False), Rule.source == "manual")
-                
+
         if severity_level:
             query = query.filter(Rule.severity_level == severity_level)
-            
+
         total = query.count()
         from sqlalchemy import case
-        
+
         items = (
             query.options(
-                joinedload(Rule.created_by_user),
-                joinedload(Rule.last_modified_by_user)
+                joinedload(Rule.created_by_user), joinedload(Rule.last_modified_by_user)
             )
             .order_by(
                 Rule.is_active.desc(),
                 case({"critical": 0, "warning": 1}, value=Rule.severity_level).asc(),
-                Rule.frequency.desc()
+                Rule.frequency.desc(),
             )
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
         )
-        
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_rule_or_404(self, rule_id: str) -> Rule:
         rule = self.db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found"
+            )
         return rule
 
     def create_rule(self, data: RuleCreate, user_id: str) -> Rule:
         # Check if table exists
         table = self.db.query(Table).filter(Table.id == str(data.table_id)).first()
         if not table:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Table not found")
-            
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Table not found"
+            )
+
         rule_dict = data.model_dump()
         # If manual, active by default. If system, inactive (pending) by default.
         if rule_dict.get("source") == "system":
             rule_dict["is_active"] = False
         else:
             rule_dict["is_active"] = True
-            
+
         rule = Rule(**rule_dict, created_by=user_id, last_modified_by=user_id)
-        
+
         self.db.add(rule)
         self.db.commit()
         self.db.refresh(rule)
@@ -105,11 +104,11 @@ class RuleService:
 
     def update_rule(self, rule_id: str, data: RuleUpdate, user_id: str) -> Rule:
         rule = self.get_rule_or_404(rule_id)
-        
+
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(rule, field, value)
-            
+
         rule.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(rule)
@@ -121,7 +120,7 @@ class RuleService:
             rule.is_active = True
         elif status_value == "inactive":
             rule.is_active = False
-            
+
         rule.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(rule)
@@ -132,11 +131,15 @@ class RuleService:
         self.db.delete(rule)
         self.db.commit()
 
-    def list_verify_results(self, table_id: str | None = None, limit: int | None = None) -> list[RuleVerify]:
+    def list_verify_results(
+        self, table_id: str | None = None, limit: int | None = None
+    ) -> list[RuleVerify]:
         query = self.db.query(RuleVerify).join(RuleVerify.rule)
         if table_id:
             query = query.filter(Rule.table_id == table_id)
-        query = query.order_by(RuleVerify.processing_date_hour.desc(), RuleVerify.updated_at.desc())
+        query = query.order_by(
+            RuleVerify.processing_date_hour.desc(), RuleVerify.updated_at.desc()
+        )
         if limit:
             query = query.limit(limit)
         return query.all()
@@ -144,7 +147,10 @@ class RuleService:
     def set_verify_resolved(self, verify_id: str, is_resolved: bool) -> RuleVerify:
         result = self.db.query(RuleVerify).filter(RuleVerify.id == verify_id).first()
         if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule verify result not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Rule verify result not found",
+            )
         result.is_resolved = is_resolved
         self.db.commit()
         self.db.refresh(result)

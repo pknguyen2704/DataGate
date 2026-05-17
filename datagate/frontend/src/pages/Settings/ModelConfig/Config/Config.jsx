@@ -40,8 +40,9 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { anomalyJobConfigsApi } from "~/apis/modelConfigsApi";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
-import { StateBox } from "~/components/DataGate/Page";
+import { StateBox } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
+import { useConfirm } from "material-ui-confirm";
 
 const INITIAL_CONFIG = {
   table_id: "",
@@ -79,6 +80,7 @@ const toNumber = (value, fallback = 0) => {
 };
 
 function Config() {
+  const confirm = useConfirm();
   const { user } = useSelector((state) => state.auth);
   const isAdmin = user?.roles?.some((role) => role === "Admin" || role?.name === "Admin");
   const canUpdate =
@@ -143,15 +145,24 @@ function Config() {
     setOpenDialog(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this anomaly job configuration?")) return;
-    try {
-      await anomalyJobConfigsApi.delete(id);
-      toast.success("Deleted");
-      configs.reload();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to delete");
-    }
+  const handleDelete = (id) => {
+    confirm({
+      title: "Delete Configuration",
+      description: "Are you sure you want to delete this anomaly job configuration?",
+      confirmationText: "Delete",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await anomalyJobConfigsApi.delete(id);
+          toast.success("Deleted");
+          configs.reload();
+        } catch (err) {
+          toast.error(err.response?.data?.detail || "Failed to delete");
+        }
+      })
+      .catch(() => {});
   };
 
   const buildPayload = () => ({
@@ -181,7 +192,8 @@ function Config() {
     setSaving(true);
     try {
       if (editingId) {
-        const { table_id, ...updatePayload } = payload;
+        const updatePayload = { ...payload };
+        delete updatePayload.table_id;
         await anomalyJobConfigsApi.update(editingId, updatePayload);
         toast.success("Updated");
       } else {

@@ -23,3 +23,7 @@ dependencies = [
     "requests>=2.33.1",
     "greenlet>=3.4.0",
 ]
+
+[tool.setuptools]
+packages = ["app"]
+

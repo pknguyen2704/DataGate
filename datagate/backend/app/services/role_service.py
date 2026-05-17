@@ -10,15 +10,19 @@ class RoleService:
         self.db = db
 
     def list_permissions(self) -> list[Permission]:
+        from app.rbac.permissions import ALL_PERMISSIONS
+
+        valid_codes = [p["code"] for p in ALL_PERMISSIONS]
         return (
             self.db.query(Permission)
+            .filter(Permission.code.in_(valid_codes))
             .order_by(Permission.permission_group.asc(), Permission.name.asc())
             .all()
         )
 
     def list_roles(self, page: int = 1, page_size: int = 50) -> dict:
         query = self.db.query(Role).options(selectinload(Role.permissions))
-        
+
         total = query.count()
         items = (
             query.order_by(Role.created_at.desc())
@@ -26,13 +30,8 @@ class RoleService:
             .limit(page_size)
             .all()
         )
-        
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_role_by_id(self, role_id: str) -> Role | None:
         return (
@@ -51,11 +50,7 @@ class RoleService:
         return role
 
     def get_role_by_name(self, name: str) -> Role | None:
-        return (
-            self.db.query(Role)
-            .filter(Role.name == name)
-            .first()
-        )
+        return self.db.query(Role).filter(Role.name == name).first()
 
     def create_role(self, data: RoleCreate) -> Role:
         existing_role = self.get_role_by_name(data.name)
@@ -118,8 +113,8 @@ class RoleService:
         if role.is_system:
             raise BadRequestError("Cannot delete a system role")
 
-        # Soft delete/deactivate
-        role.is_active = False
+        # Hard delete from database
+        self.db.delete(role)
         self.db.commit()
 
     def assign_permissions_to_role(
@@ -144,9 +139,7 @@ class RoleService:
             return []
 
         permissions = (
-            self.db.query(Permission)
-            .filter(Permission.id.in_(permission_ids))
-            .all()
+            self.db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
         )
 
         if len(permissions) != len(set(permission_ids)):

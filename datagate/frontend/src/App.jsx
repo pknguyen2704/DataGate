@@ -1,16 +1,14 @@
 import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import Auth from "~/pages/Auth/Auth";
-import Login from "~/pages/Auth/Login/Login";
-import MainLayout from "~/components/Layout/MainLayout";
-import ProtectedRoute from "~/components/Auth/ProtectedRoute";
-import "react-toastify/dist/ReactToastify.css";
 import { useDispatch } from "react-redux";
 import { initializeAuth } from "~/stores/slices/authSlice";
-
-// Explicit imports replacing React.lazy for simpler, beginner-friendly code
+import "react-toastify/dist/ReactToastify.css";
+import ProtectedRoute from "~/components/Auth/ProtectedRoute";
+import MainLayout from "~/components/Layout/MainLayout";
+import Auth from "~/pages/Auth/Auth";
 import Home from "~/pages/Home/Home";
 import DataAssets from "~/pages/DataAssets/DataAssets";
+import Notebook from "~/pages/Notebook/Notebook";
 import TableDetail from "~/pages/DataAssets/TableDetail/index.jsx";
 import Settings from "~/pages/Settings/Settings";
 import { ObservabilityTab, MetricsTab, RulesTab, QualityTab } from "~/pages/DataAssets/TableDetail/index.jsx";
@@ -29,13 +27,14 @@ function App() {
   return (
     <Routes>
       {/* Auth Routes */}
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={<Auth />} />
 
       {/* Protected App Routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Navigate to="/app/home" replace />} />
           <Route path="/app/home" element={<Home />} />
+          <Route path="/app/notebook" element={<Notebook />} />
 
           {/* Data Assets */}
           <Route path="/app/data-assets" element={<DataAssets />} />
@@ -55,7 +54,9 @@ function App() {
               <Route path="connections" element={<PlatformConnection />} />
             </Route>
 
-            <Route path="model-configs" element={<ModelConfig />} />
+            <Route element={<ProtectedRoute permission="model_config:view" />}>
+              <Route path="model-configs" element={<ModelConfig />} />
+            </Route>
             
             <Route element={<ProtectedRoute permission="user:manage" />}>
               <Route path="users" element={<UserManagement />} />

@@ -4,17 +4,6 @@ from fastapi import status
 
 
 class AppError(Exception):
-    """
-    Base exception dùng chung cho toàn bộ hệ thống.
-
-    Khi raise AppError trong service/router, main.py sẽ bắt lỗi này
-    và trả về JSON response theo format thống nhất:
-    {
-        "message": "...",
-        "detail": ...
-    }
-    """
-
     def __init__(
         self,
         message: str,

@@ -1,9 +1,134 @@
-import React from 'react'
+import React from 'react';
+import {
+  Box, Button, Typography, Switch, Grid, Chip, Paper
+} from "@mui/material";
+import { DeleteOutline } from "@mui/icons-material";
+import { connectionsApi } from "~/apis/connectionsApi";
+import { toast } from "react-toastify";
 
-function Connection() {
+import { useConfirm } from "material-ui-confirm";
+
+function Connection({ connection, canUpdate, canDelete, onReload, onDeleted }) {
+  const confirm = useConfirm();
+
+  const handleToggleActive = async () => {
+    try {
+      if (connection.is_active) {
+        await connectionsApi.deactivate(connection.id);
+        toast.success("Deactivated");
+      } else {
+        await connectionsApi.activate(connection.id);
+        toast.success("Activated");
+      }
+      onReload();
+    } catch (error) {
+      console.error(error);
+      toast.error("Action failed");
+    }
+  };
+
+  const handleDelete = () => {
+    confirm({
+      title: "Delete Connection",
+      description: `Are you sure you want to permanently delete connection "${connection.connection_name}"?`,
+      confirmationText: "Delete",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await connectionsApi.delete(connection.id);
+          toast.success("Connection deleted successfully");
+          onDeleted();
+        } catch (err) {
+          toast.error("Failed to delete connection: " + (err.response?.data?.detail || err.message));
+        }
+      })
+      .catch(() => {});
+  };
+
   return (
-    <div>Connection</div>
-  )
+    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+      <Grid container spacing={3}>
+        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider', pb: 1, mb: 1 }}>
+          <Typography variant="h6" color="primary" fontWeight={700}>General Info</Typography>
+          {canDelete && (
+            <Button variant="outlined" color="error" size="small" startIcon={<DeleteOutline />} onClick={handleDelete}>
+              Delete Connection
+            </Button>
+          )}
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>DESCRIPTION</Typography>
+          <Typography variant="body2">{connection.description || "N/A"}</Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>STATUS</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+            <Switch
+              size="small"
+              checked={connection.is_active}
+              onChange={handleToggleActive}
+              color="success"
+              disabled={!canUpdate}
+            />
+            <Chip
+              label={connection.is_active ? "Active" : "Inactive"}
+              size="small"
+              variant="outlined"
+              color={connection.is_active ? "success" : "default"}
+              sx={{ ml: 1, border: 'none', fontWeight: 600 }}
+            />
+          </Box>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Trino Configuration</Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>HOST</Typography>
+          <Typography variant="body2">{connection.trino_host}</Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>PORT</Typography>
+          <Typography variant="body2">{connection.trino_port}</Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>USER</Typography>
+          <Typography variant="body2">{connection.trino_user}</Typography>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Iceberg Configuration</Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>CATALOG NAME</Typography>
+          <Typography variant="body2">{connection.iceberg_catalog_name}</Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>REST URL</Typography>
+          <Typography variant="body2">{connection.iceberg_rest_url}</Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>WAREHOUSE</Typography>
+          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{connection.iceberg_warehouse}</Typography>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Storage (MinIO/S3) Configuration</Typography>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>ENDPOINT URL</Typography>
+          <Typography variant="body2">{connection.minio_endpoint_url}</Typography>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>ACCESS KEY</Typography>
+          <Typography variant="body2">{connection.minio_access_key}</Typography>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
 }
 
-export default Connection
+export default Connection;

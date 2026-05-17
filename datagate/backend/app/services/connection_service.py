@@ -5,7 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.core.trino_client import TrinoClient
 from app.models import Connection, Table
-from app.schemas.connection_schema import ConnectionCreate, ConnectionTestResult, ConnectionUpdate
+from app.schemas.connection_schema import (
+    ConnectionCreate,
+    ConnectionTestResult,
+    ConnectionUpdate,
+)
 
 
 SYSTEM_SCHEMAS = {"information_schema", "pg_catalog", "sys", "system"}
@@ -33,8 +37,12 @@ class ConnectionService:
             created_by=str(creator_id),
         )
 
-    def _validate_name_unique(self, connection_name: str, exclude_id: str | None = None) -> None:
-        query = self.db.query(Connection).filter(Connection.connection_name == connection_name)
+    def _validate_name_unique(
+        self, connection_name: str, exclude_id: str | None = None
+    ) -> None:
+        query = self.db.query(Connection).filter(
+            Connection.connection_name == connection_name
+        )
         if exclude_id:
             query = query.filter(Connection.id != exclude_id)
         if query.first():
@@ -56,11 +64,11 @@ class ConnectionService:
                 match = re.search(r"error (\d+):", error_msg)
                 status_code = f" (Status {match.group(1)})" if match else ""
                 error_msg = f"Server responded with an error{status_code}. This usually happens when the port is incorrect or pointing to a different service."
-            
+
             # Truncate very long messages
             if len(error_msg) > 250:
                 error_msg = error_msg[:247] + "..."
-                
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Connection test failed: {error_msg}",
@@ -83,15 +91,18 @@ class ConnectionService:
         }
         return any(field in update_data for field in fields)
 
-    def list_connections(self, page: int = 1, page_size: int = 50, is_active: bool | None = None) -> dict:
+    def list_connections(
+        self, page: int = 1, page_size: int = 50, is_active: bool | None = None
+    ) -> dict:
         from sqlalchemy.orm import selectinload
+
         query = self.db.query(Connection).options(
             selectinload(Connection.created_by_user),
-            selectinload(Connection.last_modified_by_user)
+            selectinload(Connection.last_modified_by_user),
         )
         if is_active is not None:
             query = query.filter(Connection.is_active == is_active)
-        
+
         total = query.count()
         items = (
             query.order_by(Connection.created_at.desc())
@@ -99,21 +110,17 @@ class ConnectionService:
             .limit(page_size)
             .all()
         )
-        
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_connection_by_id(self, connection_id: str) -> Connection | None:
         from sqlalchemy.orm import selectinload
+
         return (
             self.db.query(Connection)
             .options(
                 selectinload(Connection.created_by_user),
-                selectinload(Connection.last_modified_by_user)
+                selectinload(Connection.last_modified_by_user),
             )
             .filter(Connection.id == connection_id)
             .first()
@@ -137,11 +144,15 @@ class ConnectionService:
         self.db.refresh(connection)
         return connection
 
-    def update_connection(self, connection_id: str, data: ConnectionUpdate, modifier_id: str | None = None) -> Connection:
+    def update_connection(
+        self, connection_id: str, data: ConnectionUpdate, modifier_id: str | None = None
+    ) -> Connection:
         connection = self.get_connection_or_404(connection_id)
         update_data = data.model_dump(exclude_unset=True)
         if "connection_name" in update_data:
-            self._validate_name_unique(update_data["connection_name"], exclude_id=connection_id)
+            self._validate_name_unique(
+                update_data["connection_name"], exclude_id=connection_id
+            )
         for field, value in update_data.items():
             # Skip empty passwords/secrets to avoid overwriting with empty string
             if field in ["trino_password", "minio_secret_key"] and not value:
@@ -205,11 +216,15 @@ class ConnectionService:
         client = TrinoClient(connection)
         try:
             schemas = client.list_schemas(connection.iceberg_catalog_name)
-            return [schema for schema in schemas if schema.lower() not in SYSTEM_SCHEMAS]
+            return [
+                schema for schema in schemas if schema.lower() not in SYSTEM_SCHEMAS
+            ]
         finally:
             client.close()
 
-    def list_tables(self, connection_id: str, schema: str, catalog: str | None = None) -> list[str]:
+    def list_tables(
+        self, connection_id: str, schema: str, catalog: str | None = None
+    ) -> list[str]:
         connection = self.get_connection_or_404(connection_id)
         target_catalog = catalog or connection.iceberg_catalog_name
         if target_catalog != connection.iceberg_catalog_name:
@@ -223,7 +238,9 @@ class ConnectionService:
         finally:
             client.close()
 
-    def add_managed_table(self, connection_id: str, catalog: str, schema: str, table_name: str) -> Table:
+    def add_managed_table(
+        self, connection_id: str, catalog: str, schema: str, table_name: str
+    ) -> Table:
         # Check if already managed
         existing = (
             self.db.query(Table)
@@ -231,19 +248,19 @@ class ConnectionService:
                 Table.connection_id == connection_id,
                 Table.catalog_name == catalog,
                 Table.schema_name == schema,
-                Table.table_name == table_name
+                Table.table_name == table_name,
             )
             .first()
         )
         if existing:
             return existing
-            
+
         table = Table(
             connection_id=connection_id,
             catalog_name=catalog,
             schema_name=schema,
             table_name=table_name,
-            is_active=True
+            is_active=True,
         )
         self.db.add(table)
         self.db.commit()
@@ -254,7 +271,7 @@ class ConnectionService:
         table = self.db.query(Table).filter(Table.id == table_id).first()
         if not table:
             raise HTTPException(status_code=404, detail="Managed table not found")
-        
+
         # Check if has results
         # We prefer soft delete if it has data, but for now simple delete is ok if user requested it.
         # But wait, Table model doesn't have soft delete for the row itself, just is_active.

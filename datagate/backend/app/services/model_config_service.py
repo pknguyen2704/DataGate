@@ -1,16 +1,15 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from uuid import UUID
 from datetime import datetime
-from typing import Any, List, Optional
 
-from app.models import LightGBMAnomalyConfig, LightGBMParameter, Table
-from app.schemas.lightgbm_schema import (
-    LightGBMAnomalyConfigCreate,
-    LightGBMAnomalyConfigUpdate,
-    LightGBMParameterCreate,
-    LightGBMParameterUpdate,
+from app.models import ModelConfig, ModelParameter, Table, AUCResult, SHAPResult
+from app.schemas.model_schema import (
+    ModelConfigCreate,
+    ModelConfigUpdate,
+    ModelParameterCreate,
+    ModelParameterUpdate,
 )
+
 
 class ModelConfigService:
     def __init__(self, db: Session):
@@ -18,47 +17,52 @@ class ModelConfigService:
 
     def list_configs(self, page: int = 1, page_size: int = 50) -> dict:
         from sqlalchemy.orm import selectinload
-        query = self.db.query(LightGBMParameter).options(
-            selectinload(LightGBMParameter.created_by_user),
-            selectinload(LightGBMParameter.last_modified_by_user)
+
+        query = self.db.query(ModelParameter).options(
+            selectinload(ModelParameter.created_by_user),
+            selectinload(ModelParameter.last_modified_by_user),
         )
         total = query.count()
         items = (
-            query.order_by(LightGBMParameter.updated_at.desc())
+            query.order_by(ModelParameter.updated_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
         )
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-    def get_config_or_404(self, config_id: str) -> LightGBMParameter:
-        config = self.db.query(LightGBMParameter).filter(LightGBMParameter.id == config_id).first()
+    def get_config_or_404(self, config_id: str) -> ModelParameter:
+        config = (
+            self.db.query(ModelParameter).filter(ModelParameter.id == config_id).first()
+        )
         if not config:
             raise HTTPException(status_code=404, detail="Model configuration not found")
         return config
 
-    def create_config(self, data: LightGBMParameterCreate, user_id: str) -> LightGBMParameter:
+    def create_config(self, data: ModelParameterCreate, user_id: str) -> ModelParameter:
         # Check if table already has a config
-        existing = self.db.query(LightGBMParameter).filter(LightGBMParameter.table_id == str(data.table_id)).first()
+        existing = (
+            self.db.query(ModelParameter)
+            .filter(ModelParameter.table_id == str(data.table_id))
+            .first()
+        )
         if existing:
-            raise HTTPException(status_code=400, detail="Configuration already exists for this table. Use update instead.")
-            
-        config = LightGBMParameter(
-            **data.model_dump(),
-            created_by=user_id,
-            last_modified_by=user_id
+            raise HTTPException(
+                status_code=400,
+                detail="Configuration already exists for this table. Use update instead.",
+            )
+
+        config = ModelParameter(
+            **data.model_dump(), created_by=user_id, last_modified_by=user_id
         )
         self.db.add(config)
         self.db.commit()
         self.db.refresh(config)
         return config
 
-    def update_config(self, config_id: str, data: LightGBMParameterUpdate, user_id: str) -> LightGBMParameter:
+    def update_config(
+        self, config_id: str, data: ModelParameterUpdate, user_id: str
+    ) -> ModelParameter:
         config = self.get_config_or_404(config_id)
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
@@ -87,15 +91,15 @@ class ModelConfigService:
             "lambda_l2": 0.0,
             "min_gain_to_split": 0.0,
             "max_bin": 255,
-            "num_iterations": 100
+            "num_iterations": 100,
         }
 
-    def upload_json(self, table_id: str, data: dict, user_id: str) -> LightGBMParameter:
+    def upload_json(self, table_id: str, data: dict, user_id: str) -> ModelParameter:
         # Validate table exists
         table = self.db.query(Table).filter(Table.id == table_id).first()
         if not table:
             raise HTTPException(status_code=404, detail="Table not found")
-            
+
         # Extract fields
         template = self.get_template()
         params = {}
@@ -103,13 +107,14 @@ class ModelConfigService:
             if key in data:
                 params[key] = data[key]
             else:
-                # Use default if missing? 
-                # Requirement: "map them to existing fields. If mapping is ambiguous, return validation error"
-                # I'll just use defaults for now to be safe, or error if vital ones are missing.
                 params[key] = template[key]
-        
+
         # Check if already exists
-        existing = self.db.query(LightGBMParameter).filter(LightGBMParameter.table_id == table_id).first()
+        existing = (
+            self.db.query(ModelParameter)
+            .filter(ModelParameter.table_id == table_id)
+            .first()
+        )
         if existing:
             for field, value in params.items():
                 setattr(existing, field, value)
@@ -119,11 +124,11 @@ class ModelConfigService:
             self.db.refresh(existing)
             return existing
         else:
-            config = LightGBMParameter(
+            config = ModelParameter(
                 table_id=table_id,
                 **params,
                 created_by=user_id,
-                last_modified_by=user_id
+                last_modified_by=user_id,
             )
             self.db.add(config)
             self.db.commit()
@@ -138,16 +143,16 @@ class ModelConfigService:
     ) -> dict:
         from sqlalchemy.orm import selectinload
 
-        query = self.db.query(LightGBMAnomalyConfig).options(
-            selectinload(LightGBMAnomalyConfig.created_by_user),
-            selectinload(LightGBMAnomalyConfig.last_modified_by_user),
+        query = self.db.query(ModelConfig).options(
+            selectinload(ModelConfig.created_by_user),
+            selectinload(ModelConfig.last_modified_by_user),
         )
         if table_id:
-            query = query.filter(LightGBMAnomalyConfig.table_id == table_id)
+            query = query.filter(ModelConfig.table_id == table_id)
 
         total = query.count()
         items = (
-            query.order_by(LightGBMAnomalyConfig.updated_at.desc())
+            query.order_by(ModelConfig.updated_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
@@ -159,28 +164,26 @@ class ModelConfigService:
             "page_size": page_size,
         }
 
-    def get_anomaly_config_or_404(self, config_id: str) -> LightGBMAnomalyConfig:
-        config = (
-            self.db.query(LightGBMAnomalyConfig)
-            .filter(LightGBMAnomalyConfig.id == config_id)
-            .first()
-        )
+    def get_anomaly_config_or_404(self, config_id: str) -> ModelConfig:
+        config = self.db.query(ModelConfig).filter(ModelConfig.id == config_id).first()
         if not config:
-            raise HTTPException(status_code=404, detail="Anomaly job configuration not found")
+            raise HTTPException(
+                status_code=404, detail="Anomaly job configuration not found"
+            )
         return config
 
     def create_anomaly_config(
         self,
-        data: LightGBMAnomalyConfigCreate,
+        data: ModelConfigCreate,
         user_id: str,
-    ) -> LightGBMAnomalyConfig:
+    ) -> ModelConfig:
         table = self.db.query(Table).filter(Table.id == str(data.table_id)).first()
         if not table:
             raise HTTPException(status_code=404, detail="Table not found")
 
         existing = (
-            self.db.query(LightGBMAnomalyConfig)
-            .filter(LightGBMAnomalyConfig.table_id == str(data.table_id))
+            self.db.query(ModelConfig)
+            .filter(ModelConfig.table_id == str(data.table_id))
             .first()
         )
         if existing:
@@ -189,7 +192,7 @@ class ModelConfigService:
                 detail="Anomaly job configuration already exists for this table. Use update instead.",
             )
 
-        config = LightGBMAnomalyConfig(
+        config = ModelConfig(
             **data.model_dump(),
             created_by=user_id,
             last_modified_by=user_id,
@@ -202,9 +205,9 @@ class ModelConfigService:
     def update_anomaly_config(
         self,
         config_id: str,
-        data: LightGBMAnomalyConfigUpdate,
+        data: ModelConfigUpdate,
         user_id: str,
-    ) -> LightGBMAnomalyConfig:
+    ) -> ModelConfig:
         config = self.get_anomaly_config_or_404(config_id)
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
@@ -237,7 +240,9 @@ class ModelConfigService:
             "description": None,
         }
 
-    def upload_anomaly_config_json(self, table_id: str, data: dict, user_id: str) -> LightGBMAnomalyConfig:
+    def upload_anomaly_config_json(
+        self, table_id: str, data: dict, user_id: str
+    ) -> ModelConfig:
         table = self.db.query(Table).filter(Table.id == table_id).first()
         if not table:
             raise HTTPException(status_code=404, detail="Table not found")
@@ -256,8 +261,14 @@ class ModelConfigService:
             for key, default_value in template.items():
                 value = data.get(key, default_value)
                 if key == "history_days" and isinstance(value, str):
-                    value = [int(item.strip()) for item in value.split(",") if item.strip()]
-                elif key in {"exclude_cols", "categorical_cols", "numeric_cols"} and isinstance(value, str):
+                    value = [
+                        int(item.strip()) for item in value.split(",") if item.strip()
+                    ]
+                elif key in {
+                    "exclude_cols",
+                    "categorical_cols",
+                    "numeric_cols",
+                } and isinstance(value, str):
                     value = [item.strip() for item in value.split(",") if item.strip()]
                 elif key in integer_fields and value is not None:
                     value = int(value)
@@ -265,12 +276,12 @@ class ModelConfigService:
                     value = float(value)
                 params[key] = value
         except (TypeError, ValueError):
-            raise HTTPException(status_code=400, detail="Invalid anomaly config JSON values")
+            raise HTTPException(
+                status_code=400, detail="Invalid anomaly config JSON values"
+            )
 
         existing = (
-            self.db.query(LightGBMAnomalyConfig)
-            .filter(LightGBMAnomalyConfig.table_id == table_id)
-            .first()
+            self.db.query(ModelConfig).filter(ModelConfig.table_id == table_id).first()
         )
         if existing:
             for field, value in params.items():
@@ -281,7 +292,7 @@ class ModelConfigService:
             self.db.refresh(existing)
             return existing
 
-        config = LightGBMAnomalyConfig(
+        config = ModelConfig(
             table_id=table_id,
             **params,
             created_by=user_id,
@@ -291,3 +302,37 @@ class ModelConfigService:
         self.db.commit()
         self.db.refresh(config)
         return config
+
+    # Merged methods from AnomalyDetectionService
+    def list_auc_results(
+        self, table_id: str | None = None, page: int = 1, page_size: int = 50
+    ) -> dict:
+        query = self.db.query(AUCResult)
+        if table_id:
+            query = query.filter(AUCResult.table_id == table_id)
+
+        total = query.count()
+        items = (
+            query.order_by(AUCResult.processing_date_hour.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+    def get_auc_result_or_404(self, auc_result_id: str) -> AUCResult:
+        row = self.db.query(AUCResult).filter(AUCResult.id == auc_result_id).first()
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="AUC result not found"
+            )
+        return row
+
+    def list_shap_results(self, auc_result_id: str) -> list[SHAPResult]:
+        self.get_auc_result_or_404(auc_result_id)
+        return (
+            self.db.query(SHAPResult)
+            .filter(SHAPResult.auc_result_id == auc_result_id)
+            .order_by(SHAPResult.shap_rank.asc())
+            .all()
+        )

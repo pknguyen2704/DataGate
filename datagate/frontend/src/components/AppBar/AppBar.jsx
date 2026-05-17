@@ -5,25 +5,20 @@ import {
   Box,
   Typography,
   IconButton,
-  Tooltip,
   Avatar,
   Menu,
   MenuItem,
-  Divider,
   ListItemIcon,
 } from "@mui/material";
 import {
-  NotificationsNoneOutlined as NotificationsIcon,
   Logout as LogoutIcon,
-  PersonOutline as PersonIcon,
-  HelpOutline as HelpIcon,
   Menu as MenuIcon,
   MenuOpen as MenuOpenIcon,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
-import { logout as logoutAction } from "../../stores/slices/authSlice";
+import { logout as logoutAction } from "~/stores/slices/authSlice";
 import { useNavigate } from "react-router-dom";
-import { datagateColors } from "~/theme";
+
 
 const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
   const dispatch = useDispatch();
@@ -107,11 +102,6 @@ const AppBar = ({ onToggleSidebar, isSidebarCollapsed }) => {
             sx: { mt: 1.5, borderRadius: 2, minWidth: 200 },
           }}
         >
-          <MenuItem onClick={handleClose}>
-            <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
-            Account Profile
-          </MenuItem>
-          <Divider />
           <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
             <ListItemIcon><LogoutIcon fontSize="small" sx={{ color: 'error.main' }} /></ListItemIcon>
             Sign Out

@@ -3,83 +3,98 @@ import { authApi } from "~/apis/authApi";
 
 const TOKEN_KEY = "token";
 
-const getStoredToken = () => localStorage.getItem(TOKEN_KEY);
-const saveToken = (token) => localStorage.setItem(TOKEN_KEY, token);
-const clearStoredToken = () => localStorage.removeItem(TOKEN_KEY);
+const readToken = () => localStorage.getItem(TOKEN_KEY);
+const storeToken = (token) => localStorage.setItem(TOKEN_KEY, token);
+const removeToken = () => localStorage.removeItem(TOKEN_KEY);
+
+const getErrorMessage = (error, fallbackMessage) => (
+  error.response?.data?.detail || fallbackMessage
+);
+
+const markAsLoading = (state) => {
+  state.loading = true;
+  state.status = "loading";
+  state.error = null;
+};
+
+const markAsLoggedIn = (state, payload) => {
+  state.loading = false;
+  state.status = "authenticated";
+  state.isAuthenticated = true;
+  state.user = payload.user;
+  state.token = payload.token;
+  state.error = null;
+};
+
+const markAsLoggedOut = (state, status = "anonymous") => {
+  state.loading = false;
+  state.status = status;
+  state.isAuthenticated = false;
+  state.user = null;
+  state.token = null;
+};
 
 export const login = createAsyncThunk(
   "auth/login",
   async (loginData, { rejectWithValue }) => {
     try {
-      const res = await authApi.login(loginData);
-      const accessToken = res.data.access_token;
-      saveToken(accessToken);
+      const response = await authApi.login(loginData);
+      const token = response.data.access_token;
 
-      // Use user info from login response if available, otherwise fetch it
-      const user = res.data.user;
-      
+      storeToken(token);
+
       return {
-        user: user,
-        token: accessToken,
+        user: response.data.user,
+        token,
       };
-    } catch (err) {
-      clearStoredToken();
-      return rejectWithValue(err.response?.data?.detail || "Login failed");
+    } catch (error) {
+      removeToken();
+      return rejectWithValue(getErrorMessage(error, "Login failed"));
     }
   }
 );
 
-export const logout = createAsyncThunk(
-  "auth/logout",
+export const logout = createAsyncThunk("auth/logout", async () => {
+  try {
+    await authApi.logout();
+  } catch (error) {
+    console.error("Logout API failed", error);
+  } finally {
+    removeToken();
+  }
+});
+
+export const initializeAuth = createAsyncThunk(
+  "auth/initialize",
   async (_, { rejectWithValue }) => {
-    try {
-      await authApi.logout();
-    } catch (err) {
-      console.error("Logout API failed", err);
-    } finally {
-      clearStoredToken();
-    }
-  }
-);
+    const token = readToken();
 
-export const changePassword = createAsyncThunk(
-  "auth/changePassword",
-  async (data, { rejectWithValue }) => {
+    if (!token) {
+      return rejectWithValue("No token");
+    }
+
     try {
-      const res = await authApi.changePassword(data);
-      return res.data;
-    } catch (err) {
+      const response = await authApi.getMe();
+
+      return {
+        user: response.data,
+        token,
+      };
+    } catch (error) {
+      removeToken();
       return rejectWithValue(
-        err.response?.data?.detail || "Change password failed"
+        getErrorMessage(error, "Auth initialization failed")
       );
     }
   }
 );
 
-
-export const initializeAuth = createAsyncThunk(
-  "auth/initialize",
-  async (_, { rejectWithValue }) => {
-    const token = getStoredToken();
-    if (!token) return rejectWithValue("No token");
-
-    try {
-      const meRes = await authApi.getMe();
-      return {
-        user: meRes.data,
-        token,
-      };
-    } catch (error) {
-      clearStoredToken();
-      return rejectWithValue(error.response?.data?.detail || "Auth initialization failed");
-    }
-  }
-);
+const savedToken = readToken();
 
 const initialState = {
   user: null,
-  token: getStoredToken(),
-  isAuthenticated: Boolean(getStoredToken()),
+  token: savedToken,
+  isAuthenticated: Boolean(savedToken),
   loading: true,
   status: "idle",
   error: null,
@@ -93,71 +108,29 @@ const authSlice = createSlice({
       state.error = null;
     },
   },
-
   extraReducers: (builder) => {
     builder
-      // Login
-      .addCase(login.pending, (state) => {
-        state.loading = true;
-        state.status = "loading";
-        state.error = null;
-      })
+      .addCase(login.pending, markAsLoading)
       .addCase(login.fulfilled, (state, action) => {
-        state.loading = false;
-        state.status = "authenticated";
-        state.isAuthenticated = true;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
+        markAsLoggedIn(state, action.payload);
       })
       .addCase(login.rejected, (state, action) => {
-        state.loading = false;
-        state.status = "error";
-        state.isAuthenticated = false;
+        markAsLoggedOut(state, "error");
         state.error = action.payload;
       })
-      // Initialize Auth
-      .addCase(initializeAuth.pending, (state) => {
-        state.loading = true;
-        state.status = "loading";
-      })
+
+      .addCase(initializeAuth.pending, markAsLoading)
       .addCase(initializeAuth.fulfilled, (state, action) => {
-        state.loading = false;
-        state.status = "authenticated";
-        state.isAuthenticated = true;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
+        markAsLoggedIn(state, action.payload);
       })
       .addCase(initializeAuth.rejected, (state) => {
-        state.loading = false;
-        state.status = "anonymous";
-        state.isAuthenticated = false;
-        state.user = null;
-        state.token = null;
+        markAsLoggedOut(state);
       })
-      // Logout
-      .addCase(logout.fulfilled, (state) => {
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-        state.loading = false;
-        state.status = "idle";
-        state.error = null;
-      })
-      // Change Password
-      .addCase(changePassword.pending, (state) => {
-        state.loading = true;
-        state.status = "loading";
-      })
-      .addCase(changePassword.fulfilled, (state) => {
-        state.loading = false;
-        state.status = "success";
-      })
-      .addCase(changePassword.rejected, (state, action) => {
-        state.loading = false;
-        state.status = "error";
-        state.error = action.payload;
-      });
 
+      .addCase(logout.fulfilled, (state) => {
+        markAsLoggedOut(state, "idle");
+        state.error = null;
+      });
   },
 });
 

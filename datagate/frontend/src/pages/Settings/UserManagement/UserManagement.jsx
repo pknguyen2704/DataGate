@@ -13,7 +13,7 @@ import {
 import { useSelector } from "react-redux";
 import { usersApi } from "~/apis/usersApi";
 import { rolesApi } from "~/apis/rolesApi";
-import { StateBox, StatusChip } from "~/components/DataGate/Page";
+import { StateBox, StatusChip } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
 import { toast } from "react-toastify";
 

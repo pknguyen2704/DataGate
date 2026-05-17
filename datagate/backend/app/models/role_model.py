@@ -24,30 +24,26 @@ class Role(Base):
     is_system = Column(Boolean, default=False, nullable=False)
 
     created_by = Column(
-        UUID(as_uuid=False),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    users = relationship(
-        "User",
-        secondary=user_roles,
-        back_populates="roles"
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    users = relationship("User", secondary=user_roles, back_populates="roles")
 
     permissions = relationship(
-        "Permission",
-        secondary=role_permissions,
-        back_populates="roles"
+        "Permission", secondary=role_permissions, back_populates="roles"
     )
 
-    created_by_user = relationship(
-        "User",
-        foreign_keys=[created_by]
-    )
+    created_by_user = relationship("User", foreign_keys=[created_by])
 
     __table_args__ = (
         Index("ix_roles__name", "name", unique=True),

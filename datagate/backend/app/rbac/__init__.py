@@ -1,1 +1,1 @@
-from .permissions import PermissionCode
+from .permissions import PermissionCode as PermissionCode

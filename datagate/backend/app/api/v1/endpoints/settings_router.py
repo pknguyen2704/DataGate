@@ -11,4 +11,6 @@ settings_router.include_router(connections_router)
 settings_router.include_router(model_configs_router)
 settings_router.include_router(users_router, prefix="/users", tags=["Users Settings"])
 settings_router.include_router(roles_router, prefix="/roles", tags=["Roles Settings"])
-settings_router.include_router(permission_router, prefix="/permissions", tags=["Permissions Settings"])
+settings_router.include_router(
+    permission_router, prefix="/permissions", tags=["Permissions Settings"]
+)

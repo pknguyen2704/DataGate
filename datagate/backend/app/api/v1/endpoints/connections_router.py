@@ -6,7 +6,13 @@ from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
-from app.schemas.connection_schema import ConnectionCreate, ConnectionOut, ConnectionTestResult, ConnectionUpdate
+from app.schemas.connection_schema import (
+    ConnectionCreate,
+    ConnectionListOut,
+    ConnectionOut,
+    ConnectionTestResult,
+    ConnectionUpdate,
+)
 from app.services.connection_service import ConnectionService
 
 
@@ -15,9 +21,6 @@ connections_router = APIRouter(prefix="/connections", tags=["Connections"])
 
 def get_connection_service(db: Session = Depends(get_db)) -> ConnectionService:
     return ConnectionService(db)
-
-
-from app.schemas.connection_schema import ConnectionCreate, ConnectionOut, ConnectionTestResult, ConnectionUpdate, ConnectionListOut
 
 
 @connections_router.get("", response_model=ConnectionListOut)
@@ -31,7 +34,9 @@ def list_connections(
     return service.list_connections(page=page, page_size=page_size, is_active=is_active)
 
 
-@connections_router.post("", response_model=ConnectionOut, status_code=status.HTTP_201_CREATED)
+@connections_router.post(
+    "", response_model=ConnectionOut, status_code=status.HTTP_201_CREATED
+)
 def create_connection(
     body: ConnectionCreate,
     service: ConnectionService = Depends(get_connection_service),
@@ -111,7 +116,9 @@ def add_managed_table(
     return service.add_managed_table(str(connection_id), catalog, schema, table_name)
 
 
-@connections_router.delete("/{connection_id}/managed-tables/{table_id}", status_code=status.HTTP_204_NO_CONTENT)
+@connections_router.delete(
+    "/{connection_id}/managed-tables/{table_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def remove_managed_table(
     connection_id: UUID,
     table_id: UUID,

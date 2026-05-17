@@ -11,11 +11,9 @@ import {
 } from "@mui/material";
 import {
   DashboardOutlined as DashboardIcon,
+  MenuBookOutlined as NotebookIcon,
   SettingsOutlined as SettingsIcon,
   TableChartOutlined as TablesIcon,
-  TuneOutlined as MetricsIcon,
-  RuleOutlined as RuleIcon,
-  VerifiedOutlined as QualityIcon,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -28,13 +26,19 @@ const getNavItems = () => [
     text: "Home",
     icon: <DashboardIcon />,
     path: "/app/home",
-    permission: "dashboard:view",
+    permission: "home:view",
   },
   {
     text: "Data Assets",
     icon: <TablesIcon />,
     path: "/app/data-assets",
     permission: "table:view",
+  },
+  {
+    text: "Notebook",
+    icon: <NotebookIcon />,
+    path: "/app/notebook",
+    permission: "lab:view",
   },
 ];
 
@@ -169,7 +173,7 @@ const SideBar = ({ isCollapsed }) => {
       <Divider />
 
       {/* Settings at the bottom */}
-      {(hasPermission("user:view") || hasPermission("role:view") || hasPermission("connection:view") || hasPermission("model_config:view")) && (
+      {(hasPermission("user:manage") || hasPermission("connection:view") || hasPermission("model_config:view")) && (
         <List sx={{ px: 1, pb: 1, pt: 0.5 }}>
           <Tooltip title={isCollapsed ? "Settings" : ""} placement="right">
             <ListItemButton

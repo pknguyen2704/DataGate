@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Container } from "@mui/material";
-import { Outlet } from "react-router-dom";
+import Login from "~/pages/Auth/Login/Login";
 
 const Auth = () => {
   return (
@@ -26,7 +26,7 @@ const Auth = () => {
             position: "relative",
           }}
         >
-          <Outlet />
+          <Login />
         </Box>
       </Container>
     </Box>

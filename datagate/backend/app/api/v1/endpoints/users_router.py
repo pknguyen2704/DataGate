@@ -2,11 +2,18 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_permission
+from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
-from app.schemas.user_schema import UserCreate, UserListOut, UserOut, UserProfileUpdate, UserRoleAssign, UserUpdate, UserPasswordUpdate
+from app.schemas.user_schema import (
+    UserCreate,
+    UserListOut,
+    UserOut,
+    UserRoleAssign,
+    UserUpdate,
+    UserPasswordUpdate,
+)
 from app.services.user_service import UserService
 
 
@@ -71,7 +78,9 @@ def deactivate_user(
     service: UserService = Depends(get_user_service),
     current_user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
 ):
-    return service.deactivate_user(user_id=str(user_id), current_user_id=str(current_user.id))
+    return service.deactivate_user(
+        user_id=str(user_id), current_user_id=str(current_user.id)
+    )
 
 
 @users_router.patch("/{user_id}/roles", response_model=UserOut)
@@ -91,4 +100,6 @@ def update_password(
     service: UserService = Depends(get_user_service),
     _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
 ):
-    return service.update_user(user_id=str(user_id), data=UserUpdate(password=data.password))
+    return service.update_user(
+        user_id=str(user_id), data=UserUpdate(password=data.password)
+    )

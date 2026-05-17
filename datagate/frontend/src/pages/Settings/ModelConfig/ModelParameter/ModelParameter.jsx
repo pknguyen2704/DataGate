@@ -13,11 +13,13 @@ import {
 import { useSelector } from "react-redux";
 import { modelParametersApi } from "~/apis/modelConfigsApi";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
-import { observabilityApi } from "~/apis/observabilityApi";
-import { StateBox } from "~/components/DataGate/Page";
+
+import { StateBox } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
-import { format } from "date-fns";
+
 import { toast } from "react-toastify";
+
+import { useConfirm } from "material-ui-confirm";
 
 const INITIAL_PARAMS = {
   table_id: "",
@@ -36,11 +38,10 @@ const INITIAL_PARAMS = {
 };
 
 function ModelParameter() {
+  const confirm = useConfirm();
   const { user } = useSelector(state => state.auth);
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const canView = isAdmin || user?.permissions?.some(p => p === "model_config:view" || p?.code === "model_config:view");
   const canUpdate = isAdmin || user?.permissions?.some(p => p === "model_config:update" || p?.code === "model_config:update");
-  const canDelete = isAdmin || user?.permissions?.some(p => p === "model_config:delete" || p?.code === "model_config:delete");
   const canManage = canUpdate; // Use update as the base for manage UI elements
   
   const [page, setPage] = useState(0);
@@ -85,15 +86,25 @@ function ModelParameter() {
     setOpenDialog(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this configuration?")) return;
-    try {
-      await modelParametersApi.delete(id);
-      toast.success("Deleted");
-      configs.reload();
-    } catch (err) {
-      toast.error("Failed to delete");
-    }
+  const handleDelete = (id) => {
+    confirm({
+      title: "Delete Configuration",
+      description: "Are you sure you want to permanently delete this configuration?",
+      confirmationText: "Delete",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await modelParametersApi.delete(id);
+          toast.success("Deleted");
+          configs.reload();
+        } catch (error) {
+          console.error(error);
+          toast.error("Failed to delete");
+        }
+      })
+      .catch(() => {});
   };
 
   const handleSave = async () => {
@@ -108,8 +119,9 @@ function ModelParameter() {
       }
       setOpenDialog(false);
       configs.reload();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Save failed");
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.detail || "Save failed");
     } finally {
       setSaving(false);
     }
@@ -131,8 +143,9 @@ function ModelParameter() {
         toast.success("JSON uploaded and mapped successfully");
         setOpenDialog(false);
         configs.reload();
-      } catch (err) {
-        toast.error("Upload failed: " + (err.response?.data?.detail || "Invalid JSON"));
+      } catch (error) {
+        console.error(error);
+        toast.error("Upload failed: " + (error.response?.data?.detail || "Invalid JSON"));
       }
     };
     reader.readAsText(file);
@@ -144,7 +157,8 @@ function ModelParameter() {
       const res = await modelParametersApi.getTemplate();
       setTemplateJson(JSON.stringify(res.data, null, 2));
       setOpenTemplate(true);
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       toast.error("Failed to fetch template");
     }
   };

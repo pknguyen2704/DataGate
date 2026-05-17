@@ -1,73 +1,85 @@
-from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from app.models import (
-    BatchTableMetadataManualThreshold, 
+    BatchTableMetadataManualThreshold,
     BatchTableProfilingManualThreshold,
-    LightGBMAUCManualThreshold,
-    LightGBMParameter,
-    Table
+    AUCManualThreshold,
+    ModelParameter,
 )
 from app.schemas.metrics_schema import (
-    MetadataThresholdCreate, MetadataThresholdUpdate,
-    ProfilingThresholdCreate, ProfilingThresholdUpdate,
-    AnomalyThresholdCreate, AnomalyThresholdUpdate
+    MetadataThresholdCreate,
+    MetadataThresholdUpdate,
+    ProfilingThresholdCreate,
+    ProfilingThresholdUpdate,
+    AnomalyThresholdCreate,
+    AnomalyThresholdUpdate,
 )
+
 
 class MetricsService:
     def __init__(self, db: Session):
         self.db = db
 
     # Metadata Thresholds
-    def list_metadata_thresholds(self, table_id: str | None = None, page: int = 1, page_size: int = 50):
+    def list_metadata_thresholds(
+        self, table_id: str | None = None, page: int = 1, page_size: int = 50
+    ):
         query = self.db.query(BatchTableMetadataManualThreshold)
         if table_id:
             query = query.filter(BatchTableMetadataManualThreshold.table_id == table_id)
-        
+
         total = query.count()
         items = (
             query.options(
                 joinedload(BatchTableMetadataManualThreshold.created_by_user),
-                joinedload(BatchTableMetadataManualThreshold.last_modified_by_user)
+                joinedload(BatchTableMetadataManualThreshold.last_modified_by_user),
             )
             .order_by(BatchTableMetadataManualThreshold.created_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
         )
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_metadata_threshold(self, threshold_id: str):
-        threshold = self.db.query(BatchTableMetadataManualThreshold).filter(BatchTableMetadataManualThreshold.id == threshold_id).first()
+        threshold = (
+            self.db.query(BatchTableMetadataManualThreshold)
+            .filter(BatchTableMetadataManualThreshold.id == threshold_id)
+            .first()
+        )
         if not threshold:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Threshold not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Threshold not found"
+            )
         return threshold
 
     def create_metadata_threshold(self, data: MetadataThresholdCreate, user_id: str):
         # Check if metric already exists for this table
-        existing = self.db.query(BatchTableMetadataManualThreshold).filter(
-            BatchTableMetadataManualThreshold.table_id == str(data.table_id),
-            BatchTableMetadataManualThreshold.metric_name == data.metric_name
-        ).first()
+        existing = (
+            self.db.query(BatchTableMetadataManualThreshold)
+            .filter(
+                BatchTableMetadataManualThreshold.table_id == str(data.table_id),
+                BatchTableMetadataManualThreshold.metric_name == data.metric_name,
+            )
+            .first()
+        )
         if existing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Metric threshold already exists for this table")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Metric threshold already exists for this table",
+            )
 
         threshold = BatchTableMetadataManualThreshold(
-            **data.model_dump(),
-            created_by=user_id,
-            last_modified_by=user_id
+            **data.model_dump(), created_by=user_id, last_modified_by=user_id
         )
         self.db.add(threshold)
         self.db.commit()
         self.db.refresh(threshold)
         return threshold
 
-    def update_metadata_threshold(self, threshold_id: str, data: MetadataThresholdUpdate, user_id: str):
+    def update_metadata_threshold(
+        self, threshold_id: str, data: MetadataThresholdUpdate, user_id: str
+    ):
         threshold = self.get_metadata_threshold(threshold_id)
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(threshold, field, value)
@@ -82,55 +94,67 @@ class MetricsService:
         self.db.commit()
 
     # Profiling Thresholds
-    def list_profiling_thresholds(self, table_id: str | None = None, page: int = 1, page_size: int = 50):
+    def list_profiling_thresholds(
+        self, table_id: str | None = None, page: int = 1, page_size: int = 50
+    ):
         query = self.db.query(BatchTableProfilingManualThreshold)
         if table_id:
-            query = query.filter(BatchTableProfilingManualThreshold.table_id == table_id)
-            
+            query = query.filter(
+                BatchTableProfilingManualThreshold.table_id == table_id
+            )
+
         total = query.count()
         items = (
             query.options(
                 joinedload(BatchTableProfilingManualThreshold.created_by_user),
-                joinedload(BatchTableProfilingManualThreshold.last_modified_by_user)
+                joinedload(BatchTableProfilingManualThreshold.last_modified_by_user),
             )
             .order_by(BatchTableProfilingManualThreshold.created_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
         )
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_profiling_threshold(self, threshold_id: str):
-        threshold = self.db.query(BatchTableProfilingManualThreshold).filter(BatchTableProfilingManualThreshold.id == threshold_id).first()
+        threshold = (
+            self.db.query(BatchTableProfilingManualThreshold)
+            .filter(BatchTableProfilingManualThreshold.id == threshold_id)
+            .first()
+        )
         if not threshold:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Threshold not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Threshold not found"
+            )
         return threshold
 
     def create_profiling_threshold(self, data: ProfilingThresholdCreate, user_id: str):
-        existing = self.db.query(BatchTableProfilingManualThreshold).filter(
-            BatchTableProfilingManualThreshold.table_id == str(data.table_id),
-            BatchTableProfilingManualThreshold.column_name == data.column_name,
-            BatchTableProfilingManualThreshold.metric_name == data.metric_name
-        ).first()
+        existing = (
+            self.db.query(BatchTableProfilingManualThreshold)
+            .filter(
+                BatchTableProfilingManualThreshold.table_id == str(data.table_id),
+                BatchTableProfilingManualThreshold.column_name == data.column_name,
+                BatchTableProfilingManualThreshold.metric_name == data.metric_name,
+            )
+            .first()
+        )
         if existing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profiling threshold already exists for this column/metric")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Profiling threshold already exists for this column/metric",
+            )
 
         threshold = BatchTableProfilingManualThreshold(
-            **data.model_dump(),
-            created_by=user_id,
-            last_modified_by=user_id
+            **data.model_dump(), created_by=user_id, last_modified_by=user_id
         )
         self.db.add(threshold)
         self.db.commit()
         self.db.refresh(threshold)
         return threshold
 
-    def update_profiling_threshold(self, threshold_id: str, data: ProfilingThresholdUpdate, user_id: str):
+    def update_profiling_threshold(
+        self, threshold_id: str, data: ProfilingThresholdUpdate, user_id: str
+    ):
         threshold = self.get_profiling_threshold(threshold_id)
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(threshold, field, value)
@@ -145,41 +169,50 @@ class MetricsService:
         self.db.commit()
 
     # Anomaly Thresholds
-    def list_anomaly_thresholds(self, table_id: str | None = None, page: int = 1, page_size: int = 50):
-        query = self.db.query(LightGBMAUCManualThreshold)
+    def list_anomaly_thresholds(
+        self, table_id: str | None = None, page: int = 1, page_size: int = 50
+    ):
+        query = self.db.query(AUCManualThreshold)
         if table_id:
-            query = query.join(LightGBMParameter).filter(LightGBMParameter.table_id == table_id)
-            
+            query = query.join(ModelParameter).filter(
+                ModelParameter.table_id == table_id
+            )
+
         total = query.count()
         items = (
             query.options(
-                joinedload(LightGBMAUCManualThreshold.created_by_user),
-                joinedload(LightGBMAUCManualThreshold.last_modified_by_user)
+                joinedload(AUCManualThreshold.created_by_user),
+                joinedload(AUCManualThreshold.last_modified_by_user),
             )
-            .order_by(LightGBMAUCManualThreshold.created_at.desc())
+            .order_by(AUCManualThreshold.created_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
         )
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_anomaly_threshold(self, threshold_id: str):
-        threshold = self.db.query(LightGBMAUCManualThreshold).filter(LightGBMAUCManualThreshold.id == threshold_id).first()
+        threshold = (
+            self.db.query(AUCManualThreshold)
+            .filter(AUCManualThreshold.id == threshold_id)
+            .first()
+        )
         if not threshold:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Threshold not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Threshold not found"
+            )
         return threshold
 
     def create_anomaly_threshold(self, data: AnomalyThresholdCreate, user_id: str):
-        # Find or create LightGBMParameter for table
-        lgbm_param = self.db.query(LightGBMParameter).filter(LightGBMParameter.table_id == str(data.table_id)).first()
-        if not lgbm_param:
+        # Find or create ModelParameter for table
+        model_param = (
+            self.db.query(ModelParameter)
+            .filter(ModelParameter.table_id == str(data.table_id))
+            .first()
+        )
+        if not model_param:
             # Create default parameters if missing
-            lgbm_param = LightGBMParameter(
+            model_param = ModelParameter(
                 table_id=str(data.table_id),
                 learning_rate=0.01,
                 num_leaves=31,
@@ -194,26 +227,28 @@ class MetricsService:
                 max_bin=255,
                 num_iterations=100,
                 created_by=user_id,
-                last_modified_by=user_id
+                last_modified_by=user_id,
             )
-            self.db.add(lgbm_param)
+            self.db.add(model_param)
             self.db.flush()
 
-        threshold = LightGBMAUCManualThreshold(
-            lightgbm_parameter_id=lgbm_param.id,
+        threshold = AUCManualThreshold(
+            model_parameter_id=model_param.id,
             auc_threshold=data.auc_threshold,
             severity_level=data.severity_level,
             description=data.description,
             is_active=data.is_active,
             created_by=user_id,
-            last_modified_by=user_id
+            last_modified_by=user_id,
         )
         self.db.add(threshold)
         self.db.commit()
         self.db.refresh(threshold)
         return threshold
 
-    def update_anomaly_threshold(self, threshold_id: str, data: AnomalyThresholdUpdate, user_id: str):
+    def update_anomaly_threshold(
+        self, threshold_id: str, data: AnomalyThresholdUpdate, user_id: str
+    ):
         threshold = self.get_anomaly_threshold(threshold_id)
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(threshold, field, value)

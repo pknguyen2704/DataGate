@@ -2,9 +2,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.security import create_access_token, get_hashed_password, verify_password
+from app.core.security import create_access_token, verify_password
 from app.models import Role, User
-from app.schemas import ChangePasswordRequest, LoginRequest, TokenResponse, UserMeOut
+from app.schemas import LoginRequest, TokenResponse, UserMeOut
 
 
 class AuthService:
@@ -51,6 +51,7 @@ class AuthService:
         expires_delta = None
         if data.remember_me:
             from datetime import timedelta
+
             expires_delta = timedelta(days=30)
 
         access_token = create_access_token(user.id, expires_delta=expires_delta)
@@ -58,7 +59,7 @@ class AuthService:
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
-            user=self.build_user_me(user)
+            user=self.build_user_me(user),
         )
 
     def build_user_me(self, user: User) -> UserMeOut:
@@ -73,11 +74,7 @@ class AuthService:
         )
 
     def get_role_names(self, user: User) -> list[str]:
-        return [
-            role.name
-            for role in user.roles
-            if role.is_active
-        ]
+        return [role.name for role in user.roles if role.is_active]
 
     def get_permission_codes(self, user: User) -> list[str]:
         permission_codes: set[str] = set()
@@ -109,20 +106,3 @@ class AuthService:
             return True
 
         return False
-
-    def change_password(
-        self,
-        user: User,
-        data: ChangePasswordRequest,
-    ) -> None:
-        if not verify_password(data.current_password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect",
-            )
-
-        user.hashed_password = get_hashed_password(data.new_password)
-
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)

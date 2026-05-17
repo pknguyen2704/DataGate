@@ -11,11 +11,14 @@ import {
 } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { rolesApi } from "~/apis/rolesApi";
-import { StateBox, StatusChip } from "~/components/DataGate/Page";
+import { StateBox, StatusChip } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
 import { toast } from "react-toastify";
 
+import { useConfirm } from "material-ui-confirm";
+
 function RoleManagement() {
+  const confirm = useConfirm();
   const { user: currentUser } = useSelector(state => state.auth);
   const isAdmin = currentUser?.roles?.some(r => r === "Admin" || r?.name === "Admin");
   const hasPerm = currentUser?.permissions?.some(p => p === "user:manage" || p?.code === "user:manage");
@@ -39,15 +42,24 @@ function RoleManagement() {
     setOpenRole(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this role?")) return;
-    try {
-      await rolesApi.delete(id);
-      toast.success("Role deleted");
-      refresh();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to delete role");
-    }
+  const handleDelete = (id) => {
+    confirm({
+      title: "Delete Role",
+      description: "Are you sure you want to delete this role?",
+      confirmationText: "Delete",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await rolesApi.delete(id);
+          toast.success("Role deleted");
+          refresh();
+        } catch (err) {
+          toast.error(err.response?.data?.detail || "Failed to delete role");
+        }
+      })
+      .catch(() => {});
   };
 
   const handleToggleStatus = async (role) => {

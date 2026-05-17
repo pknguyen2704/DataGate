@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
-from app.schemas.common_schema import PaginatedResponse, RuleSource, RuleStatus, SeverityLevel
+from app.schemas.common_schema import PaginatedResponse, RuleSource, SeverityLevel
 from app.schemas.user_schema import UserLiteOut
 
 
@@ -58,10 +58,11 @@ class RuleListOut(PaginatedResponse[RuleOut]):
 
 class RuleVerifyCreate(BaseModel):
     rule_id: UUID
-    table_id: UUID
-    batch_id: str | None = None
-    status: str
-    message: str | None = None
+    severity_level: SeverityLevel = SeverityLevel.WARNING
+    constraint: str | None = Field(default=None, max_length=512)
+    constraint_status: str = Field(..., max_length=50)
+    constraint_message: str | None = None
+    processing_date_hour: datetime
 
 
 class RuleVerifyUpdate(BaseModel):
@@ -71,11 +72,14 @@ class RuleVerifyUpdate(BaseModel):
 class RuleVerifyOut(BaseModel):
     id: UUID
     rule_id: UUID
-    table_id: UUID
-    batch_id: str | None = None
-    status: str
-    message: str | None = None
+    severity_level: SeverityLevel
+    constraint: str | None = None
+    constraint_status: str
+    constraint_message: str | None = None
     is_resolved: bool
+    resolved_by: UUID | None = None
+    processing_date_hour: datetime
     created_at: datetime
+    updated_at: datetime
     rule: RuleOut | None = None
     model_config = ConfigDict(from_attributes=True)

@@ -1,4 +1,3 @@
-import React from 'react'
 import { useSelector } from 'react-redux'
 import { Box, CircularProgress } from '@mui/material'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'

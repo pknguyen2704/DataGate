@@ -1,19 +1,25 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
 from datetime import datetime
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
 from app.schemas.data_quality_schema import (
-    QualityResultOut, DataQualitySummary, MetadataResultDetail,
-    ProfilingResultDetail, RuleResultDetail, AnomalyResultDetail, QualityResultListOut
+    AnomalyResultDetail,
+    DataQualitySummary,
+    MetadataResultDetail,
+    ProfilingResultDetail,
+    QualityResultListOut,
+    RuleResultDetail,
 )
 from app.services.data_quality_service import DataQualityService
 
 data_quality_router = APIRouter(prefix="/data-quality", tags=["Data Quality"])
+
 
 def get_dq_service(db: Session = Depends(get_db)) -> DataQualityService:
     return DataQualityService(db)
@@ -34,19 +40,22 @@ def list_results(
 ):
     pdh = None
     if processing_date_hour and processing_date_hour.strip():
-        # Handle trailing Z if present, or just parse datetime-local format
-        clean_pdh = processing_date_hour.replace("Z", "+00:00") if "Z" in processing_date_hour else processing_date_hour
+        clean_pdh = (
+            processing_date_hour.replace("Z", "+00:00")
+            if "Z" in processing_date_hour
+            else processing_date_hour
+        )
         pdh = datetime.fromisoformat(clean_pdh)
 
     return service.list_results(
         str(table_id) if table_id else None,
-        layer if layer and layer.strip() else None, 
-        pdh, 
-        status if status and status.strip() else None, 
-        severity_level if severity_level and severity_level.strip() else None, 
-        result_type if result_type and result_type.strip() else None, 
-        page, 
-        page_size
+        layer if layer and layer.strip() else None,
+        pdh,
+        status if status and status.strip() else None,
+        severity_level if severity_level and severity_level.strip() else None,
+        result_type if result_type and result_type.strip() else None,
+        page,
+        page_size,
     )
 
 
@@ -59,7 +68,9 @@ def get_summary(
     return service.get_summary(str(table_id) if table_id else None)
 
 
-@data_quality_router.get("/metadata-results/{result_id}", response_model=MetadataResultDetail)
+@data_quality_router.get(
+    "/metadata-results/{result_id}", response_model=MetadataResultDetail
+)
 def get_metadata_detail(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),
@@ -72,12 +83,14 @@ def get_metadata_detail(
 def resolve_metadata(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),
-    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)), # Mapping resolve to quality:resolve
+    current_user: User = Depends(require_permission(PermissionCode.QUALITY_RESOLVE)),
 ):
     return service.resolve_result("metadata", str(result_id), str(current_user.id))
 
 
-@data_quality_router.get("/profiling-results/{result_id}", response_model=ProfilingResultDetail)
+@data_quality_router.get(
+    "/profiling-results/{result_id}", response_model=ProfilingResultDetail
+)
 def get_profiling_detail(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),
@@ -113,7 +126,9 @@ def resolve_rule(
     return service.resolve_result("rule", str(result_id), str(current_user.id))
 
 
-@data_quality_router.get("/anomaly-results/{result_id}", response_model=AnomalyResultDetail)
+@data_quality_router.get(
+    "/anomaly-results/{result_id}", response_model=AnomalyResultDetail
+)
 def get_anomaly_detail(
     result_id: UUID,
     service: DataQualityService = Depends(get_dq_service),

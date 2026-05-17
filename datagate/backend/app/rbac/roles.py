@@ -2,11 +2,7 @@ from app.rbac.permissions import ALL_PERMISSIONS, PermissionCode
 
 
 DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
-    "Admin": [
-        permission["code"]
-        for permission in ALL_PERMISSIONS
-    ],
-
+    "Admin": [permission["code"] for permission in ALL_PERMISSIONS],
     "Data Engineer": [
         PermissionCode.CONNECTION_VIEW,
         PermissionCode.TABLE_VIEW,
@@ -21,9 +17,9 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         PermissionCode.RULE_MANAGE,
         PermissionCode.QUALITY_VIEW,
         PermissionCode.QUALITY_RESOLVE,
-        PermissionCode.DASHBOARD_VIEW,
+        PermissionCode.HOME_VIEW,
+        PermissionCode.LAB_VIEW,
     ],
-
     "Data Analyst": [
         PermissionCode.TABLE_VIEW,
         PermissionCode.MODEL_CONFIG_VIEW,
@@ -32,6 +28,7 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         PermissionCode.RULE_VIEW,
         PermissionCode.RULE_SUGGEST,
         PermissionCode.QUALITY_VIEW,
-        PermissionCode.DASHBOARD_VIEW,
+        PermissionCode.HOME_VIEW,
+        PermissionCode.LAB_VIEW,
     ],
 }

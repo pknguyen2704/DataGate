@@ -7,8 +7,12 @@ from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
 from app.schemas.table_schema import (
-    ProcessingHourOut, TableColumnOut, TableCreate, 
-    TableDetailOut, TableUpdate, TableListOut
+    ProcessingHourOut,
+    TableColumnOut,
+    TableCreate,
+    TableDetailOut,
+    TableUpdate,
+    TableListOut,
 )
 from app.services.table_service import TableService
 
@@ -33,7 +37,7 @@ def list_tables(
 ):
     # Handle empty string from frontend filters
     conn_id = connection_id if connection_id and connection_id.strip() != "" else None
-    
+
     return service.list_tables(
         connection_id=conn_id,
         catalog_name=catalog_name,
@@ -44,7 +48,9 @@ def list_tables(
     )
 
 
-@data_assets_router.post("/tables", response_model=TableDetailOut, status_code=status.HTTP_201_CREATED)
+@data_assets_router.post(
+    "/tables", response_model=TableDetailOut, status_code=status.HTTP_201_CREATED
+)
 def create_table(
     data: TableCreate,
     service: TableService = Depends(get_table_service),
@@ -74,7 +80,9 @@ def update_table(
     return service.update_table(table_id=str(table_id), data=data)
 
 
-@data_assets_router.get("/tables/{table_id}/columns", response_model=list[TableColumnOut])
+@data_assets_router.get(
+    "/tables/{table_id}/columns", response_model=list[TableColumnOut]
+)
 def list_table_columns(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
@@ -85,7 +93,9 @@ def list_table_columns(
     return service.list_columns(str(table_id))
 
 
-@data_assets_router.get("/tables/{table_id}/processing-hours", response_model=list[ProcessingHourOut])
+@data_assets_router.get(
+    "/tables/{table_id}/processing-hours", response_model=list[ProcessingHourOut]
+)
 def list_table_processing_hours(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
@@ -105,7 +115,9 @@ def activate_table(
     return service.activate_table(str(table_id))
 
 
-@data_assets_router.patch("/tables/{table_id}/deactivate", response_model=TableDetailOut)
+@data_assets_router.patch(
+    "/tables/{table_id}/deactivate", response_model=TableDetailOut
+)
 def deactivate_table(
     table_id: UUID,
     service: TableService = Depends(get_table_service),

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, 
   TableHead, TableRow, TableContainer, Button, IconButton, 
@@ -14,8 +14,9 @@ import { useParams } from "react-router-dom";
 import { rulesApi } from "~/apis/rulesApi";
 import { useApiResource } from "~/hooks/useApiResource";
 import { useSelector } from "react-redux";
-import { format } from "date-fns";
-import { StateBox } from "~/components/DataGate/Page";
+import { StateBox } from "~/components/Common/DataDisplay";
+
+import { useConfirm } from "material-ui-confirm";
 
 const STATUS_COLORS = {
   active: "success",
@@ -28,6 +29,7 @@ const SEVERITY_COLORS = {
 };
 
 const Rule = () => {
+  const confirm = useConfirm();
   const { tableId } = useParams();
   const { user } = useSelector(state => state.auth);
   
@@ -98,37 +100,30 @@ const Rule = () => {
       }
       setOpenDialog(false);
       rulesRes.reload();
-    } catch (err) {
-      alert(err.response?.data?.detail || "Failed to save rule");
+    } catch (error) {
+      alert(error.response?.data?.detail || "Failed to save rule");
     }
   };
 
-  const handleApprove = async (id) => {
-    try {
-      await rulesApi.approve(id);
-      rulesRes.reload();
-    } catch (err) {
-      alert("Approve failed");
-    }
-  };
 
-  const handleDeactivate = async (id) => {
-    try {
-      await rulesApi.deactivate(id);
-      rulesRes.reload();
-    } catch (err) {
-      alert("Deactivate failed");
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to permanently delete this rule?")) return;
-    try {
-      await rulesApi.delete(id);
-      rulesRes.reload();
-    } catch (err) {
-      alert("Delete failed");
-    }
+  const handleDelete = (id) => {
+    confirm({
+      title: "Delete Rule",
+      description: "Are you sure you want to permanently delete this rule?",
+      confirmationText: "Delete",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await rulesApi.delete(id);
+          rulesRes.reload();
+        } catch (error) {
+          console.error(error);
+          alert("Delete failed");
+        }
+      })
+      .catch(() => {});
   };
 
   const handleToggleActive = async (rule) => {
@@ -139,14 +134,12 @@ const Rule = () => {
         await rulesApi.approve(rule.id);
       }
       rulesRes.reload();
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       alert("Toggle status failed");
     }
   };
 
-  const getRuleStatus = (rule) => {
-    return rule.is_active ? "active" : "inactive";
-  };
 
   return (
     <Box sx={{ p: 3 }}>

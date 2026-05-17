@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box, Typography, Paper, Table, TableBody, TableCell,
   TableHead, TableRow, TableContainer, Button, IconButton,
@@ -9,8 +9,9 @@ import {
 import { Edit, Delete, InfoOutlined, Add } from "@mui/icons-material";
 import { metricsApi } from "~/apis/metricsApi";
 import { useApiResource } from "~/hooks/useApiResource";
-import { format } from "date-fns";
-import { StateBox } from "~/components/DataGate/Page";
+import { StateBox } from "~/components/Common/DataDisplay";
+
+import { useConfirm } from "material-ui-confirm";
 
 const SEVERITY_COLORS = {
   warning: "warning",
@@ -18,19 +19,14 @@ const SEVERITY_COLORS = {
 };
 
 const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
+  const confirm = useConfirm();
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({});
 
   const anomalyRes = useApiResource(() => metricsApi.listAnomaly(tableId), [tableId]);
 
-  useEffect(() => {
-    if (addTrigger > 0) {
-      handleOpenDialog();
-    }
-  }, [addTrigger]);
-
-  const handleOpenDialog = (item = null) => {
+  const handleOpenDialog = useCallback((item = null) => {
     setEditingId(item?.id || null);
     if (item) {
       setFormData({ ...item });
@@ -45,7 +41,14 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
       });
     }
     setOpenDialog(true);
-  };
+  }, [tableId]);
+
+  useEffect(() => {
+    if (addTrigger > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleOpenDialog();
+    }
+  }, [addTrigger, handleOpenDialog]);
 
   const handleSave = async () => {
     try {
@@ -58,28 +61,43 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
 
       setOpenDialog(false);
       anomalyRes.reload();
-    } catch (err) {
-      console.error("Save failed:", err);
-      alert(err.response?.data?.detail || "Failed to save threshold");
+    } catch (error) {
+      console.error("Save failed:", error);
+      alert(error.response?.data?.detail || "Failed to save threshold");
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to permanently delete this threshold?")) return;
-    try {
-      await metricsApi.deleteAnomaly(id);
-      anomalyRes.reload();
-    } catch (err) {
-      alert("Delete failed");
-    }
+  const handleDelete = (id) => {
+    confirm({
+      title: "Delete Threshold",
+      description: "Are you sure you want to permanently delete this threshold?",
+      confirmationText: "Delete",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await metricsApi.deleteAnomaly(id);
+          anomalyRes.reload();
+        } catch (error) {
+          console.error(error);
+          alert("Delete failed");
+        }
+      })
+      .catch(() => {});
   };
 
   const handleToggleActive = async (item) => {
     try {
-      const { id, updated_at, created_at, created_by_user, last_modified_by_user, ...data } = item;
-      await metricsApi.updateAnomaly(id, { ...data, is_active: !item.is_active });
+      const data = { ...item, is_active: !item.is_active };
+      delete data.updated_at;
+      delete data.created_at;
+      delete data.created_by_user;
+      delete data.last_modified_by_user;
+      await metricsApi.updateAnomaly(data.id, data);
       anomalyRes.reload();
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       alert("Toggle status failed");
     }
   };

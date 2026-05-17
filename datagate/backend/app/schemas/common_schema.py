@@ -23,7 +23,7 @@ class MetricResultStatus(str, Enum):
     FAIL = "fail"
 
 
-class LightGBMAUCStatus(str, Enum):
+class AUCResultStatus(str, Enum):
     PASS = "pass"
     FAIL = "fail"
 

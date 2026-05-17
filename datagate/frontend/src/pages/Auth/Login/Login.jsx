@@ -6,7 +6,6 @@ import {
   Button,
   FormControlLabel,
   Checkbox,
-  Link,
   IconButton,
   InputAdornment,
   CircularProgress,
@@ -24,7 +23,6 @@ const Login = () => {
   const [formData, setFormData] = useState({
     username: "",
     password: "",
-    rememberMe: false,
   });
   const [loginError, setLoginError] = useState("");
 
@@ -47,7 +45,6 @@ const Login = () => {
       await dispatch(login({ 
         username: formData.username, 
         password: formData.password,
-        remember_me: formData.rememberMe 
       })).unwrap();
       toast.success("Welcome back to DataGate!");
       navigate("/app/home");
@@ -61,28 +58,19 @@ const Login = () => {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        width: "100%",
+        maxWidth: 420,
+        p: { xs: 4, sm: 5 },
+        borderRadius: "16px",
+        bgcolor: "#FFFFFF",
+        boxShadow: "0 20px 50px rgba(0, 0, 0, 0.05)",
+        border: "1px solid rgba(0, 0, 0, 0.05)",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: `linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)`,
-        p: 2
       }}
     >
-      <Box
-        sx={{
-          width: "100%",
-          maxWidth: 420,
-          p: { xs: 4, sm: 5 },
-          borderRadius: "16px",
-          bgcolor: "#FFFFFF",
-          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.05)",
-          border: "1px solid rgba(0, 0, 0, 0.05)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
         <Box sx={{ mb: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
           <Box 
             sx={{ 
@@ -164,29 +152,6 @@ const Login = () => {
             }}
           />
 
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mt: -1
-            }}
-          >
-            <FormControlLabel
-              control={
-                <Checkbox
-                  name="rememberMe"
-                  size="small"
-                  color="primary"
-                  checked={formData.rememberMe}
-                  onChange={handleChange}
-                />
-              }
-              label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Remember me</Typography>}
-            />
-
-          </Box>
-
           <Button
             fullWidth
             type="submit"
@@ -224,9 +189,8 @@ const Login = () => {
           color="text.disabled"
           sx={{ mt: 4, textAlign: "center", fontWeight: 500 }}
         >
-          &copy; 2026 DataGate Platform. All rights reserved.
+          &copy; 2026 DataGate
         </Typography>
-      </Box>
     </Box>
   );
 };

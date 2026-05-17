@@ -5,7 +5,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.security import get_hashed_password
 from app.models import Role, User
-from app.schemas.user_schema import UserCreate, UserListOut, UserOut, UserProfileUpdate, UserRoleAssign, UserUpdate
+from app.schemas.user_schema import (
+    UserCreate,
+    UserListOut,
+    UserOut,
+    UserProfileUpdate,
+    UserRoleAssign,
+    UserUpdate,
+)
 
 
 class UserService:
@@ -15,7 +22,9 @@ class UserService:
     def _role_ids_to_str(self, role_ids: list[UUID]) -> list[str]:
         return [str(role_id) for role_id in role_ids]
 
-    def _validate_unique_user(self, username: str | None, email: str | None, exclude_id: str | None = None) -> None:
+    def _validate_unique_user(
+        self, username: str | None, email: str | None, exclude_id: str | None = None
+    ) -> None:
         filters = []
         if username:
             filters.append(User.username == username)
@@ -32,13 +41,28 @@ class UserService:
                 detail="Username or email already registered",
             )
 
-    def list_users(self, page: int = 1, page_size: int = 20, search: str | None = None) -> UserListOut:
-        query = self.db.query(User).options(selectinload(User.roles).selectinload(Role.permissions))
+    def list_users(
+        self, page: int = 1, page_size: int = 20, search: str | None = None
+    ) -> UserListOut:
+        query = self.db.query(User).options(
+            selectinload(User.roles).selectinload(Role.permissions)
+        )
         if search:
             keyword = f"%{search}%"
-            query = query.filter(or_(User.username.ilike(keyword), User.email.ilike(keyword), User.full_name.ilike(keyword)))
+            query = query.filter(
+                or_(
+                    User.username.ilike(keyword),
+                    User.email.ilike(keyword),
+                    User.full_name.ilike(keyword),
+                )
+            )
         total = query.with_entities(func.count(User.id)).scalar() or 0
-        users = query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        users = (
+            query.order_by(User.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return UserListOut(
             items=[self.to_user_out(user) for user in users],
             total=total,
@@ -79,7 +103,9 @@ class UserService:
         self.db.refresh(user)
         return self.to_user_out(self.get_user_or_404(str(user.id)))
 
-    def update_user(self, user_id: str, data: UserUpdate | UserProfileUpdate) -> UserOut:
+    def update_user(
+        self, user_id: str, data: UserUpdate | UserProfileUpdate
+    ) -> UserOut:
         user = self.get_user_or_404(user_id)
         update_data = data.model_dump(exclude_unset=True)
         self._validate_unique_user(

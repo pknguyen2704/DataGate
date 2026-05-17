@@ -1,44 +1,101 @@
-import React from "react";
 import { Box, Typography, Paper, List, ListItemButton, ListItemIcon, ListItemText, Divider } from "@mui/material";
 import { SettingsInputComponentOutlined, ModelTrainingOutlined, PeopleOutlined, ShieldOutlined } from "@mui/icons-material";
-import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import UserManagement from "./UserManagement/UserManagement";
-import RoleManagement from "./RoleManagement/RoleManagement";
+import { useEffect, useMemo } from "react";
+
+const SETTINGS_BASE_PATH = "/app/settings";
+
+const SETTINGS_MENU = [
+  {
+    text: "Platform Connections",
+    icon: <SettingsInputComponentOutlined />,
+    path: `${SETTINGS_BASE_PATH}/connections`,
+    permission: "connection:view",
+  },
+  {
+    text: "Model Configurations",
+    icon: <ModelTrainingOutlined />,
+    path: `${SETTINGS_BASE_PATH}/model-configs`,
+    permission: "model_config:view",
+  },
+  {
+    text: "Users",
+    icon: <PeopleOutlined />,
+    path: `${SETTINGS_BASE_PATH}/users`,
+    permission: "user:manage",
+  },
+  {
+    text: "Roles",
+    icon: <ShieldOutlined />,
+    path: `${SETTINGS_BASE_PATH}/roles`,
+    permission: "user:manage",
+  },
+];
+
+const isAdminUser = (user) => user?.roles?.some((role) => role === "Admin" || role?.name === "Admin");
+
+const hasPermission = (user, permission) => {
+  if (!permission || isAdminUser(user)) return true;
+
+  return user?.permissions?.some((item) => item === permission || item?.code === permission);
+};
+
+const settingsShellSx = {
+  display: "flex",
+  height: "100%",
+  p: 3,
+  gap: 3,
+};
+
+const settingsNavSx = {
+  width: 280,
+  flexShrink: 0,
+  height: "fit-content",
+  borderRadius: 2,
+  border: "1px solid",
+  borderColor: "divider",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+};
+
+const navItemSx = {
+  borderRadius: 1.5,
+  mb: 0.5,
+  "&.Mui-selected": {
+    color: "primary.main",
+    bgcolor: "rgba(37, 99, 235, 0.08)",
+    "& .MuiListItemIcon-root": {
+      color: "primary.main",
+    },
+    "&:hover": {
+      bgcolor: "rgba(37, 99, 235, 0.12)",
+    },
+  },
+};
 
 const SettingsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
-  const permissions = user?.permissions || [];
 
-  const hasPermission = (permCode) => {
-    if (!permCode) return true;
-    const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-    if (isAdmin) return true;
-    return permissions.some(p => p === permCode || p?.code === permCode);
-  };
+  const visibleItems = useMemo(
+    () => SETTINGS_MENU.filter((item) => hasPermission(user, item.permission)),
+    [user]
+  );
 
-  const menuItems = [
-    { text: "Platform Connections", icon: <SettingsInputComponentOutlined />, path: "/app/settings/connections", permission: "connection:view" },
-    { text: "Model Configurations", icon: <ModelTrainingOutlined />, path: "/app/settings/model-configs", permission: "model_config:view" },
-    { text: "Users", icon: <PeopleOutlined />, path: "/app/settings/users", permission: "user:manage" },
-    { text: "Roles", icon: <ShieldOutlined />, path: "/app/settings/roles", permission: "user:manage" },
-  ];
-
-  const visibleItems = menuItems.filter(item => hasPermission(item.permission));
-
-  React.useEffect(() => {
-    if (location.pathname === "/app/settings" && visibleItems.length > 0) {
+  useEffect(() => {
+    if (location.pathname === SETTINGS_BASE_PATH && visibleItems.length > 0) {
       navigate(visibleItems[0].path, { replace: true });
     }
   }, [location.pathname, visibleItems, navigate]);
 
   return (
-    <Box sx={{ display: 'flex', height: '100%', p: 3, gap: 3 }}>
-      <Paper sx={{ width: 280, flexShrink: 0, borderRadius: 2, height: 'fit-content', border: '1px solid', borderColor: 'divider', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+    <Box sx={settingsShellSx}>
+      <Paper sx={settingsNavSx}>
         <Box sx={{ p: 2.5 }}>
-          <Typography variant="h6" fontWeight={800}>Settings</Typography>
+          <Typography variant="h6" fontWeight={800}>
+            Settings
+          </Typography>
         </Box>
         <Divider />
         <List sx={{ p: 1 }}>
@@ -47,19 +104,16 @@ const SettingsPage = () => {
               key={item.text}
               selected={location.pathname === item.path}
               onClick={() => navigate(item.path)}
-              sx={{
-                borderRadius: 1.5,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  bgcolor: 'primary.50',
-                  color: 'primary.main',
-                  '& .MuiListItemIcon-root': { color: 'primary.main' },
-                  '&:hover': { bgcolor: 'primary.100' }
-                }
-              }}
+              sx={navItemSx}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={<Typography variant="body2" fontWeight={600}>{item.text}</Typography>} />
+              <ListItemText
+                primary={
+                  <Typography variant="body2" fontWeight={600}>
+                    {item.text}
+                  </Typography>
+                }
+              />
             </ListItemButton>
           ))}
         </List>
@@ -73,7 +127,3 @@ const SettingsPage = () => {
 };
 
 export default SettingsPage;
-
-export { UserManagement as UsersPlaceholder, RoleManagement as RolesPlaceholder };
-export const ConnectionsPlaceholder = () => <Typography variant="h5">Connections Management</Typography>;
-export const ModelConfigsPlaceholder = () => <Typography variant="h5">Model Configurations</Typography>;

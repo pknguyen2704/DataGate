@@ -1,1 +1,1 @@
-from app.services.auth_service import AuthService
+"""API endpoint modules."""

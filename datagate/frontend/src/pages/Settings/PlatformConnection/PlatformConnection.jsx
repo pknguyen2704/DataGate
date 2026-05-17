@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import {
   Box, Button, Table, TableBody, TableCell, TableHead, TableRow,
-  Paper, Typography, CircularProgress, Stack, IconButton,
+  Paper, Typography, Stack, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Switch, FormControlLabel, Grid, Tooltip, TablePagination, TableContainer,
-  MenuItem, Select, FormControl, InputLabel, Chip
+  Switch, Grid, Tooltip, TablePagination, TableContainer, Chip, CircularProgress
 } from "@mui/material";
 import {
   RefreshOutlined, AddOutlined, EditOutlined,
-  ArrowBackOutlined, VisibilityOutlined, SaveOutlined,
-  StorageOutlined, SearchOutlined, CheckCircleOutline, CancelOutlined,
-  BugReportOutlined, PowerSettingsNewOutlined, DeleteOutline
+  VisibilityOutlined, SaveOutlined, PowerSettingsNewOutlined, BugReportOutlined, ArrowBackOutlined
 } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { connectionsApi } from "~/apis/connectionsApi";
-import { dataAssetsApi } from "~/apis/dataAssetsApi";
-import { StateBox, StatusChip, TabContainer, TabButton } from "~/components/DataGate/Page";
+import { StateBox, TabButton, TabContainer } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
 import { toast } from "react-toastify";
+
+import { useConfirm } from "material-ui-confirm";
+
+import ListTable from "./ListTable/ListTable";
+import Connection from "./Connection/Connection";
 
 const INITIAL_CONNECTION = {
   connection_name: "",
@@ -35,18 +36,83 @@ const INITIAL_CONNECTION = {
   is_active: true
 };
 
-function PlatformConnection() {
+function ConnectionDetailWrapper({ connectionId, onBack, canUpdate, canDelete, canUpdateTable, canCreateTable, canDeleteTable }) {
+  const [tab, setTab] = useState("config");
+  const connection = useApiResource(() => connectionsApi.get(connectionId));
+
+  if (connection.loading) return <Box sx={{ p: 10, textAlign: 'center' }}><CircularProgress /></Box>;
+  if (!connection.data) return <Box sx={{ p: 5 }}>Error loading connection.</Box>;
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <IconButton onClick={onBack} sx={{ mr: 1 }} color="primary"><ArrowBackOutlined /></IconButton>
+        <Typography variant="h6" fontWeight={700}>{connection.data.connection_name}</Typography>
+      </Box>
+
+      <TabContainer>
+        <TabButton active={tab === "config"} onClick={() => setTab("config")} label="Configuration" />
+        <TabButton active={tab === "tables"} onClick={() => setTab("tables")} label="Managed Tables" />
+      </TabContainer>
+
+      {tab === "config" && (
+        <Connection 
+          connection={connection.data} 
+          canUpdate={canUpdate}
+          canDelete={canDelete}
+          onReload={() => connection.reload()}
+          onDeleted={onBack}
+        />
+      )}
+      {tab === "tables" && (
+        <ListTable 
+          connectionId={connectionId} 
+          connectionData={connection.data} 
+          canUpdateTable={canUpdateTable} 
+          canCreateTable={canCreateTable} 
+          canDeleteTable={canDeleteTable} 
+        />
+      )}
+    </Box>
+  );
+}
+
+export default function PlatformConnection() {
   const { user } = useSelector(state => state.auth);
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const canView = isAdmin || user?.permissions?.some(p => p === "connection:view" || p?.code === "connection:view");
+  
   const canManage = isAdmin || user?.permissions?.some(p => p === "connection:manage" || p?.code === "connection:manage");
+  
   const canCreate = canManage;
   const canUpdate = canManage;
   const canDelete = canManage;
-  const canTest = canManage;
+  
   const canCreateTable = isAdmin || user?.permissions?.some(p => p === "table:manage" || p?.code === "table:manage");
   const canUpdateTable = isAdmin || user?.permissions?.some(p => p === "table:manage" || p?.code === "table:manage");
   const canDeleteTable = isAdmin || user?.permissions?.some(p => p === "table:delete" || p?.code === "table:delete");
+
+  const confirm = useConfirm();
+
+  const handleDeactivate = (id) => {
+    confirm({
+      title: "Deactivate Connection",
+      description: "Are you sure you want to deactivate this connection?",
+      confirmationText: "Deactivate",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await connectionsApi.deactivate(id);
+          toast.success("Deactivated");
+          connections.reload();
+        } catch (error) {
+          console.error(error);
+          toast.error("Failed to deactivate");
+        }
+      })
+      .catch(() => {});
+  };
 
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
 
@@ -90,19 +156,9 @@ function PlatformConnection() {
         toast.success("Activated");
       }
       connections.reload();
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       toast.error("Action failed");
-    }
-  };
-
-  const handleDeactivate = async (id) => {
-    if (!window.confirm("Are you sure you want to deactivate this connection?")) return;
-    try {
-      await connectionsApi.deactivate(id);
-      toast.success("Deactivated");
-      connections.reload();
-    } catch (err) {
-      toast.error("Failed to deactivate");
     }
   };
 
@@ -142,14 +198,17 @@ function PlatformConnection() {
 
   if (selectedConnectionId) {
     return (
-      <ConnectionDetail
-        connectionId={selectedConnectionId}
-        onBack={() => setSelectedConnectionId(null)}
+      <ConnectionDetailWrapper 
+        connectionId={selectedConnectionId} 
+        onBack={() => {
+          setSelectedConnectionId(null);
+          connections.reload();
+        }}
         canUpdate={canUpdate}
+        canDelete={canDelete}
         canUpdateTable={canUpdateTable}
         canCreateTable={canCreateTable}
         canDeleteTable={canDeleteTable}
-        onToggleActive={handleToggleActive}
       />
     );
   }
@@ -319,284 +378,3 @@ function PlatformConnection() {
     </Box>
   );
 }
-
-function ConnectionDetail({ connectionId, onBack, canUpdate, canUpdateTable, canCreateTable, canDeleteTable, onToggleActive }) {
-  const [tab, setTab] = useState("config");
-  const connection = useApiResource(() => connectionsApi.get(connectionId));
-
-  if (connection.loading) return <Box sx={{ p: 10, textAlign: 'center' }}><CircularProgress /></Box>;
-
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <IconButton onClick={onBack} sx={{ mr: 1 }} color="primary"><ArrowBackOutlined /></IconButton>
-        <Typography variant="h6" fontWeight={700}>{connection.data?.connection_name}</Typography>
-      </Box>
-
-      <TabContainer>
-        <TabButton active={tab === "config"} onClick={() => setTab("config")} label="Configuration" />
-        <TabButton active={tab === "tables"} onClick={() => setTab("tables")} label="Managed Tables" />
-      </TabContainer>
-
-      {tab === "config" && (
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>General Info</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>DESCRIPTION</Typography>
-              <Typography variant="body2">{connection.data.description || "N/A"}</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>STATUS</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                <Switch
-                  size="small"
-                  checked={connection.data.is_active}
-                  onChange={() => onToggleActive(connection.data)}
-                  color="success"
-                  disabled={!canUpdate}
-                />
-                <Chip
-                  label={connection.data.is_active ? "Active" : "Inactive"}
-                  size="small"
-                  variant="outlined"
-                  color={connection.data.is_active ? "success" : "default"}
-                  sx={{ ml: 1, border: 'none', fontWeight: 600 }}
-                />
-              </Box>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Trino Configuration</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>HOST</Typography>
-              <Typography variant="body2">{connection.data.trino_host}</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>PORT</Typography>
-              <Typography variant="body2">{connection.data.trino_port}</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>USER</Typography>
-              <Typography variant="body2">{connection.data.trino_user}</Typography>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Iceberg Configuration</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>CATALOG NAME</Typography>
-              <Typography variant="body2">{connection.data.iceberg_catalog_name}</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>REST URL</Typography>
-              <Typography variant="body2">{connection.data.iceberg_rest_url}</Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>WAREHOUSE</Typography>
-              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{connection.data.iceberg_warehouse}</Typography>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Storage (MinIO/S3) Configuration</Typography>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>ENDPOINT URL</Typography>
-              <Typography variant="body2">{connection.data.minio_endpoint_url}</Typography>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>ACCESS KEY</Typography>
-              <Typography variant="body2">{connection.data.minio_access_key}</Typography>
-            </Grid>
-          </Grid>
-        </Paper>
-      )}
-
-      {tab === "tables" && (
-        <ManagedTables connectionId={connectionId} connectionData={connection.data} canUpdateTable={canUpdateTable} canCreateTable={canCreateTable} canDeleteTable={canDeleteTable} />
-      )}
-    </Box>
-  );
-}
-
-function ManagedTables({ connectionId, connectionData, canUpdateTable, canCreateTable, canDeleteTable }) {
-  const [tables, setTables] = useState({ data: [], loading: true });
-  const [openAdd, setOpenAdd] = useState(false);
-  const [adding, setAdding] = useState(false);
-
-  const [schemas, setSchemas] = useState([]);
-  const [loadingSchemas, setLoadingSchemas] = useState(false);
-  const [selectedSchema, setSelectedSchema] = useState("");
-
-  const [discoveryTables, setDiscoveryTables] = useState([]);
-  const [loadingDiscovery, setLoadingDiscovery] = useState(false);
-  const [selectedTable, setSelectedTable] = useState("");
-
-  const refreshManaged = async () => {
-    setTables(prev => ({ ...prev, loading: true }));
-    try {
-      const res = await connectionsApi.list();
-    } catch (err) { }
-  };
-
-  const managedRes = useApiResource(() => dataAssetsApi.list({ connection_id: connectionId }), [connectionId]);
-
-  const fetchSchemas = async () => {
-    setLoadingSchemas(true);
-    try {
-      const res = await connectionsApi.discover(connectionId);
-      setSchemas(res.data || []);
-    } catch (err) {
-      toast.error("Discovery failed");
-    } finally {
-      setLoadingSchemas(false);
-    }
-  };
-
-  const fetchDiscoveryTables = async (schemaName) => {
-    setLoadingDiscovery(true);
-    try {
-      const res = await connectionsApi.discover(connectionId, schemaName);
-      setDiscoveryTables(res.data || []);
-    } catch (err) {
-      toast.error("Table discovery failed");
-    } finally {
-      setLoadingDiscovery(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    setAdding(true);
-    try {
-      await connectionsApi.addManagedTable(connectionId, {
-        catalog: connectionData.iceberg_catalog_name,
-        schema: selectedSchema,
-        table_name: selectedTable
-      });
-      toast.success("Table registered");
-      setOpenAdd(false);
-      managedRes.reload();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Registration failed");
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const handleToggleTableActive = async (table) => {
-    try {
-      if (table.is_active) {
-        await dataAssetsApi.deactivate(table.id);
-        toast.success("Table deactivated");
-      } else {
-        await dataAssetsApi.activate(table.id);
-        toast.success("Table activated");
-      }
-      managedRes.reload();
-    } catch (err) {
-      toast.error("Action failed");
-    }
-  };
-
-  const handleDelete = async (tableId) => {
-    if (!window.confirm("Remove this table from management?")) return;
-    try {
-      await connectionsApi.removeManagedTable(connectionId, tableId);
-      toast.success("Removed");
-      managedRes.reload();
-    } catch (err) {
-      toast.error("Removal failed");
-    }
-  };
-
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        {canCreateTable && (
-          <Button startIcon={<AddOutlined />} variant="contained" size="small" onClick={() => { setOpenAdd(true); fetchSchemas(); }}>
-            Register Table
-          </Button>
-        )}
-      </Box>
-
-      <StateBox loading={managedRes.loading} error={managedRes.error} empty={!(managedRes.data?.items || []).length}>
-        <Paper variant="outlined" sx={{ borderRadius: 2 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Schema</TableCell>
-                <TableCell>Table Name</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(managedRes.data?.items || []).map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{row.schema_name}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{row.table_name}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch
-                        size="small"
-                        checked={row.is_active}
-                        onChange={() => handleToggleTableActive(row)}
-                        color="success"
-                        disabled={!canUpdateTable}
-                      />
-                      <Chip
-                        label={row.is_active ? "Active" : "Inactive"}
-                        size="small"
-                        variant="outlined"
-                        color={row.is_active ? "success" : "default"}
-                        sx={{ ml: 1, border: 'none', fontWeight: 600 }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">
-                    {canDeleteTable && (
-                      <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}>
-                        <DeleteOutline fontSize="small" />
-                      </IconButton>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
-      </StateBox>
-
-      <Dialog open={openAdd} onClose={() => setOpenAdd(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Register Managed Table</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Schema</InputLabel>
-              <Select value={selectedSchema} label="Schema" onChange={e => { setSelectedSchema(e.target.value); fetchDiscoveryTables(e.target.value); }}>
-                {loadingSchemas ? <MenuItem disabled>Loading...</MenuItem> : schemas.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth size="small" disabled={!selectedSchema}>
-              <InputLabel>Table</InputLabel>
-              <Select value={selectedTable} label="Table" onChange={e => setSelectedTable(e.target.value)}>
-                {loadingDiscovery ? <MenuItem disabled>Discovering...</MenuItem> : discoveryTables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenAdd(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleRegister} disabled={!selectedTable || adding}>
-            {adding ? "Registering..." : "Register"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-}
-
-export default PlatformConnection;

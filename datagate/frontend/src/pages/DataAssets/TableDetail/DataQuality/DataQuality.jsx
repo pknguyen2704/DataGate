@@ -3,8 +3,8 @@ import {
   Box, Typography, Paper, Table, TableBody, TableCell,
   TableHead, TableRow, TableContainer, Button, IconButton,
   Chip, Grid, Stack, TextField, MenuItem, FormControl,
-  InputLabel, Select, Divider, Tooltip, Alert, CircularProgress,
-  Tabs, Tab
+  InputLabel, Select, Tooltip, CircularProgress,
+  Tabs, Tab, TablePagination
 } from "@mui/material";
 import {
   ArrowBack, CheckCircle, Refresh, CheckCircleOutline
@@ -15,11 +15,12 @@ import { dataAssetsApi } from "~/apis/dataAssetsApi";
 import { useApiResource } from "~/hooks/useApiResource";
 import { useSelector } from "react-redux";
 import { format } from "date-fns";
-import { 
-  Panel, Stat, StateBox, StatusChip 
-} from "~/components/DataGate/Page";
+import { Panel, Stat, StateBox, StatusChip } from "~/components/Common/DataDisplay";
 
 import AnomalyDetection from "./AnomalyDetection/AnomalyDetection";
+import Profile from "./Profile/Profile";
+import Metadata from "./Metadata/Metadata";
+import Rule from "./Rule/Rule";
 
 const DataQuality = () => {
   const { tableId } = useParams();
@@ -32,6 +33,8 @@ const DataQuality = () => {
     status: "",
     severity_level: ""
   });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   // Permissions
   const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
@@ -57,11 +60,14 @@ const DataQuality = () => {
   const resultsRes = useApiResource(() => dataQualityApi.listResults({ 
     table_id: tableId, 
     result_type: currentType,
-    ...filters 
-  }), [tableId, currentType, filters]);
+    ...filters,
+    page: page + 1,
+    page_size: pageSize
+  }), [tableId, currentType, filters, page, pageSize]);
 
   const handleFilterChange = (name, value) => {
     setFilters(prev => ({ ...prev, [name]: value }));
+    setPage(0);
   };
 
   const handleResolve = async (type, id) => {
@@ -73,7 +79,8 @@ const DataQuality = () => {
 
       resultsRes.reload();
       summaryRes.reload();
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       alert("Resolve failed");
     }
   };
@@ -101,7 +108,7 @@ const DataQuality = () => {
 
         {/* Tab Selection */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
+          <Tabs value={activeTab} onChange={(e, v) => { setActiveTab(v); setPage(0); }}>
             <Tab label="Metadata Checks" />
             <Tab label="Profiling Checks" />
             {showRules && <Tab label="Data Rules" />}
@@ -148,78 +155,20 @@ const DataQuality = () => {
         {/* Results Content */}
         <StateBox loading={resultsRes.loading} error={resultsRes.error} empty={!(resultsRes.data?.items || []).length}>
           {currentType === "anomaly" ? (
-            <AnomalyTab results={resultsRes.data?.items || []} handleResolve={handleResolve} canResolve={canResolve} />
+            <AnomalyTab 
+              results={resultsRes.data?.items || []} 
+              total={resultsRes.data?.total || 0}
+              page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize}
+              handleResolve={handleResolve} canResolve={canResolve} 
+            />
           ) : (
-            <Panel title={`${currentType.toUpperCase()} Verification Results`} subtitle={`History of quality checks for ${currentType}.`}>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Target</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Metric / Rule</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Severity</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Value / Result</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Execution Date</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(resultsRes.data?.items || []).map((r) => (
-                      <TableRow key={r.id} hover>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight={600}>{r.column_name || 'Table'}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">{r.metric_name || r.message || '-'}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <StatusChip value={r.status} />
-                        </TableCell>
-                        <TableCell>
-                          {r.severity_level && (
-                            <Chip 
-                              label={r.severity_level} 
-                              size="small" 
-                              variant="outlined" 
-                              color={r.severity_level === 'critical' ? 'error' : 'warning'} 
-                              sx={{ height: 20, fontSize: '0.65rem', textTransform: 'capitalize' }} 
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {r.actual_value !== null ? r.actual_value.toFixed(4) : '-'}
-                            {r.threshold_value !== null && (
-                              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                                ({r.threshold_value.toFixed(4)})
-                              </Typography>
-                            )}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="caption" color="text.secondary">
-                            {format(new Date(r.processing_date_hour), "yyyy-MM-dd HH:mm")}
-                          </Typography>
-                        </TableCell>
-                         <TableCell align="center">
-                           <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
-                             {r.status?.toLowerCase() === 'fail' && !r.is_resolved && canResolve && (
-                               <Tooltip title="Mark as Resolved">
-                                <IconButton size="small" color="error" onClick={() => handleResolve(r.result_type, r.id)}>
-                                  <CheckCircleOutline fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                            {r.is_resolved && <CheckCircle color="success" fontSize="small" />}
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Panel>
+            <GenericTab 
+              type={currentType} 
+              results={resultsRes.data?.items || []} 
+              total={resultsRes.data?.total || 0}
+              page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize}
+              handleResolve={handleResolve} canResolve={canResolve} 
+            />
           )}
         </StateBox>
       </Stack>
@@ -227,41 +176,194 @@ const DataQuality = () => {
   );
 };
 
-const AnomalyTab = ({ results, handleResolve, canResolve }) => {
+const GenericTab = ({ type, results, total, page, pageSize, setPage, setPageSize, handleResolve, canResolve }) => {
   const [selectedId, setSelectedId] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
+    const loadDetail = async (id) => {
+      setLoading(true);
+      try {
+        let res;
+        if (type === "metadata") res = await dataQualityApi.getMetadataDetail(id);
+        else if (type === "profiling") res = await dataQualityApi.getProfilingDetail(id);
+        else if (type === "rule") res = await dataQualityApi.getRuleDetail(id);
+        
+        setDetailData(res.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (selectedId) {
+      loadDetail(selectedId);
+    }
+  }, [selectedId, type]);
+
+  const DetailComponent = type === "metadata" ? Metadata : type === "profiling" ? Profile : Rule;
+
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Grid container spacing={selectedId ? 3 : 0}>
+        <Grid item xs={selectedId ? 7 : 12}>
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'primary.main' }}>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Target</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Metric / Rule</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                  {!selectedId && <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Severity</TableCell>}
+                  {!selectedId && <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Value</TableCell>}
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Execution Date</TableCell>
+                  {!selectedId && <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {results.map((r) => (
+                  <TableRow 
+                    key={r.id} 
+                    hover
+                    onClick={() => setSelectedId(r.id)} 
+                    selected={selectedId === r.id}
+                    sx={{ cursor: 'pointer' }}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>{r.column_name || 'Table'}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{r.metric_name || r.message || '-'}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <StatusChip value={r.status} />
+                    </TableCell>
+                    {!selectedId && (
+                      <TableCell>
+                        {r.severity_level && (
+                          <Chip 
+                            label={r.severity_level} 
+                            size="small" 
+                            variant="outlined" 
+                            color={r.severity_level === 'critical' ? 'error' : 'warning'} 
+                            sx={{ height: 20, fontSize: '0.65rem', textTransform: 'capitalize' }} 
+                          />
+                        )}
+                      </TableCell>
+                    )}
+                    {!selectedId && (
+                      <TableCell>
+                        <Typography variant="body2">
+                          {r.actual_value !== null && r.actual_value !== undefined ? Number(r.actual_value).toFixed(4) : '-'}
+                          {r.threshold_value !== null && r.threshold_value !== undefined && (
+                            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                              ({Number(r.threshold_value).toFixed(4)})
+                            </Typography>
+                          )}
+                        </Typography>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Typography variant="caption" color="text.secondary">
+                        {format(new Date(r.processing_date_hour), "yyyy-MM-dd HH:mm")}
+                      </Typography>
+                    </TableCell>
+                    {!selectedId && (
+                      <TableCell align="center">
+                        <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
+                          {r.status?.toLowerCase() === 'fail' && !r.is_resolved && canResolve && (
+                            <Tooltip title="Mark as Resolved">
+                              <IconButton size="small" color="error" onClick={() => handleResolve(type, r.id)}>
+                                <CheckCircleOutline fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {r.is_resolved && <CheckCircle color="success" fontSize="small" />}
+                        </Stack>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={total}
+              rowsPerPage={pageSize}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(e) => {
+                setPageSize(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </TableContainer>
+      </Grid>
+
+      {selectedId && (
+        <Grid item xs={5}>
+          <Box sx={{ position: 'sticky', top: 20 }}>
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
+            ) : detailData ? (
+              <Box>
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="h6" fontWeight={800}>Analysis: {format(new Date(detailData.processing_date_hour), "yyyy-MM-dd HH:mm")}</Typography>
+                  <Tooltip title="Back to results">
+                    <IconButton onClick={() => setSelectedId(null)} size="small">
+                      <ArrowBack fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <DetailComponent detailData={detailData} />
+              </Box>
+            ) : null}
+          </Box>
+        </Grid>
+      )}
+    </Grid>
+    </Box>
+  );
+};
+
+const AnomalyTab = ({ results, total, page, pageSize, setPage, setPageSize, handleResolve, canResolve }) => {
+  const [selectedId, setSelectedId] = useState(null);
+  const [detailData, setDetailData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    const loadDetail = async (id) => {
+      setLoading(true);
+      try {
+        const res = await dataQualityApi.getAnomalyDetail(id);
+        setDetailData(res.data);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (selectedId) {
       loadDetail(selectedId);
     }
   }, [selectedId]);
 
-  const loadDetail = async (id) => {
-    setLoading(true);
-    try {
-      const res = await dataQualityApi.getAnomalyDetail(id);
-      setDetailData(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <Grid container spacing={3}>
-      <Grid item xs={selectedId ? 4 : 12}>
-        <Panel title="Anomaly Verification History" subtitle="List of recent executions.">
-          <TableContainer>
+    <Box sx={{ width: '100%' }}>
+      <Grid container spacing={selectedId ? 3 : 0}>
+        <Grid item xs={selectedId ? 4 : 12}>
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
             <Table size="small">
               <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>AUC</TableCell>
-                  {!selectedId && <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>}
+                <TableRow sx={{ bgcolor: 'primary.main' }}>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>AUC</TableCell>
+                  {!selectedId && <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -279,7 +381,7 @@ const AnomalyTab = ({ results, handleResolve, canResolve }) => {
                       </Typography>
                     </TableCell>
                     <TableCell><StatusChip value={r.status} /></TableCell>
-                    <TableCell><Typography variant="body2" fontWeight={700}>{r.actual_value !== null ? r.actual_value.toFixed(4) : "N/A"}</Typography></TableCell>
+                    <TableCell><Typography variant="body2" fontWeight={700}>{r.actual_value !== null ? Number(r.actual_value).toFixed(4) : "N/A"}</Typography></TableCell>
                     {!selectedId && (
                       <TableCell align="center">
                         <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
@@ -298,8 +400,19 @@ const AnomalyTab = ({ results, handleResolve, canResolve }) => {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={total}
+              rowsPerPage={pageSize}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(e) => {
+                setPageSize(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+            />
           </TableContainer>
-        </Panel>
       </Grid>
 
       {selectedId && (
@@ -324,6 +437,7 @@ const AnomalyTab = ({ results, handleResolve, canResolve }) => {
         </Grid>
       )}
     </Grid>
+    </Box>
   );
 };
 

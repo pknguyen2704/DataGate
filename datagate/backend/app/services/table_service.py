@@ -1,9 +1,19 @@
+from datetime import datetime
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import BatchTableMetadata, BatchTableProfiling, Connection, LightGBMAUC, LightGBMAnomalyConfig, RuleVerify, Table, Rule
+from app.models import (
+    BatchTableMetadata,
+    BatchTableProfiling,
+    Connection,
+    AUCResult,
+    ModelConfig,
+    RuleVerify,
+    Table,
+    Rule,
+)
 from app.schemas.table_schema import TableCreate, TableUpdate
 
 
@@ -60,7 +70,7 @@ class TableService:
 
     def get_latest_processing_hour(self, table_id: str) -> datetime | None:
         hours = []
-        for model in (BatchTableMetadata, BatchTableProfiling, LightGBMAUC):
+        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult):
             latest = (
                 self.db.query(model.processing_date_hour)
                 .filter(model.table_id == table_id)
@@ -69,7 +79,7 @@ class TableService:
             )
             if latest and latest[0]:
                 hours.append(latest[0])
-        
+
         # Check RuleVerify via Rule
         latest_rule_verify = (
             self.db.query(RuleVerify.processing_date_hour)
@@ -80,7 +90,7 @@ class TableService:
         )
         if latest_rule_verify and latest_rule_verify[0]:
             hours.append(latest_rule_verify[0])
-            
+
         if not hours:
             return None
         return max(hours)
@@ -88,9 +98,9 @@ class TableService:
     def get_latest_processing_hours(self, table_ids: list[str]) -> dict[str, datetime]:
         if not table_ids:
             return {}
-            
+
         latest_dates = {}
-        for model in (BatchTableMetadata, BatchTableProfiling, LightGBMAUC):
+        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult):
             rows = (
                 self.db.query(model.table_id, func.max(model.processing_date_hour))
                 .filter(model.table_id.in_(table_ids))
@@ -100,7 +110,7 @@ class TableService:
             for tid, dt in rows:
                 if dt:
                     latest_dates[tid] = max(latest_dates.get(tid, dt), dt)
-        
+
         # RuleVerify is slightly different due to join
         rule_rows = (
             self.db.query(Rule.table_id, func.max(RuleVerify.processing_date_hour))
@@ -112,7 +122,7 @@ class TableService:
         for tid, dt in rule_rows:
             if dt:
                 latest_dates[tid] = max(latest_dates.get(tid, dt), dt)
-                
+
         return latest_dates
 
     def list_tables(
@@ -125,25 +135,29 @@ class TableService:
         page_size: int = 20,
     ) -> dict:
         # Join with Connection to filter out inactive connections
-        query = self.db.query(Table).join(Connection).options(selectinload(Table.connection))
-        
+        query = (
+            self.db.query(Table)
+            .join(Connection)
+            .options(selectinload(Table.connection))
+        )
+
         # Only hide tables from inactive connections ALWAYS
         query = query.filter(Connection.is_active.is_(True))
-        
+
         if connection_id:
             query = query.filter(Table.connection_id == connection_id)
         if catalog_name:
             query = query.filter(Table.catalog_name == catalog_name)
         if schema_name:
             query = query.filter(Table.schema_name == schema_name)
-            
+
         # Standard filtering: Default to active only if not specified
         if is_active is not None:
             query = query.filter(Table.is_active == is_active)
-        elif not connection_id: 
+        elif not connection_id:
             # If not in a specific connection management view, show only active
             query = query.filter(Table.is_active.is_(True))
-        
+
         total = query.count()
         tables = (
             query.order_by(Table.schema_name.asc(), Table.table_name.asc())
@@ -151,30 +165,25 @@ class TableService:
             .limit(page_size)
             .all()
         )
-        
+
         # Batch fetch latest processing hours to avoid N+1 queries
         table_ids = [str(t.id) for t in tables]
         latest_hours = self.get_latest_processing_hours(table_ids)
 
         # Batch fetch anomaly configs
         anomaly_configs = (
-            self.db.query(LightGBMAnomalyConfig.table_id)
-            .filter(LightGBMAnomalyConfig.table_id.in_(table_ids))
+            self.db.query(ModelConfig.table_id)
+            .filter(ModelConfig.table_id.in_(table_ids))
             .all()
         )
         anomaly_table_ids = {str(r[0]) for r in anomaly_configs}
-        
+
         for table in tables:
             tid = str(table.id)
             table.latest_processing_date_hour = latest_hours.get(tid)
             table.has_anomaly_config = tid in anomaly_table_ids
-            
-        return {
-            "items": tables,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+
+        return {"items": tables, "total": total, "page": page, "page_size": page_size}
 
     def get_table_by_id(self, table_id: str) -> Table | None:
         table = (
@@ -184,10 +193,12 @@ class TableService:
             .first()
         )
         if table:
-            table.latest_processing_date_hour = self.get_latest_processing_hour(table_id)
+            table.latest_processing_date_hour = self.get_latest_processing_hour(
+                table_id
+            )
             table.has_anomaly_config = (
-                self.db.query(LightGBMAnomalyConfig)
-                .filter(LightGBMAnomalyConfig.table_id == table_id)
+                self.db.query(ModelConfig)
+                .filter(ModelConfig.table_id == table_id)
                 .first()
                 is not None
             )
@@ -208,7 +219,7 @@ class TableService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Connection is inactive",
             )
-        
+
         if not table.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -286,9 +297,14 @@ class TableService:
     def list_columns(self, table_id: str) -> list[dict]:
         self.get_table_or_404(table_id)
         rows = (
-            self.db.query(BatchTableProfiling.column_name, BatchTableProfiling.data_type)
+            self.db.query(
+                BatchTableProfiling.column_name, BatchTableProfiling.data_type
+            )
             .filter(BatchTableProfiling.table_id == table_id)
-            .order_by(BatchTableProfiling.processing_date_hour.desc(), BatchTableProfiling.column_name.asc())
+            .order_by(
+                BatchTableProfiling.processing_date_hour.desc(),
+                BatchTableProfiling.column_name.asc(),
+            )
             .all()
         )
         seen = set()
@@ -303,8 +319,12 @@ class TableService:
     def list_processing_hours(self, table_id: str) -> list[dict]:
         self.get_table_or_404(table_id)
         hours = set()
-        for model in (BatchTableMetadata, BatchTableProfiling, LightGBMAUC):
-            rows = self.db.query(model.processing_date_hour).filter(model.table_id == table_id).all()
+        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult):
+            rows = (
+                self.db.query(model.processing_date_hour)
+                .filter(model.table_id == table_id)
+                .all()
+            )
             hours.update(row[0] for row in rows if row[0])
         rule_rows = (
             self.db.query(RuleVerify.processing_date_hour)

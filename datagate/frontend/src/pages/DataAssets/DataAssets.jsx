@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   Box, Typography, Paper, Breadcrumbs, Link, Grid, TextField, 
   MenuItem, Table as MuiTable, TableBody, TableCell, TableHead, 
@@ -11,11 +11,11 @@ import {
 } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
-import { connectionsApi } from "~/apis/connectionsApi";
+
 import { observabilityApi } from "~/apis/observabilityApi";
 import { useApiResource } from "~/hooks/useApiResource";
 import { format } from "date-fns";
-import { StateBox } from "~/components/DataGate/Page";
+import { StateBox } from "~/components/Common/DataDisplay";
 
 const DataAssets = () => {
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ const DataAssets = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
-  const variablesRes = useApiResource(() => observabilityApi.getGrafanaVariables(), []);
+  const variablesRes = useApiResource(() => observabilityApi.getObservabilityVariables(), []);
   
   const tablesRes = useApiResource(() => dataAssetsApi.list({
     ...filters,

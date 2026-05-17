@@ -1,9 +1,11 @@
 from datetime import datetime
-from uuid import UUID
-from pydantic import BaseModel, ConfigDict
-from typing import Any, List, Optional
 from enum import Enum
-from app.schemas.common_schema import PaginatedResponse, SeverityLevel, MetricResultStatus
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.common_schema import PaginatedResponse
+
 
 class ResultType(str, Enum):
     METADATA = "metadata"
@@ -14,19 +16,20 @@ class ResultType(str, Enum):
 
 class QualityResultOut(BaseModel):
     id: UUID
-    result_type: str  # metadata, profiling, rule, anomaly
+    result_type: ResultType
     table_id: UUID
-    column_name: Optional[str] = None
-    metric_name: Optional[str] = None
+    table_name: str | None = None
+    column_name: str | None = None
+    metric_name: str | None = None
     status: str
-    severity_level: Optional[str] = None
-    actual_value: Optional[float] = None
-    threshold_value: Optional[float] = None
-    message: Optional[str] = None
+    severity_level: str | None = None
+    actual_value: float | None = None
+    threshold_value: float | None = None
+    message: str | None = None
     is_resolved: bool
     processing_date_hour: datetime
     created_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -48,41 +51,56 @@ class DataQualitySummary(BaseModel):
 class MetadataResultDetail(BaseModel):
     id: UUID
     table_id: UUID
+    table_name: str | None = None
+    result_type: ResultType | None = None
     metric_name: str
     status: str
-    severity_level: str
-    actual_value: float
-    threshold_value: float
+    severity_level: str | None = None
+    actual_value: float | None = None
+    threshold_value: float | None = None
+    min_threshold: float | None = None
+    max_threshold: float | None = None
     is_resolved: bool
     processing_date_hour: datetime
-    created_at: datetime
+    created_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
 class ProfilingResultDetail(BaseModel):
     id: UUID
     table_id: UUID
+    table_name: str | None = None
+    result_type: ResultType | None = None
     column_name: str
     metric_name: str
     status: str
-    severity_level: str
-    actual_value: float
-    threshold_value: float
+    severity_level: str | None = None
+    actual_value: float | None = None
+    threshold_value: float | None = None
+    min_threshold: float | None = None
+    max_threshold: float | None = None
     is_resolved: bool
     processing_date_hour: datetime
-    created_at: datetime
+    created_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
 class RuleResultDetail(BaseModel):
     id: UUID
-    rule_id: UUID
+    rule_id: UUID | None = None
     table_id: UUID
-    column_name: Optional[str] = None
+    table_name: str | None = None
+    result_type: ResultType | None = None
+    column_name: str | None = None
+    constraint_name: str | None = None
+    code_for_constraint: str | None = None
+    rule_description: str | None = None
+    severity_level: str | None = None
+    processing_date_hour: datetime | None = None
     status: str
-    message: Optional[str] = None
+    message: str | None = None
     is_resolved: bool
-    created_at: datetime
+    created_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -95,7 +113,7 @@ class AnomalyResultDetail(BaseModel):
     is_resolved: bool
     auc_score: float
     auc_threshold: float
-    model_config_params: Optional[dict] = None
-    top_features: List[dict] = []
+    model_config_params: dict | None = None
+    top_features: list[dict] = Field(default_factory=list)
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
