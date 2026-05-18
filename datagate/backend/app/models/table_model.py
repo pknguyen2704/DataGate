@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -17,7 +17,7 @@ class Table(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     connection_id = Column(
         UUID(as_uuid=False),
-        ForeignKey("connections.id", ondelete="RESTRICT"),
+        ForeignKey("connections.id", ondelete="CASCADE"),
         nullable=False,
     )
 
@@ -25,7 +25,6 @@ class Table(Base):
     schema_name = Column(String(255), nullable=False)
     table_name = Column(String(255), nullable=False)
 
-    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -37,37 +36,24 @@ class Table(Base):
     )
 
     connection = relationship("Connection", back_populates="tables")
-    batch_table_metadata = relationship(
-        "BatchTableMetadata", back_populates="table", cascade="all, delete-orphan"
+    quality_metric_observations = relationship(
+        "QualityMetricObservation", back_populates="table", cascade="all, delete-orphan"
     )
-    batch_table_profiling = relationship(
-        "BatchTableProfiling", back_populates="table", cascade="all, delete-orphan"
-    )
-    batch_table_metadata_manual_thresholds = relationship(
-        "BatchTableMetadataManualThreshold",
-        back_populates="table",
-        cascade="all, delete-orphan",
-    )
-    batch_table_profiling_manual_thresholds = relationship(
-        "BatchTableProfilingManualThreshold",
-        back_populates="table",
-        cascade="all, delete-orphan",
+    quality_thresholds = relationship(
+        "QualityThreshold", back_populates="table", cascade="all, delete-orphan"
     )
     rules = relationship("Rule", back_populates="table", cascade="all, delete-orphan")
-    model_parameter = relationship(
-        "ModelParameter",
+    quality_check_results = relationship(
+        "QualityCheckResult", back_populates="table", cascade="all, delete-orphan"
+    )
+    anomaly_config = relationship(
+        "AnomalyConfig",
         back_populates="table",
         uselist=False,
         cascade="all, delete-orphan",
     )
-    model_config = relationship(
-        "ModelConfig",
-        back_populates="table",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
-    auc_results = relationship(
-        "AUCResult", back_populates="table", cascade="all, delete-orphan"
+    anomaly_results = relationship(
+        "AnomalyResult", back_populates="table", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -80,5 +66,4 @@ class Table(Base):
             unique=True,
         ),
         Index("ix_tables__connection_id", "connection_id"),
-        Index("ix_tables__is_active", "is_active"),
     )

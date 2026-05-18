@@ -2,10 +2,9 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.models import (
-    BatchTableMetadata,
-    BatchTableProfiling,
-    AUCResult,
-    RuleVerify,
+    AnomalyResult,
+    QualityCheckResult,
+    QualityMetricObservation,
     Table,
 )
 
@@ -16,14 +15,14 @@ class ObservabilityService:
 
     def processing_hours(self) -> list[datetime]:
         hours = set()
-        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult, RuleVerify):
+        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
             rows = self.db.query(model.processing_date_hour).distinct().all()
             hours.update(row[0] for row in rows if row[0])
         return sorted(hours, reverse=True)
 
     def get_table_processing_hours(self, table_id: str) -> list[datetime]:
         hours = set()
-        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult):
+        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
             rows = (
                 self.db.query(model.processing_date_hour)
                 .filter(model.table_id == table_id)
@@ -31,14 +30,6 @@ class ObservabilityService:
                 .all()
             )
             hours.update(row[0] for row in rows if row[0])
-        rule_rows = (
-            self.db.query(RuleVerify.processing_date_hour)
-            .join(RuleVerify.rule)
-            .filter(RuleVerify.rule.has(table_id=table_id))
-            .distinct()
-            .all()
-        )
-        hours.update(row[0] for row in rule_rows if row[0])
         return sorted(hours, reverse=True)
 
     def get_default_time_range(self, table_id: str) -> dict:
@@ -98,7 +89,7 @@ class ObservabilityService:
         rows = (
             self.db.query(Table)
             .join(Connection)
-            .filter(Table.is_active.is_(True), Connection.is_active.is_(True))
+            .filter(Connection.is_active.is_(True))
             .order_by(Table.schema_name, Table.table_name)
             .all()
         )
@@ -118,7 +109,7 @@ class ObservabilityService:
         rows = (
             self.db.query(Table)
             .join(Connection)
-            .filter(Table.is_active.is_(True), Connection.is_active.is_(True))
+            .filter(Connection.is_active.is_(True))
             .all()
         )
         connections = (

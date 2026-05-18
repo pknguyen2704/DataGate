@@ -10,7 +10,6 @@ from app.schemas.user_schema import (
     UserListOut,
     UserOut,
     UserProfileUpdate,
-    UserRoleAssign,
     UserUpdate,
 )
 
@@ -18,9 +17,6 @@ from app.schemas.user_schema import (
 class UserService:
     def __init__(self, db: Session):
         self.db = db
-
-    def _role_ids_to_str(self, role_ids: list[UUID]) -> list[str]:
-        return [str(role_id) for role_id in role_ids]
 
     def _validate_unique_user(
         self, username: str | None, email: str | None, exclude_id: str | None = None
@@ -44,9 +40,7 @@ class UserService:
     def list_users(
         self, page: int = 1, page_size: int = 20, search: str | None = None
     ) -> UserListOut:
-        query = self.db.query(User).options(
-            selectinload(User.roles).selectinload(Role.permissions)
-        )
+        query = self.db.query(User).options(selectinload(User.role))
         if search:
             keyword = f"%{search}%"
             query = query.filter(
@@ -73,7 +67,7 @@ class UserService:
     def get_user_by_id(self, user_id: str) -> User | None:
         return (
             self.db.query(User)
-            .options(selectinload(User.roles).selectinload(Role.permissions))
+            .options(selectinload(User.role))
             .filter(User.id == user_id)
             .first()
         )
@@ -94,10 +88,8 @@ class UserService:
             full_name=data.full_name,
             email=data.email,
             hashed_password=get_hashed_password(data.password),
-            is_active=data.is_active,
+            role=self.get_role_by_id(data.role_id),
         )
-        if data.role_ids:
-            user.roles = self.get_roles_by_ids(data.role_ids)
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
@@ -117,62 +109,42 @@ class UserService:
             password = update_data.pop("password")
             if password:
                 user.hashed_password = get_hashed_password(password)
-        if "role_ids" in update_data:
-            role_ids = update_data.pop("role_ids")
-            if role_ids is not None:
-                user.roles = self.get_roles_by_ids(role_ids)
+        if "role_id" in update_data:
+            role_id = update_data.pop("role_id")
+            if role_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User must have exactly one role",
+                )
+            user.role = self.get_role_by_id(role_id)
         for field, value in update_data.items():
             setattr(user, field, value)
         self.db.commit()
         self.db.refresh(user)
         return self.to_user_out(self.get_user_or_404(str(user.id)))
 
-    def activate_user(self, user_id: str) -> UserOut:
-        user = self.get_user_or_404(user_id)
-        user.is_active = True
-        self.db.commit()
-        self.db.refresh(user)
-        return self.to_user_out(user)
-
-    def deactivate_user(self, user_id: str, current_user_id: str) -> UserOut:
-        user = self.get_user_or_404(user_id)
-        if str(user.id) == str(current_user_id):
+    def get_role_by_id(self, role_id: UUID | str) -> Role:
+        role = (
+            self.db.query(Role)
+            .filter(Role.id == str(role_id))
+            .first()
+        )
+        if role is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot deactivate your own account",
+                detail="Role does not exist",
             )
-        user.is_active = False
-        self.db.commit()
-        self.db.refresh(user)
-        return self.to_user_out(user)
-
-    def assign_roles(self, user_id: str, data: UserRoleAssign) -> UserOut:
-        user = self.get_user_or_404(user_id)
-        user.roles = self.get_roles_by_ids(data.role_ids)
-        self.db.commit()
-        self.db.refresh(user)
-        return self.to_user_out(self.get_user_or_404(str(user.id)))
-
-    def get_roles_by_ids(self, role_ids: list[UUID]) -> list[Role]:
-        role_id_list = self._role_ids_to_str(role_ids)
-        if not role_id_list:
-            return []
-        roles = self.db.query(Role).filter(Role.id.in_(role_id_list)).all()
-        if len(roles) != len(set(role_id_list)):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Some roles do not exist",
-            )
-        return roles
+        return role
 
     def get_permission_codes(self, user: User) -> set[str]:
         permission_codes = set()
-        for role in user.roles:
-            if not role.is_active:
-                continue
-            for permission in role.permissions:
-                permission_codes.add(permission.code)
+        role = user.role
+        if role:
+            for permission in role.permissions or []:
+                permission_codes.add(permission)
         return permission_codes
 
     def to_user_out(self, user: User) -> UserOut:
-        return UserOut.model_validate(user)
+        data = UserOut.model_validate(user)
+        data.roles = [data.role] if data.role else []
+        return data

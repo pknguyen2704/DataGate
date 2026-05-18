@@ -84,7 +84,6 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name = %s
-          AND is_active = TRUE
         ORDER BY table_name
         """,
         parameters=(catalog_name, schema_name),
@@ -115,6 +114,7 @@ def get_active_rules(pg_hook, table_id):
     return [
         {
             "rule_id": str(row[0]),
+            "table_id": table_id,
             "column_name": row[1],
             "constraint": row[2] or row[3],
             "code_for_constraint": row[3],
@@ -210,39 +210,35 @@ def save_results(pg_hook, rows, processing_date_hour):
     if not rows:
         return
 
+    pg_hook.run(
+        """
+        DELETE FROM quality_check_results
+        WHERE check_type = 'rule'
+          AND processing_date_hour = %s
+          AND table_id = ANY(%s::uuid[])
+        """,
+        parameters=(processing_date_hour, list({row["table_id"] for row in rows})),
+    )
+
     sql = """
-        INSERT INTO rule_verify (
-            id,
-            rule_id,
-            severity_level,
-            "constraint",
-            constraint_status,
-            constraint_message,
-            is_resolved,
-            processing_date_hour,
-            created_at,
-            updated_at
+        INSERT INTO quality_check_results (
+            id, table_id, check_type, rule_id, column_name, metric_name,
+            status, severity_level, message, is_resolved,
+            processing_date_hour, created_at, updated_at
         )
         VALUES %s
-        ON CONFLICT (rule_id, processing_date_hour)
-        DO UPDATE SET
-            severity_level = EXCLUDED.severity_level,
-            "constraint" = EXCLUDED."constraint",
-            constraint_status = EXCLUDED.constraint_status,
-            constraint_message = EXCLUDED.constraint_message,
-            is_resolved = FALSE,
-            resolved_by = NULL,
-            processing_date_hour = EXCLUDED.processing_date_hour,
-            updated_at = NOW()
     """
 
     values = [
         (
             str(uuid.uuid4()),
+            row["table_id"],
+            "rule",
             row["rule_id"],
-            row["severity_level"],
+            row["column_name"],
             row["constraint"],
             row["constraint_status"],
+            row["severity_level"],
             row["constraint_message"],
             processing_date_hour,
         )
@@ -256,7 +252,7 @@ def save_results(pg_hook, rows, processing_date_hour):
             cur,
             sql,
             values,
-            template="(%s, %s, %s, %s, %s, %s, FALSE, %s, NOW(), NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, NOW(), NOW())",
         )
 
     conn.commit()
@@ -339,6 +335,8 @@ def verify_rules_for_table(spark, table_info, rules, processing_date_hour):
         rows.append(
             {
                 "rule_id": rule["rule_id"],
+                "table_id": rule["table_id"],
+                "column_name": rule["column_name"],
                 "severity_level": rule["severity_level"],
                 "constraint": rule["constraint"],
                 "constraint_status": map_status(item.get("constraint_status")),

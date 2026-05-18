@@ -58,7 +58,7 @@ class Connection(Base):
         nullable=False,
     )
 
-    tables = relationship("Table", back_populates="connection")
+    tables = relationship("Table", back_populates="connection", cascade="all, delete-orphan")
     created_by_user = relationship("User", foreign_keys=[created_by])
     last_modified_by_user = relationship("User", foreign_keys=[last_modified_by])
 

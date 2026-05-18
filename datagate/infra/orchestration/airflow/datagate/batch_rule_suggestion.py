@@ -101,7 +101,6 @@ def get_active_tables(pg_hook, catalog_name, schema_names):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name IN ({placeholders})
-          AND is_active = TRUE
         ORDER BY schema_name, table_name
         """,
         parameters=tuple([catalog_name] + schema_names),

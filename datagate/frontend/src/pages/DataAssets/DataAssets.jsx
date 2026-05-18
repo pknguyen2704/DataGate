@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { 
   Box, Typography, Paper, Breadcrumbs, Link, Grid, TextField, 
   MenuItem, Table as MuiTable, TableBody, TableCell, TableHead, 
-  TableRow, TableContainer, TablePagination, Chip, IconButton,
+  TableRow, TableContainer, TablePagination, IconButton,
   Button, Stack, Tooltip
 } from "@mui/material";
 import { 
   TableChartOutlined, FilterList, Search, Refresh,
-  VisibilityOutlined, CheckCircle, Cancel, LayersOutlined
+  VisibilityOutlined, LayersOutlined
 } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
@@ -22,8 +22,7 @@ const DataAssets = () => {
   const [filters, setFilters] = useState({
     connection_id: "",
     catalog_name: "",
-    schema_name: "",
-    is_active: ""
+    schema_name: ""
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -32,7 +31,6 @@ const DataAssets = () => {
   
   const tablesRes = useApiResource(() => dataAssetsApi.list({
     ...filters,
-    is_active: filters.is_active === "" ? undefined : filters.is_active === "true",
     page: page + 1,
     page_size: pageSize
   }), [filters, page, pageSize]);
@@ -154,22 +152,6 @@ const DataAssets = () => {
                 {schemas.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Status"
-                name="is_active"
-                value={filters.is_active}
-                onChange={handleFilterChange}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-              >
-                <MenuItem value="">All Status</MenuItem>
-                <MenuItem value="true">Active</MenuItem>
-                <MenuItem value="false">Inactive</MenuItem>
-              </TextField>
-            </Grid>
           </Grid>
         </Paper>
 
@@ -186,7 +168,6 @@ const DataAssets = () => {
                 <TableRow>
                   <TableCell>Table Name</TableCell>
                   <TableCell>Catalog / Schema</TableCell>
-                  <TableCell>Status</TableCell>
                   <TableCell>Latest Processed</TableCell>
                   <TableCell align="right">Action</TableCell>
                 </TableRow>
@@ -204,23 +185,6 @@ const DataAssets = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="caption" color="text.secondary">{table.catalog_name} / {table.schema_name}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={table.is_active ? "Active" : "Inactive"} 
-                        size="small" 
-                        variant="filled"
-                        color={table.is_active ? "success" : "default"}
-                        icon={table.is_active ? <CheckCircle sx={{ color: 'white !important' }} /> : <Cancel />}
-                        sx={{ 
-                          fontWeight: 700, 
-                          borderRadius: 1.5,
-                          ...(table.is_active && {
-                            bgcolor: 'success.main',
-                            color: 'white',
-                          })
-                        }}
-                      />
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">

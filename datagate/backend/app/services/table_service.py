@@ -5,14 +5,12 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
-    BatchTableMetadata,
-    BatchTableProfiling,
+    AnomalyConfig,
+    AnomalyResult,
     Connection,
-    AUCResult,
-    ModelConfig,
-    RuleVerify,
+    QualityCheckResult,
+    QualityMetricObservation,
     Table,
-    Rule,
 )
 from app.schemas.table_schema import TableCreate, TableUpdate
 
@@ -36,13 +34,6 @@ class TableService:
                 detail="Connection not found",
             )
         return connection
-
-    def _validate_connection_active(self, connection: Connection) -> None:
-        if not connection.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot register table with inactive connection",
-            )
 
     def _validate_table_unique(
         self,
@@ -69,27 +60,25 @@ class TableService:
             )
 
     def get_latest_processing_hour(self, table_id: str) -> datetime | None:
-        hours = []
-        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult):
-            latest = (
-                self.db.query(model.processing_date_hour)
-                .filter(model.table_id == table_id)
-                .order_by(model.processing_date_hour.desc())
-                .first()
+        hours = [
+            row[0]
+            for row in (
+                self.db.query(func.max(QualityMetricObservation.processing_date_hour))
+                .filter(QualityMetricObservation.table_id == table_id)
+                .union_all(
+                    self.db.query(func.max(AnomalyResult.processing_date_hour)).filter(
+                        AnomalyResult.table_id == table_id
+                    )
+                )
+                .union_all(
+                    self.db.query(func.max(QualityCheckResult.processing_date_hour)).filter(
+                        QualityCheckResult.table_id == table_id
+                    )
+                )
+                .all()
             )
-            if latest and latest[0]:
-                hours.append(latest[0])
-
-        # Check RuleVerify via Rule
-        latest_rule_verify = (
-            self.db.query(RuleVerify.processing_date_hour)
-            .join(RuleVerify.rule)
-            .filter(Rule.table_id == table_id)
-            .order_by(RuleVerify.processing_date_hour.desc())
-            .first()
-        )
-        if latest_rule_verify and latest_rule_verify[0]:
-            hours.append(latest_rule_verify[0])
+            if row[0]
+        ]
 
         if not hours:
             return None
@@ -100,7 +89,7 @@ class TableService:
             return {}
 
         latest_dates = {}
-        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult):
+        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
             rows = (
                 self.db.query(model.table_id, func.max(model.processing_date_hour))
                 .filter(model.table_id.in_(table_ids))
@@ -111,18 +100,6 @@ class TableService:
                 if dt:
                     latest_dates[tid] = max(latest_dates.get(tid, dt), dt)
 
-        # RuleVerify is slightly different due to join
-        rule_rows = (
-            self.db.query(Rule.table_id, func.max(RuleVerify.processing_date_hour))
-            .join(RuleVerify.rule)
-            .filter(Rule.table_id.in_(table_ids))
-            .group_by(Rule.table_id)
-            .all()
-        )
-        for tid, dt in rule_rows:
-            if dt:
-                latest_dates[tid] = max(latest_dates.get(tid, dt), dt)
-
         return latest_dates
 
     def list_tables(
@@ -130,18 +107,15 @@ class TableService:
         connection_id: str | None = None,
         catalog_name: str | None = None,
         schema_name: str | None = None,
-        is_active: bool | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        # Join with Connection to filter out inactive connections
         query = (
             self.db.query(Table)
             .join(Connection)
             .options(selectinload(Table.connection))
         )
 
-        # Only hide tables from inactive connections ALWAYS
         query = query.filter(Connection.is_active.is_(True))
 
         if connection_id:
@@ -150,13 +124,6 @@ class TableService:
             query = query.filter(Table.catalog_name == catalog_name)
         if schema_name:
             query = query.filter(Table.schema_name == schema_name)
-
-        # Standard filtering: Default to active only if not specified
-        if is_active is not None:
-            query = query.filter(Table.is_active == is_active)
-        elif not connection_id:
-            # If not in a specific connection management view, show only active
-            query = query.filter(Table.is_active.is_(True))
 
         total = query.count()
         tables = (
@@ -172,8 +139,8 @@ class TableService:
 
         # Batch fetch anomaly configs
         anomaly_configs = (
-            self.db.query(ModelConfig.table_id)
-            .filter(ModelConfig.table_id.in_(table_ids))
+            self.db.query(AnomalyConfig.table_id)
+            .filter(AnomalyConfig.table_id.in_(table_ids))
             .all()
         )
         anomaly_table_ids = {str(r[0]) for r in anomaly_configs}
@@ -197,8 +164,8 @@ class TableService:
                 table_id
             )
             table.has_anomaly_config = (
-                self.db.query(ModelConfig)
-                .filter(ModelConfig.table_id == table_id)
+                self.db.query(AnomalyConfig)
+                .filter(AnomalyConfig.table_id == table_id)
                 .first()
                 is not None
             )
@@ -220,15 +187,8 @@ class TableService:
                 detail="Access denied: Connection is inactive",
             )
 
-        if not table.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: Table is inactive",
-            )
-
     def create_table(self, data: TableCreate, owner_id: str) -> Table:
         connection = self._get_connection_or_404(data.connection_id)
-        self._validate_connection_active(connection)
         self._validate_table_unique(
             connection_id=data.connection_id,
             catalog_name=data.catalog_name,
@@ -240,7 +200,6 @@ class TableService:
             catalog_name=data.catalog_name,
             schema_name=data.schema_name,
             table_name=data.table_name,
-            is_active=data.is_active,
         )
         self.db.add(table)
         self.db.commit()
@@ -257,7 +216,6 @@ class TableService:
 
         if "connection_id" in update_data:
             connection = self._get_connection_or_404(new_connection_id)
-            self._validate_connection_active(connection)
             update_data["connection_id"] = str(new_connection_id)
 
         self._validate_table_unique(
@@ -275,20 +233,6 @@ class TableService:
         self.db.refresh(table)
         return self.get_table_or_404(str(table.id))
 
-    def activate_table(self, table_id: str) -> Table:
-        table = self.get_table_or_404(table_id)
-        table.is_active = True
-        self.db.commit()
-        self.db.refresh(table)
-        return self.get_table_or_404(str(table.id))
-
-    def deactivate_table(self, table_id: str) -> Table:
-        table = self.get_table_or_404(table_id)
-        table.is_active = False
-        self.db.commit()
-        self.db.refresh(table)
-        return self.get_table_or_404(str(table.id))
-
     def delete_table(self, table_id: str) -> None:
         table = self.get_table_or_404(table_id)
         self.db.delete(table)
@@ -298,39 +242,38 @@ class TableService:
         self.get_table_or_404(table_id)
         rows = (
             self.db.query(
-                BatchTableProfiling.column_name, BatchTableProfiling.data_type
+                QualityMetricObservation.column_name,
+                QualityMetricObservation.extra_data,
             )
-            .filter(BatchTableProfiling.table_id == table_id)
+            .filter(
+                QualityMetricObservation.table_id == table_id,
+                QualityMetricObservation.metric_scope == "profiling",
+                QualityMetricObservation.column_name.isnot(None),
+            )
             .order_by(
-                BatchTableProfiling.processing_date_hour.desc(),
-                BatchTableProfiling.column_name.asc(),
+                QualityMetricObservation.processing_date_hour.desc(),
+                QualityMetricObservation.column_name.asc(),
             )
             .all()
         )
         seen = set()
         columns = []
-        for column_name, data_type in rows:
+        for column_name, extra_data in rows:
             if column_name in seen:
                 continue
             seen.add(column_name)
+            data_type = (extra_data or {}).get("data_type")
             columns.append({"column_name": column_name, "data_type": data_type})
         return columns
 
     def list_processing_hours(self, table_id: str) -> list[dict]:
         self.get_table_or_404(table_id)
         hours = set()
-        for model in (BatchTableMetadata, BatchTableProfiling, AUCResult):
+        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
             rows = (
                 self.db.query(model.processing_date_hour)
                 .filter(model.table_id == table_id)
                 .all()
             )
             hours.update(row[0] for row in rows if row[0])
-        rule_rows = (
-            self.db.query(RuleVerify.processing_date_hour)
-            .join(RuleVerify.rule)
-            .filter(RuleVerify.rule.has(table_id=table_id))
-            .all()
-        )
-        hours.update(row[0] for row in rule_rows if row[0])
         return [{"processing_date_hour": hour} for hour in sorted(hours, reverse=True)]

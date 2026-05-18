@@ -29,7 +29,6 @@ def list_tables(
     connection_id: str | None = Query(default=None),
     catalog_name: str | None = Query(default=None),
     schema_name: str | None = Query(default=None),
-    is_active: bool | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1),
     service: TableService = Depends(get_table_service),
@@ -42,7 +41,6 @@ def list_tables(
         connection_id=conn_id,
         catalog_name=catalog_name,
         schema_name=schema_name,
-        is_active=is_active,
         page=page,
         page_size=page_size,
     )
@@ -104,26 +102,6 @@ def list_table_processing_hours(
     table = service.get_table_or_404(str(table_id))
     service.validate_table_accessible(table)
     return service.list_processing_hours(str(table_id))
-
-
-@data_assets_router.patch("/tables/{table_id}/activate", response_model=TableDetailOut)
-def activate_table(
-    table_id: UUID,
-    service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
-):
-    return service.activate_table(str(table_id))
-
-
-@data_assets_router.patch(
-    "/tables/{table_id}/deactivate", response_model=TableDetailOut
-)
-def deactivate_table(
-    table_id: UUID,
-    service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
-):
-    return service.deactivate_table(str(table_id))
 
 
 @data_assets_router.delete("/tables/{table_id}", status_code=status.HTTP_204_NO_CONTENT)

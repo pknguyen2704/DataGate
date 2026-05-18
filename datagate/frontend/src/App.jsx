@@ -15,7 +15,6 @@ import { ObservabilityTab, MetricsTab, RulesTab, QualityTab } from "~/pages/Data
 import PlatformConnection from "~/pages/Settings/PlatformConnection/PlatformConnection";
 import ModelConfig from "~/pages/Settings/ModelConfig/ModelConfig";
 import UserManagement from "~/pages/Settings/UserManagement/UserManagement";
-import RoleManagement from "~/pages/Settings/RoleManagement/RoleManagement";
 
 function App() {
   const dispatch = useDispatch();
@@ -60,7 +59,6 @@ function App() {
             
             <Route element={<ProtectedRoute permission="user:manage" />}>
               <Route path="users" element={<UserManagement />} />
-              <Route path="roles" element={<RoleManagement />} />
             </Route>
           </Route>
         </Route>

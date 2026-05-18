@@ -4,6 +4,7 @@ from contextlib import suppress
 from datetime import datetime
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.providers.trino.hooks.trino import TrinoHook
+from psycopg2.extras import execute_values
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -72,7 +73,6 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name = %s
-          AND is_active = TRUE
         ORDER BY table_name
         """,
         parameters=(catalog_name, schema_name),
@@ -155,46 +155,51 @@ def build_batch_table_metadata_sql(
 
 
 def upsert_batch_table_metadata(pg_hook, table_id, metadata):
-    pg_hook.run(
-        """
-        INSERT INTO batch_table_metadata (
-            id,
-            table_id,
-            batch_added_rows,
-            batch_added_files,
-            batch_added_files_size_bytes,
-            table_total_rows,
-            table_total_files,
-            table_total_size_bytes,
-            processing_date_hour,
-            created_at,
-            updated_at
+    sql = """
+        INSERT INTO quality_metric_observations (
+            id, table_id, metric_scope, column_name, metric_name, metric_value,
+            extra_data, processing_date_hour, created_at, updated_at
         )
-        VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW()
-        )
-        ON CONFLICT (table_id, processing_date_hour)
-        DO UPDATE SET
-            batch_added_rows = EXCLUDED.batch_added_rows,
-            batch_added_files = EXCLUDED.batch_added_files,
-            batch_added_files_size_bytes = EXCLUDED.batch_added_files_size_bytes,
-            table_total_rows = EXCLUDED.table_total_rows,
-            table_total_files = EXCLUDED.table_total_files,
-            table_total_size_bytes = EXCLUDED.table_total_size_bytes,
-            updated_at = NOW()
-        """,
-        parameters=(
+        VALUES %s
+    """
+    values = [
+        (
             str(uuid.uuid4()),
             table_id,
-            metadata["batch_added_rows"],
-            metadata["batch_added_files"],
-            metadata["batch_added_files_size_bytes"],
-            metadata["table_total_rows"],
-            metadata["table_total_files"],
-            metadata["table_total_size_bytes"],
+            "metadata",
+            None,
+            metric_name,
+            metadata.get(metric_name),
+            None,
             metadata["processing_date_hour"],
-        ),
-    )
+        )
+        for metric_name in (
+            "batch_added_rows",
+            "batch_added_files",
+            "batch_added_files_size_bytes",
+            "table_total_rows",
+            "table_total_files",
+            "table_total_size_bytes",
+        )
+    ]
+    conn = pg_hook.get_conn()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            DELETE FROM quality_metric_observations
+            WHERE table_id = %s
+              AND processing_date_hour = %s
+              AND metric_scope = 'metadata'
+            """,
+            (table_id, metadata["processing_date_hour"]),
+        )
+        execute_values(
+            cursor,
+            sql,
+            values,
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
+        )
+    conn.commit()
 
 
 def collect_one_table_metadata(

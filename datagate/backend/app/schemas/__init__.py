@@ -9,16 +9,7 @@ from .common_schema import (
     PaginatedResponse,
 )
 
-from .permission_schema import (
-    PermissionCreate,
-    PermissionUpdate,
-    PermissionOut,
-    PermissionLiteOut,
-)
-
 from .role_schema import (
-    RoleCreate,
-    RoleUpdate,
     RoleOut,
     RoleLiteOut,
 )

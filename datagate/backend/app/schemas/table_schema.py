@@ -9,7 +9,6 @@ class TableBase(BaseModel):
     catalog_name: str = Field(..., max_length=255)
     schema_name: str = Field(..., max_length=255)
     table_name: str = Field(..., max_length=255)
-    is_active: bool = True
 
 
 class TableCreate(TableBase):
@@ -21,7 +20,6 @@ class TableUpdate(BaseModel):
     catalog_name: str | None = Field(default=None, max_length=255)
     schema_name: str | None = Field(default=None, max_length=255)
     table_name: str | None = Field(default=None, max_length=255)
-    is_active: bool | None = None
 
 
 class TableOut(TableBase):
@@ -43,7 +41,6 @@ class TableLiteOut(BaseModel):
     catalog_name: str
     schema_name: str
     table_name: str
-    is_active: bool
     latest_processing_date_hour: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 

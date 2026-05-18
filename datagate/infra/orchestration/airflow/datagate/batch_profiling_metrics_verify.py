@@ -74,7 +74,6 @@ def get_active_table_ids(pg_hook, catalog_name, schema_name):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name = %s
-          AND is_active = TRUE
         """,
         parameters=(catalog_name, validate_name(schema_name, "schema_name")),
     )
@@ -86,26 +85,22 @@ def get_profiling_rows(pg_hook, table_ids, processing_date_hour):
         """
         SELECT
             m.id,
-            p.id,
+            m.table_id,
+            m.column_name,
             m.metric_name,
             m.min_threshold,
             m.max_threshold,
             m.severity_level,
-            p.completeness,
-            p.mean,
-            p.standard_deviation,
-            p.minimum,
-            p.maximum,
-            p.min_length,
-            p.max_length,
-            p.distinctness,
-            p.approx_count_distinct
-        FROM batch_table_profiling_manual_thresholds m
-        JOIN batch_table_profiling p
+            p.metric_value
+        FROM quality_thresholds m
+        JOIN quality_metric_observations p
           ON p.table_id = m.table_id
          AND p.column_name = m.column_name
          AND p.processing_date_hour = %s
+         AND p.metric_scope = 'profiling'
+         AND p.metric_name = m.metric_name
         WHERE m.table_id = ANY(%s::uuid[])
+          AND m.metric_scope = 'profiling'
           AND m.is_active = TRUE
         """,
         parameters=(processing_date_hour, table_ids),
@@ -117,40 +112,24 @@ def build_profiling_results(rows, processing_date_hour):
     for row in rows:
         (
             threshold_id,
-            batch_id,
+            table_id,
+            column_name,
             metric_name,
             min_th,
             max_th,
             severity,
-            completeness,
-            mean,
-            std,
-            min_v,
-            max_v,
-            min_len,
-            max_len,
-            distinctness,
-            approx_distinct,
+            actual_value,
         ) = row
-        values = {
-            "completeness": completeness,
-            "mean": mean,
-            "standard_deviation": std,
-            "minimum": min_v,
-            "maximum": max_v,
-            "min_length": min_len,
-            "max_length": max_len,
-            "distinctness": distinctness,
-            "approx_count_distinct": approx_distinct,
-        }
         if metric_name not in PROFILING_METRICS:
             continue
-        actual_value = values.get(metric_name)
         results.append(
             (
                 str(uuid.uuid4()),
+                table_id,
+                "profiling_threshold",
                 threshold_id,
-                batch_id,
+                column_name,
+                metric_name,
                 actual_value,
                 evaluate_status(actual_value, min_th, max_th),
                 min_th,
@@ -167,32 +146,20 @@ def save_profiling_results(pg_hook, rows):
         return
 
     sql = """
-        INSERT INTO batch_table_profiling_metrics_verify (
-            id,
-            profiling_manual_threshold_id,
-            batch_table_profiling_id,
-            actual_value,
-            status,
-            min_threshold,
-            max_threshold,
-            severity_level,
-            is_resolved,
-            processing_date_hour,
-            created_at,
-            updated_at
+        DELETE FROM quality_check_results
+        WHERE check_type = 'profiling_threshold'
+          AND processing_date_hour = %s
+          AND table_id = ANY(%s::uuid[])
+    """
+    pg_hook.run(sql, parameters=(rows[0][-1], list({row[1] for row in rows})))
+
+    sql = """
+        INSERT INTO quality_check_results (
+            id, table_id, check_type, threshold_id, column_name, metric_name,
+            actual_value, status, min_threshold, max_threshold, severity_level,
+            is_resolved, processing_date_hour, created_at, updated_at
         )
         VALUES %s
-        ON CONFLICT (profiling_manual_threshold_id, batch_table_profiling_id)
-        DO UPDATE SET
-            actual_value = EXCLUDED.actual_value,
-            status = EXCLUDED.status,
-            min_threshold = EXCLUDED.min_threshold,
-            max_threshold = EXCLUDED.max_threshold,
-            severity_level = EXCLUDED.severity_level,
-            is_resolved = FALSE,
-            resolved_by = NULL,
-            processing_date_hour = EXCLUDED.processing_date_hour,
-            updated_at = NOW()
     """
 
     conn = pg_hook.get_conn()
@@ -201,7 +168,7 @@ def save_profiling_results(pg_hook, rows):
             cursor,
             sql,
             rows,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, NOW(), NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, NOW(), NOW())",
         )
     conn.commit()
 

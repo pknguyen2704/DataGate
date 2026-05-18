@@ -1,11 +1,10 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Index, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.association import user_roles
 
 
 def gen_uuid() -> str:
@@ -20,7 +19,9 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
+    role_id = Column(
+        UUID(as_uuid=False), ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False
+    )
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -31,9 +32,9 @@ class User(Base):
         nullable=False,
     )
 
-    roles = relationship("Role", secondary=user_roles, back_populates="users")
+    role = relationship("Role", back_populates="users", foreign_keys=[role_id])
     __table_args__ = (
-        Index("ix_users__is_active", "is_active"),
         Index("ix_users__email", "email", unique=True),
+        Index("ix_users__role_id", "role_id"),
         Index("ix_users__username", "username", unique=True),
     )

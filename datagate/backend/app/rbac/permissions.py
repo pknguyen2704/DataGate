@@ -34,7 +34,7 @@ class PermissionCode:
 ALL_PERMISSIONS = [
     {
         "code": PermissionCode.USER_MANAGE,
-        "name": "Manage Users, Roles & Permissions",
+        "name": "Manage Users",
         "group": "System Administration",
     },
     {

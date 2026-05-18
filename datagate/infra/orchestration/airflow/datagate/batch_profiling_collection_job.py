@@ -1,5 +1,6 @@
 import argparse
 import gc
+import json
 import logging
 import os
 import sys
@@ -147,7 +148,6 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name = %s
-          AND is_active = TRUE
         ORDER BY table_name
         """,
         parameters=(catalog_name, schema_name),
@@ -174,59 +174,47 @@ def save_profiling_rows(pg_hook, rows):
         return
 
     sql = """
-        INSERT INTO batch_table_profiling (
-            id,
-            table_id,
-            column_name,
-            data_type,
-            completeness,
-            mean,
-            standard_deviation,
-            minimum,
-            maximum,
-            min_length,
-            max_length,
-            distinctness,
-            approx_count_distinct,
-            processing_date_hour,
-            created_at,
-            updated_at
+        INSERT INTO quality_metric_observations (
+            id, table_id, metric_scope, column_name, metric_name, metric_value,
+            extra_data, processing_date_hour, created_at, updated_at
         )
         VALUES %s
-        ON CONFLICT (table_id, processing_date_hour, column_name)
+        ON CONFLICT (table_id, processing_date_hour, metric_scope, column_name, metric_name)
         DO UPDATE SET
-            data_type = EXCLUDED.data_type,
-            completeness = EXCLUDED.completeness,
-            mean = EXCLUDED.mean,
-            standard_deviation = EXCLUDED.standard_deviation,
-            minimum = EXCLUDED.minimum,
-            maximum = EXCLUDED.maximum,
-            min_length = EXCLUDED.min_length,
-            max_length = EXCLUDED.max_length,
-            distinctness = EXCLUDED.distinctness,
-            approx_count_distinct = EXCLUDED.approx_count_distinct,
+            metric_value = EXCLUDED.metric_value,
+            extra_data = EXCLUDED.extra_data,
             updated_at = NOW()
     """
 
-    values = [
-        (
-            str(uuid.uuid4()),
-            row["table_id"],
-            row["column_name"],
-            row["data_type"],
-            row["completeness"],
-            row["mean"],
-            row["standard_deviation"],
-            row["minimum"],
-            row["maximum"],
-            row["min_length"],
-            row["max_length"],
-            row["distinctness"],
-            row["approx_count_distinct"],
-            row["processing_date_hour"],
-        )
-        for row in rows
-    ]
+    metric_names = (
+        "completeness",
+        "mean",
+        "standard_deviation",
+        "minimum",
+        "maximum",
+        "distinctness",
+    )
+    values = []
+    for row in rows:
+        extra_data = {
+            "data_type": row["data_type"],
+            "min_length": row["min_length"],
+            "max_length": row["max_length"],
+            "approx_count_distinct": row["approx_count_distinct"],
+        }
+        for metric_name in metric_names:
+            values.append(
+                (
+                    str(uuid.uuid4()),
+                    row["table_id"],
+                    "profiling",
+                    row["column_name"],
+                    metric_name,
+                    row[metric_name],
+                    json.dumps(extra_data),
+                    row["processing_date_hour"],
+                )
+            )
 
     conn = pg_hook.get_conn()
 
@@ -235,7 +223,7 @@ def save_profiling_rows(pg_hook, rows):
             cursor,
             sql,
             values,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NOW(), NOW())",
         )
 
     conn.commit()

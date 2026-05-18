@@ -81,7 +81,6 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name = %s
-          AND is_active = TRUE
         """,
         parameters=(catalog_name, schema_name),
     )
@@ -107,9 +106,10 @@ def threshold_text(row):
     max_v = row.get("max_threshold")
 
     if check_type == "anomaly":
-        if max_v is None:
+        auc_threshold = min_v if min_v is not None else max_v
+        if auc_threshold is None:
             return "AUC result threshold was not captured."
-        return f"Require `auc_result < {format_value(max_v)}`"
+        return f"Require `auc_result < {format_value(auc_threshold)}`"
     rules = []
     if min_v is not None:
         rules.append(f"actual_value >= {format_value(min_v)}")
@@ -145,177 +145,47 @@ def fetch_quality_failure_details(
         "constraint_value",
         "constraint_message",
     ]
-    selects = []
-    params = []
-    selects.append(
-        """
-        SELECT
-            'metadata' AS check_type,
-            t.catalog_name,
-            t.schema_name,
-            t.table_name,
-            NULL::text AS column_name,
-            COALESCE(
-                to_jsonb(m)->>'metric_name',
-                to_jsonb(m)->>'metric_code',
-                to_jsonb(m)->>'metric_type',
-                to_jsonb(m)->>'metadata_metric_name',
-                'metadata_metric'
-            ) AS fail_metric,
-            COALESCE(
-                to_jsonb(m)->>'description',
-                to_jsonb(m)->>'metric_description',
-                to_jsonb(m)->>'rule_description'
-            ) AS metric_description,
-            x.actual_value,
-            x.min_threshold,
-            x.max_threshold,
-            x.severity_level::text,
-            x.processing_date_hour,
-            x.created_at,
-            NULL::text AS constraint_status,
-            NULL::text AS constraint_value,
-            NULL::text AS constraint_message
-        FROM batch_table_metadata_metrics_verify x
-        JOIN batch_table_metadata_manual_thresholds m
-            ON m.id = x.metadata_manual_threshold_id
-        JOIN tables t
-            ON t.id = m.table_id
-        WHERE m.table_id = ANY(%s::uuid[])
-          AND x.processing_date_hour = %s::timestamp
-          AND x.status = 'fail'
-          AND x.is_resolved = FALSE
-        """
-    )
-    params.extend([table_ids, processing_date_hour])
-    selects.append(
-        """
-        SELECT
-            'profiling' AS check_type,
-            t.catalog_name,
-            t.schema_name,
-            t.table_name,
-            COALESCE(
-                to_jsonb(p)->>'column_name',
-                to_jsonb(m)->>'column_name'
-            ) AS column_name,
-            COALESCE(
-                to_jsonb(m)->>'metric_name',
-                to_jsonb(m)->>'metric_code',
-                to_jsonb(m)->>'metric_type',
-                to_jsonb(m)->>'profiling_metric_name',
-                'profiling_metric'
-            ) AS fail_metric,
-            COALESCE(
-                to_jsonb(m)->>'description',
-                to_jsonb(m)->>'metric_description',
-                to_jsonb(m)->>'rule_description'
-            ) AS metric_description,
-            x.actual_value,
-            x.min_threshold,
-            x.max_threshold,
-            x.severity_level::text,
-            x.processing_date_hour,
-            x.created_at,
-            NULL::text AS constraint_status,
-            NULL::text AS constraint_value,
-            NULL::text AS constraint_message
-        FROM batch_table_profiling_metrics_verify x
-        JOIN batch_table_profiling_manual_thresholds m
-            ON m.id = x.profiling_manual_threshold_id
-        JOIN batch_table_profiling p
-            ON p.id = x.batch_table_profiling_id
-        JOIN tables t
-            ON t.id = m.table_id
-        WHERE m.table_id = ANY(%s::uuid[])
-          AND x.processing_date_hour = %s::timestamp
-          AND x.status = 'fail'
-          AND x.is_resolved = FALSE
-        """
-    )
-    params.extend([table_ids, processing_date_hour])
+    check_types = ["metadata_threshold", "profiling_threshold"]
     if include_rule:
-        selects.append(
-            """
-            SELECT
-                'rule' AS check_type,
-                t.catalog_name,
-                t.schema_name,
-                t.table_name,
-                r.column_name,
-                COALESCE(
-                    r.constraint_name,
-                    r.code_for_constraint,
-                    'rule_constraint'
-                ) AS fail_metric,
-                COALESCE(
-                    r.rule_description,
-                    r.description
-                ) AS metric_description,
-                NULL::float AS actual_value,
-                NULL::float AS min_threshold,
-                NULL::float AS max_threshold,
-                x.severity_level::text,
-                x.processing_date_hour,
-                x.created_at,
-                x.constraint_status,
-                COALESCE(
-                    x.constraint,
-                    r.constraint_name,
-                    r.code_for_constraint
-                ) AS constraint_value,
-                x.constraint_message
-            FROM rule_verify x
-            JOIN rules r
-                ON r.id = x.rule_id
-            JOIN tables t
-                ON t.id = r.table_id
-            WHERE r.table_id = ANY(%s::uuid[])
-              AND x.processing_date_hour = %s::timestamp
-              AND LOWER(x.constraint_status) IN ('fail', 'failed', 'failure', 'error')
-              AND x.is_resolved = FALSE
-            """
-        )
-        params.extend([table_ids, processing_date_hour])
-
+        check_types.append("rule")
     if include_auc:
-        selects.append(
-            """
-            SELECT
-                'anomaly' AS check_type,
-                t.catalog_name,
-                t.schema_name,
-                t.table_name,
-                NULL::text AS column_name,
-                'auc_result' AS fail_metric,
-                'AUC result indicates that the target batch distribution is significantly different from historical reference data.' AS metric_description,
-                x.auc_score AS actual_value,
-                NULL::float AS min_threshold,
-                x.auc_threshold AS max_threshold,
-                x.severity_level::text,
-                x.processing_date_hour,
-                x.created_at,
-                NULL::text AS constraint_status,
-                NULL::text AS constraint_value,
-                NULL::text AS constraint_message
-            FROM auc_verify x
-            JOIN auc_results a
-                ON a.id = x.auc_result_id
-            JOIN tables t
-                ON t.id = a.table_id
-            WHERE a.table_id = ANY(%s::uuid[])
-              AND x.processing_date_hour = %s::timestamp
-              AND x.status = 'fail'
-              AND x.is_resolved = FALSE
-            """
-        )
-        params.extend([table_ids, processing_date_hour])
+        check_types.append("anomaly_auc")
 
-    sql = f"""
-        SELECT *
-        FROM (
-            {" UNION ALL ".join(selects)}
-        ) q
+    sql = """
+        SELECT
+            CASE x.check_type
+                WHEN 'metadata_threshold' THEN 'metadata'
+                WHEN 'profiling_threshold' THEN 'profiling'
+                WHEN 'anomaly_auc' THEN 'anomaly'
+                ELSE x.check_type
+            END AS check_type,
+            t.catalog_name,
+            t.schema_name,
+            t.table_name,
+            x.column_name,
+            COALESCE(x.metric_name, r.constraint_name, r.code_for_constraint, 'quality_check') AS fail_metric,
+            COALESCE(qt.description, r.description) AS metric_description,
+            x.actual_value,
+            x.min_threshold,
+            x.max_threshold,
+            x.severity_level::text,
+            x.processing_date_hour,
+            x.created_at,
+            x.status AS constraint_status,
+            COALESCE(x.metric_name, r.constraint_name, r.code_for_constraint) AS constraint_value,
+            x.message AS constraint_message
+        FROM quality_check_results x
+        JOIN tables t
+            ON t.id = x.table_id
+        LEFT JOIN quality_thresholds qt
+            ON qt.id = x.threshold_id
+        LEFT JOIN rules r
+            ON r.id = x.rule_id
+        WHERE x.table_id = ANY(%s::uuid[])
+          AND x.processing_date_hour = %s::timestamp
+          AND x.check_type = ANY(%s::text[])
+          AND x.status = 'fail'
+          AND x.is_resolved = FALSE
         ORDER BY
             CASE severity_level
                 WHEN 'critical' THEN 1
@@ -329,6 +199,7 @@ def fetch_quality_failure_details(
             column_name,
             fail_metric
     """
+    params = [table_ids, processing_date_hour, check_types]
 
     records = pg_hook.get_records(sql, parameters=tuple(params))
     return [dict(zip(columns, row)) for row in records]

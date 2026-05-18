@@ -1,5 +1,5 @@
 import { Box, Typography, Paper, List, ListItemButton, ListItemIcon, ListItemText, Divider } from "@mui/material";
-import { SettingsInputComponentOutlined, ModelTrainingOutlined, PeopleOutlined, ShieldOutlined } from "@mui/icons-material";
+import { SettingsInputComponentOutlined, ModelTrainingOutlined, PeopleOutlined } from "@mui/icons-material";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { useEffect, useMemo } from "react";
@@ -23,12 +23,6 @@ const SETTINGS_MENU = [
     text: "Users",
     icon: <PeopleOutlined />,
     path: `${SETTINGS_BASE_PATH}/users`,
-    permission: "user:manage",
-  },
-  {
-    text: "Roles",
-    icon: <ShieldOutlined />,
-    path: `${SETTINGS_BASE_PATH}/roles`,
     permission: "user:manage",
   },
 ];

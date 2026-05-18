@@ -1,6 +1,5 @@
 import re
 from fastapi import HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.trino_client import TrinoClient
@@ -186,16 +185,6 @@ class ConnectionService:
 
     def delete_connection(self, connection_id: str) -> None:
         connection = self.get_connection_or_404(connection_id)
-        table_count = (
-            self.db.query(func.count(Table.id))
-            .filter(Table.connection_id == connection_id)
-            .scalar()
-        )
-        if table_count and table_count > 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete connection used by registered tables. Deactivate it instead.",
-            )
         self.db.delete(connection)
         self.db.commit()
 
@@ -260,7 +249,6 @@ class ConnectionService:
             catalog_name=catalog,
             schema_name=schema,
             table_name=table_name,
-            is_active=True,
         )
         self.db.add(table)
         self.db.commit()
@@ -272,9 +260,5 @@ class ConnectionService:
         if not table:
             raise HTTPException(status_code=404, detail="Managed table not found")
 
-        # Check if has results
-        # We prefer soft delete if it has data, but for now simple delete is ok if user requested it.
-        # But wait, Table model doesn't have soft delete for the row itself, just is_active.
-        # I'll just delete the row.
         self.db.delete(table)
         self.db.commit()

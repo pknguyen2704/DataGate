@@ -1,7 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Rule, RuleVerify, Table
+from app.models import QualityCheckResult, Rule, Table
 from app.schemas.rule_schema import RuleCreate, RuleUpdate
 
 
@@ -133,19 +133,29 @@ class RuleService:
 
     def list_verify_results(
         self, table_id: str | None = None, limit: int | None = None
-    ) -> list[RuleVerify]:
-        query = self.db.query(RuleVerify).join(RuleVerify.rule)
+    ) -> list[QualityCheckResult]:
+        query = self.db.query(QualityCheckResult).filter(
+            QualityCheckResult.check_type == "rule"
+        )
         if table_id:
-            query = query.filter(Rule.table_id == table_id)
+            query = query.filter(QualityCheckResult.table_id == table_id)
         query = query.order_by(
-            RuleVerify.processing_date_hour.desc(), RuleVerify.updated_at.desc()
+            QualityCheckResult.processing_date_hour.desc(),
+            QualityCheckResult.updated_at.desc(),
         )
         if limit:
             query = query.limit(limit)
         return query.all()
 
-    def set_verify_resolved(self, verify_id: str, is_resolved: bool) -> RuleVerify:
-        result = self.db.query(RuleVerify).filter(RuleVerify.id == verify_id).first()
+    def set_verify_resolved(self, verify_id: str, is_resolved: bool) -> QualityCheckResult:
+        result = (
+            self.db.query(QualityCheckResult)
+            .filter(
+                QualityCheckResult.id == verify_id,
+                QualityCheckResult.check_type == "rule",
+            )
+            .first()
+        )
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -160,7 +170,6 @@ class RuleService:
         return (
             self.db.query(Table)
             .join(Rule, Rule.table_id == Table.id)
-            .filter(Table.is_active.is_(True))
             .distinct()
             .order_by(Table.schema_name, Table.table_name)
             .all()

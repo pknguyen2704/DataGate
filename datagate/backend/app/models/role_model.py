@@ -1,11 +1,10 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, Index, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.association import role_permissions, user_roles
 
 
 def gen_uuid() -> str:
@@ -19,13 +18,7 @@ class Role(Base):
 
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_system = Column(Boolean, default=False, nullable=False)
-
-    created_by = Column(
-        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    permissions = Column(JSONB, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -37,17 +30,8 @@ class Role(Base):
         nullable=False,
     )
 
-    users = relationship("User", secondary=user_roles, back_populates="roles")
-
-    permissions = relationship(
-        "Permission", secondary=role_permissions, back_populates="roles"
-    )
-
-    created_by_user = relationship("User", foreign_keys=[created_by])
+    users = relationship("User", back_populates="role", foreign_keys="User.role_id")
 
     __table_args__ = (
         Index("ix_roles__name", "name", unique=True),
-        Index("ix_roles__is_active", "is_active"),
-        Index("ix_roles__is_system", "is_system"),
-        Index("ix_roles__created_by", "created_by"),
     )

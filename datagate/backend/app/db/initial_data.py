@@ -1,41 +1,18 @@
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import SessionLocal
-from app.models import Permission, Role, User
+from app.models import Role, User
 from app.core.security import get_hashed_password
-from app.rbac.permissions import ALL_PERMISSIONS
 from app.rbac.roles import DEFAULT_ROLE_PERMISSIONS
 
 
-def seed_permissions(db: Session) -> dict[str, Permission]:
-    valid_codes = [data["code"] for data in ALL_PERMISSIONS]
-    db.query(Permission).filter(~Permission.code.in_(valid_codes)).delete(
-        synchronize_session=False
-    )
-    db.flush()
-
-    permissions = {}
-    for data in ALL_PERMISSIONS:
-        permission = (
-            db.query(Permission).filter(Permission.code == data["code"]).first()
-        )
-        if not permission:
-            permission = Permission(code=data["code"])
-            db.add(permission)
-        permission.name = data["name"]
-        permission.permission_group = data.get("group")
-        permission.description = data.get("description")
-        permissions[data["code"]] = permission
-    db.flush()
-    return permissions
-
-
-def seed_roles(db: Session, permissions: dict[str, Permission]) -> dict[str, Role]:
+def seed_roles(db: Session) -> dict[str, Role]:
+    default_role_names = set(DEFAULT_ROLE_PERMISSIONS)
     roles = {}
     for name, codes in DEFAULT_ROLE_PERMISSIONS.items():
         role = (
             db.query(Role)
-            .options(selectinload(Role.permissions))
             .filter(Role.name == name)
             .first()
         )
@@ -43,10 +20,22 @@ def seed_roles(db: Session, permissions: dict[str, Permission]) -> dict[str, Rol
             role = Role(name=name)
             db.add(role)
         role.description = role.description or f"System-defined {name} role"
-        role.is_system = True
-        role.is_active = True
-        role.permissions = [permissions[code] for code in codes if code in permissions]
+        role.permissions = list(codes)
         roles[name] = role
+    db.flush()
+
+    fallback_role = roles["Data Analyst"]
+    db.query(User).filter(
+        or_(
+            User.role_id.is_(None),
+            User.role.has(~Role.name.in_(default_role_names)),
+        )
+    ).update({User.role_id: fallback_role.id}, synchronize_session=False)
+    db.flush()
+
+    db.query(Role).filter(~Role.name.in_(default_role_names)).delete(
+        synchronize_session=False
+    )
     db.flush()
     return roles
 
@@ -79,7 +68,7 @@ def seed_default_users(db: Session, roles: dict[str, Role]) -> None:
     for user_data in default_users:
         user = (
             db.query(User)
-            .options(selectinload(User.roles))
+            .options(selectinload(User.role))
             .filter(User.username == user_data["username"])
             .first()
         )
@@ -89,16 +78,14 @@ def seed_default_users(db: Session, roles: dict[str, Role]) -> None:
         user.email = user_data["email"]
         user.full_name = user_data["full_name"]
         user.hashed_password = get_hashed_password(user_data["password"])
-        user.is_active = True
         role_name = user_data["role_name"]
-        user.roles = [roles[role_name]] if role_name in roles else []
+        user.role = roles[role_name] if role_name in roles else None
 
     db.flush()
 
 
 def seed(db: Session) -> None:
-    permissions = seed_permissions(db)
-    roles = seed_roles(db, permissions)
+    roles = seed_roles(db)
     seed_default_users(db, roles)
     db.commit()
 

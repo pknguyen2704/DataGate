@@ -1,14 +1,14 @@
 import React from "react";
 import { 
   Box, Typography, Paper, Tabs, Tab, Breadcrumbs, Link, 
-  Grid, Chip, Divider, Skeleton, Stack, Button
+  Grid, Divider, Skeleton, Stack, Button
 } from "@mui/material";
 import { 
   useParams, useNavigate, useLocation, Outlet, Link as RouterLink
 } from "react-router-dom";
 import { 
   TableChartOutlined, LayersOutlined, DnsOutlined, 
-  AccessTimeOutlined, CheckCircle, Cancel, ArrowBack
+  AccessTimeOutlined, ArrowBack
 } from "@mui/icons-material";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
 import { useApiResource } from "~/hooks/useApiResource";
@@ -99,25 +99,6 @@ const TableDetail = () => {
               </Stack>
             </Grid>
             
-            <Grid item xs={12} md={4} sx={{ textAlign: { md: 'right' } }}>
-              <Chip 
-                label={table?.is_active ? "Active" : "Inactive"} 
-                variant={table?.is_active ? "filled" : "outlined"}
-                color={table?.is_active ? "success" : "default"}
-                icon={table?.is_active ? <CheckCircle sx={{ color: 'white !important' }} /> : <Cancel />}
-                sx={{ 
-                  px: 1, 
-                  py: 2, 
-                  borderRadius: 2, 
-                  fontWeight: 800, 
-                  fontSize: '0.9rem',
-                  ...(table?.is_active && {
-                    bgcolor: 'success.main',
-                    color: 'white',
-                  })
-                }}
-              />
-            </Grid>
           </Grid>
         </Paper>
 

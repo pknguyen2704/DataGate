@@ -10,7 +10,6 @@ from app.schemas.user_schema import (
     UserCreate,
     UserListOut,
     UserOut,
-    UserRoleAssign,
     UserUpdate,
     UserPasswordUpdate,
 )
@@ -61,36 +60,6 @@ def update_user(
     _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
 ):
     return service.update_user(user_id=str(user_id), data=data)
-
-
-@users_router.post("/{user_id}/activate", response_model=UserOut)
-def activate_user(
-    user_id: UUID,
-    service: UserService = Depends(get_user_service),
-    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
-):
-    return service.activate_user(str(user_id))
-
-
-@users_router.post("/{user_id}/deactivate", response_model=UserOut)
-def deactivate_user(
-    user_id: UUID,
-    service: UserService = Depends(get_user_service),
-    current_user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
-):
-    return service.deactivate_user(
-        user_id=str(user_id), current_user_id=str(current_user.id)
-    )
-
-
-@users_router.patch("/{user_id}/roles", response_model=UserOut)
-def assign_roles(
-    user_id: UUID,
-    data: UserRoleAssign,
-    service: UserService = Depends(get_user_service),
-    _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
-):
-    return service.assign_roles(user_id=str(user_id), data=data)
 
 
 @users_router.patch("/{user_id}/password", response_model=UserOut)

@@ -100,7 +100,7 @@ def get_anomaly_config(
     service: ModelConfigService = Depends(get_model_config_service),
     _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW)),
 ):
-    return service.get_anomaly_config_or_404(str(config_id))
+    return service.get_anomaly_config_payload_or_404(str(config_id))
 
 
 @model_configs_router.post(
@@ -180,7 +180,7 @@ def get_config(
     service: ModelConfigService = Depends(get_model_config_service),
     _user: User = Depends(require_permission(PermissionCode.MODEL_CONFIG_VIEW)),
 ):
-    return service.get_config_or_404(str(config_id))
+    return service.get_model_parameter_payload_or_404(str(config_id))
 
 
 @model_configs_router.post(

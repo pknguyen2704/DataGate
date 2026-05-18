@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { 
   Box, Button, Table, TableBody, TableCell, TableHead, TableRow, 
   Paper, Stack, IconButton, Dialog, DialogTitle, DialogContent, 
-  DialogActions, TextField, Checkbox, FormControlLabel, FormGroup,
+  DialogActions, TextField,
   Typography, Tooltip, MenuItem, Select, FormControl, InputLabel,
-  TablePagination, TableContainer, Switch, Chip
+  TablePagination, TableContainer
 } from "@mui/material";
 import { 
   RefreshOutlined, EditOutlined, AddOutlined, SaveOutlined, 
-  LockOpenOutlined, PersonOffOutlined, PersonOutline, KeyOutlined
+  PersonOutline, KeyOutlined
 } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { usersApi } from "~/apis/usersApi";
@@ -54,21 +54,6 @@ function UserManagement() {
     setOpenPassword(true);
   };
 
-  const handleToggleStatus = async (user) => {
-    try {
-      if (user.is_active) {
-        await usersApi.deactivate(user.id);
-        toast.success("User deactivated");
-      } else {
-        await usersApi.activate(user.id);
-        toast.success("User activated");
-      }
-      refresh();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to update status");
-    }
-  };
-
   let userItems = [];
   if (users.data && users.data.items) {
     userItems = users.data.items;
@@ -100,8 +85,7 @@ function UserManagement() {
               <TableRow sx={{ bgcolor: 'primary.light', '& .MuiTableCell-head': { fontWeight: 700 } }}>
                 <TableCell>User</TableCell>
                 <TableCell>Email</TableCell>
-                <TableCell>Roles</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>Role</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -121,31 +105,13 @@ function UserManagement() {
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                      {(user.roles || []).map((r) => (
-                        <Typography key={r.id} variant="caption" sx={{ bgcolor: 'primary.50', color: 'primary.main', px: 1, py: 0.2, borderRadius: 1, fontWeight: 700 }}>
-                          {r.name}
-                        </Typography>
-                      ))}
-                    </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch 
-                        size="small" 
-                        checked={user.is_active} 
-                        onChange={() => handleToggleStatus(user)}
-                        color="success"
-                        disabled={!canManage || user.id === currentUser?.id}
-                      />
-                      <Chip 
-                        label={user.is_active ? "Active" : "Inactive"} 
-                        size="small" 
-                        variant="outlined" 
-                        color={user.is_active ? "success" : "default"}
-                        sx={{ ml: 1, border: 'none', fontWeight: 600 }}
-                      />
-                    </Box>
+                    {user.role || user.roles?.[0] ? (
+                      <Typography variant="caption" sx={{ bgcolor: 'primary.50', color: 'primary.main', px: 1, py: 0.2, borderRadius: 1, fontWeight: 700 }}>
+                        {(user.role || user.roles[0]).name}
+                      </Typography>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">No role</Typography>
+                    )}
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -204,24 +170,29 @@ function UserManagement() {
 }
 
 function UserDialog({ open, onClose, user, roles, onSuccess }) {
-  const [form, setForm] = useState({ username: "", full_name: "", email: "", password: "", role_ids: [] });
+  const [form, setForm] = useState({ username: "", full_name: "", email: "", password: "", role_id: "" });
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     if (user) {
+      const currentRole = user.role || user.roles?.[0];
       setForm({
         username: user.username,
         full_name: user.full_name || "",
         email: user.email,
         password: "",
-        role_ids: (user.roles || []).map(r => r.id)
+        role_id: currentRole?.id || ""
       });
     } else {
-      setForm({ username: "", full_name: "", email: "", password: "", role_ids: [] });
+      setForm({ username: "", full_name: "", email: "", password: "", role_id: "" });
     }
   }, [user, open]);
 
   const handleSave = async () => {
+    if (!form.role_id) {
+      toast.warning("Please select a role");
+      return;
+    }
     setSaving(true);
     try {
       if (user) {
@@ -229,7 +200,7 @@ function UserDialog({ open, onClose, user, roles, onSuccess }) {
           username: form.username,
           full_name: form.full_name,
           email: form.email,
-          role_ids: form.role_ids
+          role_id: form.role_id
         });
         toast.success("User updated");
       } else {
@@ -255,29 +226,20 @@ function UserDialog({ open, onClose, user, roles, onSuccess }) {
           <TextField label="Email" fullWidth size="small" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
           {!user && <TextField label="Password" type="password" fullWidth size="small" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />}
           
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Roles</Typography>
-            <Paper variant="outlined" sx={{ p: 1, bgcolor: '#f8fafc' }}>
-              <FormGroup row>
-                {roles.map(r => (
-                  <FormControlLabel 
-                    key={r.id}
-                    control={
-                      <Checkbox 
-                        size="small"
-                        checked={form.role_ids.includes(r.id)} 
-                        onChange={e => {
-                          const newIds = e.target.checked ? [...form.role_ids, r.id] : form.role_ids.filter(id => id !== r.id);
-                          setForm({...form, role_ids: newIds});
-                        }}
-                      />
-                    }
-                    label={<Typography variant="body2">{r.name}</Typography>}
-                  />
-                ))}
-              </FormGroup>
-            </Paper>
-          </Box>
+          <FormControl fullWidth size="small">
+            <InputLabel id="user-role-label">Role</InputLabel>
+            <Select
+              labelId="user-role-label"
+              label="Role"
+              value={form.role_id}
+              onChange={e => setForm({ ...form, role_id: e.target.value })}
+            >
+              <MenuItem value="" disabled>Select role</MenuItem>
+              {roles.map(r => (
+                <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Stack>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>

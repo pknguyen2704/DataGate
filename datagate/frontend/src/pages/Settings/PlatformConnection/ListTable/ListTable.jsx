@@ -3,7 +3,7 @@ import {
   Box, Button, Table, TableBody, TableCell, TableHead, TableRow,
   Paper, Stack, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Switch, MenuItem, Select, FormControl, InputLabel, Chip
+  MenuItem, Select, FormControl, InputLabel
 } from "@mui/material";
 import { AddOutlined, DeleteOutline } from "@mui/icons-material";
 import { connectionsApi } from "~/apis/connectionsApi";
@@ -73,22 +73,6 @@ function ListTable({ connectionId, connectionData, canUpdateTable, canCreateTabl
     }
   };
 
-  const handleToggleTableActive = async (table) => {
-    try {
-      if (table.is_active) {
-        await dataAssetsApi.deactivate(table.id);
-        toast.success("Table deactivated");
-      } else {
-        await dataAssetsApi.activate(table.id);
-        toast.success("Table activated");
-      }
-      managedRes.reload();
-    } catch (error) {
-      console.error(error);
-      toast.error("Action failed");
-    }
-  };
-
   const handleDelete = (tableId) => {
     confirm({
       title: "Remove Table",
@@ -127,7 +111,6 @@ function ListTable({ connectionId, connectionData, canUpdateTable, canCreateTabl
               <TableRow>
                 <TableCell>Schema</TableCell>
                 <TableCell>Table Name</TableCell>
-                <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -136,24 +119,6 @@ function ListTable({ connectionId, connectionData, canUpdateTable, canCreateTabl
                 <TableRow key={row.id}>
                   <TableCell>{row.schema_name}</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>{row.table_name}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch
-                        size="small"
-                        checked={row.is_active}
-                        onChange={() => handleToggleTableActive(row)}
-                        color="success"
-                        disabled={!canUpdateTable}
-                      />
-                      <Chip
-                        label={row.is_active ? "Active" : "Inactive"}
-                        size="small"
-                        variant="outlined"
-                        color={row.is_active ? "success" : "default"}
-                        sx={{ ml: 1, border: 'none', fontWeight: 600 }}
-                      />
-                    </Box>
-                  </TableCell>
                   <TableCell align="right">
                     {canDeleteTable && (
                       <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}>

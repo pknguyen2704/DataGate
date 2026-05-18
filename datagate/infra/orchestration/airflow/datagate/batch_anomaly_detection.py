@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timedelta
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from psycopg2.extras import execute_values, Json
+from psycopg2.extras import Json
 
 from pyspark import StorageLevel
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
@@ -175,7 +175,6 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name = %s
-          AND is_active = TRUE
         ORDER BY table_name
         """,
         parameters=(catalog_name, schema_name),
@@ -195,19 +194,11 @@ def get_anomaly_config(pg_hook, table_id):
     row = pg_hook.get_first(
         """
         SELECT
+            id,
             batch_time_col,
-            required_history_days,
-            previous_batch_hours,
-            history_days,
-            target_sample_per_group,
-            test_size,
-            random_state,
-            p_value_alpha,
-            min_history_auc_points,
-            exclude_cols,
-            categorical_cols,
-            numeric_cols
-        FROM model_configs
+            feature_config,
+            column_config
+        FROM anomaly_configs
         WHERE table_id = %s
         LIMIT 1
         """,
@@ -218,25 +209,35 @@ def get_anomaly_config(pg_hook, table_id):
         return None
 
     cfg = {
-        "batch_time_col": validate_identifier(row[0], "batch_time_col"),
-        "required_history_days": int(row[1]),
-        "previous_batch_hours": int(row[2]),
-        "history_days": [int(x) for x in as_list(row[3])],
-        "target_sample_per_group": int(row[4]),
-        "test_size": float(row[5]),
-        "random_state": int(row[6]),
-        "p_value_alpha": float(row[7]),
-        "min_history_auc_points": int(row[8]),
-        "exclude_cols": [
-            validate_identifier(col, "exclude_col") for col in as_list(row[9])
-        ],
-        "categorical_cols": [
-            validate_identifier(col, "categorical_col") for col in as_list(row[10])
-        ],
-        "numeric_cols": [
-            validate_identifier(col, "numeric_col") for col in as_list(row[11])
-        ],
+        "anomaly_config_id": str(row[0]),
+        "batch_time_col": validate_identifier(row[1], "batch_time_col"),
     }
+    feature_config = row[2] or {}
+    column_config = row[3] or {}
+    cfg.update(
+        {
+            "required_history_days": int(feature_config["required_history_days"]),
+            "previous_batch_hours": int(feature_config["previous_batch_hours"]),
+            "history_days": [int(x) for x in as_list(feature_config["history_days"])],
+            "target_sample_per_group": int(feature_config["target_sample_per_group"]),
+            "test_size": float(feature_config["test_size"]),
+            "random_state": int(feature_config["random_state"]),
+            "p_value_alpha": float(feature_config["p_value_alpha"]),
+            "min_history_auc_points": int(feature_config["min_history_auc_points"]),
+            "exclude_cols": [
+                validate_identifier(col, "exclude_col")
+                for col in as_list(column_config.get("exclude_cols", []))
+            ],
+            "categorical_cols": [
+                validate_identifier(col, "categorical_col")
+                for col in as_list(column_config.get("categorical_cols", []))
+            ],
+            "numeric_cols": [
+                validate_identifier(col, "numeric_col")
+                for col in as_list(column_config.get("numeric_cols", []))
+            ],
+        }
+    )
 
     if cfg["required_history_days"] <= 0:
         raise ValueError("required_history_days must be greater than 0.")
@@ -265,11 +266,8 @@ def get_anomaly_config(pg_hook, table_id):
 def get_model_parameter(pg_hook, table_id):
     row = pg_hook.get_first(
         """
-        SELECT id, learning_rate, num_leaves, max_depth, min_data_in_leaf,
-               bagging_fraction, bagging_freq, feature_fraction,
-               lambda_l1, lambda_l2, min_gain_to_split, max_bin,
-               num_iterations
-        FROM model_parameters
+        SELECT id, model_parameters
+        FROM anomaly_configs
         WHERE table_id = %s
         LIMIT 1
         """,
@@ -279,29 +277,32 @@ def get_model_parameter(pg_hook, table_id):
     if row is None:
         return None
 
+    params = row[1] or {}
     return {
         "parameter_id": str(row[0]),
-        "learningRate": float(row[1]),
-        "numLeaves": int(row[2]),
-        "maxDepth": int(row[3]),
-        "minDataInLeaf": int(row[4]),
-        "baggingFraction": float(row[5]),
-        "baggingFreq": int(row[6]),
-        "featureFraction": float(row[7]),
-        "lambdaL1": float(row[8]),
-        "lambdaL2": float(row[9]),
-        "minGainToSplit": float(row[10]),
-        "maxBin": int(row[11]),
-        "numIterations": int(row[12]),
+        "learningRate": float(params["learning_rate"]),
+        "numLeaves": int(params["num_leaves"]),
+        "maxDepth": int(params["max_depth"]),
+        "minDataInLeaf": int(params["min_data_in_leaf"]),
+        "baggingFraction": float(params["bagging_fraction"]),
+        "baggingFreq": int(params["bagging_freq"]),
+        "featureFraction": float(params["feature_fraction"]),
+        "lambdaL1": float(params["lambda_l1"]),
+        "lambdaL2": float(params["lambda_l2"]),
+        "minGainToSplit": float(params["min_gain_to_split"]),
+        "maxBin": int(params["max_bin"]),
+        "numIterations": int(params["num_iterations"]),
     }
 
 
-def get_auc_threshold(pg_hook, parameter_id):
+def get_auc_threshold(pg_hook, table_id):
     row = pg_hook.get_first(
         """
-        SELECT id, auc_threshold, severity_level
-        FROM auc_manual_thresholds
-        WHERE model_parameter_id = %s
+        SELECT id, min_threshold, severity_level
+        FROM quality_thresholds
+        WHERE table_id = %s
+          AND metric_scope = 'anomaly'
+          AND metric_name = 'auc_score'
           AND is_active = TRUE
         ORDER BY
             CASE severity_level
@@ -313,7 +314,7 @@ def get_auc_threshold(pg_hook, parameter_id):
             created_at DESC
         LIMIT 1
         """,
-        parameters=(parameter_id,),
+        parameters=(table_id,),
     )
 
     if row is None:
@@ -330,7 +331,7 @@ def get_historical_auc_values(pg_hook, table_id, processing_hour):
     rows = pg_hook.get_records(
         """
         SELECT auc_score
-        FROM auc_results
+        FROM anomaly_results
         WHERE table_id = %s
           AND processing_date_hour < %s
           AND auc_score IS NOT NULL
@@ -830,10 +831,10 @@ def save_auc_result(
     p_value,
 ):
     sql = """
-        INSERT INTO auc_results (
+        INSERT INTO anomaly_results (
             id,
             table_id,
-            model_parameter_id,
+            anomaly_config_id,
             processing_date_hour,
             auc_score,
             p_value,
@@ -845,7 +846,7 @@ def save_auc_result(
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
         ON CONFLICT (table_id, processing_date_hour)
         DO UPDATE SET
-            model_parameter_id = EXCLUDED.model_parameter_id,
+            anomaly_config_id = EXCLUDED.anomaly_config_id,
             auc_score = EXCLUDED.auc_score,
             p_value = EXCLUDED.p_value,
             parameter_snapshot = EXCLUDED.parameter_snapshot,
@@ -862,7 +863,7 @@ def save_auc_result(
             (
                 str(uuid.uuid4()),
                 table_id,
-                cfg["parameter_id"],
+                anomaly_cfg["anomaly_config_id"],
                 processing_hour,
                 auc_score,
                 p_value,
@@ -889,46 +890,25 @@ def save_shap(pg_hook, result_id, processing_hour, rows):
         return
 
     sql = """
-        INSERT INTO shap_results (
-            id,
-            auc_result_id,
-            feature_name,
-            shap_score,
-            shap_rank,
-            processing_date_hour,
-            created_at,
-            updated_at
-        )
-        VALUES %s
-        ON CONFLICT (auc_result_id, feature_name)
-        DO UPDATE SET
-            shap_score = EXCLUDED.shap_score,
-            shap_rank = EXCLUDED.shap_rank,
-            processing_date_hour = EXCLUDED.processing_date_hour,
+        UPDATE anomaly_results
+        SET shap_top_features = %s::jsonb,
             updated_at = NOW()
+        WHERE id = %s
     """
 
-    values = [
-        (
-            str(uuid.uuid4()),
-            result_id,
-            row["feature_name"],
-            row["shap_score"],
-            row["shap_rank"],
-            processing_hour,
-        )
+    features = [
+        {
+            "feature_name": row["feature_name"],
+            "shap_score": row["shap_score"],
+            "rank": row["shap_rank"],
+        }
         for row in rows
     ]
 
     conn = pg_hook.get_conn()
 
     with conn.cursor() as cur:
-        execute_values(
-            cur,
-            sql,
-            values,
-            template="(%s, %s, %s, %s, %s, %s, NOW(), NOW())",
-        )
+        cur.execute(sql, (Json(features), result_id))
 
     conn.commit()
 
@@ -957,7 +937,7 @@ def should_write_auc_verify(threshold, p_value):
 
 
 def save_auc_verify(
-    pg_hook, result_id, threshold, auc_score, p_value, processing_hour, anomaly_cfg
+    pg_hook, table_id, result_id, threshold, auc_score, p_value, processing_hour, anomaly_cfg
 ):
     if threshold:
         status = "fail" if auc_score >= threshold["auc_threshold"] else "pass"
@@ -971,31 +951,19 @@ def save_auc_verify(
         severity_level = "warning" if status == "fail" else None
 
     sql = """
-        INSERT INTO auc_verify (
-            id,
-            auc_result_id,
-            manual_threshold_id,
-            status,
-            auc_score,
-            auc_threshold,
-            severity_level,
-            is_resolved,
-            processing_date_hour,
-            created_at,
-            updated_at
+        DELETE FROM quality_check_results
+        WHERE check_type = 'anomaly_auc'
+          AND anomaly_result_id = %s
+    """
+    pg_hook.run(sql, parameters=(result_id,))
+
+    sql = """
+        INSERT INTO quality_check_results (
+            id, table_id, check_type, threshold_id, anomaly_result_id,
+            metric_name, actual_value, min_threshold, status, severity_level,
+            is_resolved, processing_date_hour, created_at, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, %s, NOW(), NOW())
-        ON CONFLICT (auc_result_id)
-        DO UPDATE SET
-            manual_threshold_id = EXCLUDED.manual_threshold_id,
-            status = EXCLUDED.status,
-            auc_score = EXCLUDED.auc_score,
-            auc_threshold = EXCLUDED.auc_threshold,
-            severity_level = EXCLUDED.severity_level,
-            is_resolved = FALSE,
-            resolved_by = NULL,
-            processing_date_hour = EXCLUDED.processing_date_hour,
-            updated_at = NOW()
+        VALUES (%s, %s, 'anomaly_auc', %s, %s, 'auc_score', %s, %s, %s, %s, FALSE, %s, NOW(), NOW())
         RETURNING id
     """
 
@@ -1006,11 +974,12 @@ def save_auc_verify(
             sql,
             (
                 str(uuid.uuid4()),
-                result_id,
+                table_id,
                 manual_threshold_id,
-                status,
+                result_id,
                 auc_score,
                 auc_threshold,
+                status,
                 severity_level,
                 processing_hour,
             ),
@@ -1069,7 +1038,7 @@ def run_table(spark, pg_hook, table, processing_hour, runtime_cfg):
     pred = None
 
     try:
-        threshold = get_auc_threshold(pg_hook, cfg["parameter_id"])
+        threshold = get_auc_threshold(pg_hook, table["table_id"])
 
         work_df = build_work_df(
             spark=spark,
@@ -1129,6 +1098,7 @@ def run_table(spark, pg_hook, table, processing_hour, runtime_cfg):
         if should_write_auc_verify(threshold, p_value):
             save_auc_verify(
                 pg_hook=pg_hook,
+                table_id=table["table_id"],
                 result_id=result_id,
                 threshold=threshold,
                 auc_score=auc_score,

@@ -39,13 +39,12 @@ class Rule(Base):
         nullable=False,
     )
 
-    column_name = Column(String(255), nullable=False)
+    column_name = Column(String(255), nullable=True)
     constraint_name = Column(String(512), nullable=True)
     description = Column(Text, nullable=True)
     current_value = Column(String(255), nullable=True)
     suggesting_rule = Column(String(255), nullable=True)
     code_for_constraint = Column(String(512), nullable=False)
-    rule_description = Column(Text, nullable=True)
     frequency = Column(Integer, nullable=False, default=1)
 
     created_by = Column(
@@ -67,11 +66,10 @@ class Rule(Base):
 
     table = relationship("Table", back_populates="rules")
 
-    verification_results = relationship(
-        "RuleVerify", back_populates="rule", cascade="all, delete-orphan"
+    quality_check_results = relationship(
+        "QualityCheckResult", back_populates="rule"
     )
 
-    # One-way relationship to User
     created_by_user = relationship("User", foreign_keys=[created_by])
 
     last_modified_by_user = relationship("User", foreign_keys=[last_modified_by])
@@ -86,63 +84,6 @@ class Rule(Base):
             unique=True,
         ),
         Index("ix_rules__table_column", "table_id", "column_name"),
-        Index("ix_rules__table_status", "table_id", "is_active"),
+        Index("ix_rules__table_active", "table_id", "is_active"),
         Index("ix_rules__table_severity", "table_id", "severity_level"),
-        Index("ix_rules__table_source_status", "table_id", "source", "is_active"),
-    )
-
-
-class RuleVerify(Base):
-    __tablename__ = "rule_verify"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-
-    rule_id = Column(
-        UUID(as_uuid=False), ForeignKey("rules.id", ondelete="CASCADE"), nullable=False
-    )
-
-    severity_level = Column(
-        Enum("warning", "critical", name="manual_threshold_severity_level"),
-        nullable=False,
-    )
-
-    constraint = Column(String(512), nullable=True)
-    constraint_status = Column(String(50), nullable=False)
-    constraint_message = Column(Text, nullable=True)
-
-    is_resolved = Column(Boolean, default=False, nullable=False)
-
-    resolved_by = Column(
-        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-
-    processing_date_hour = Column(DateTime, nullable=False)
-
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-    rule = relationship("Rule", back_populates="verification_results")
-
-    resolved_by_user = relationship("User", foreign_keys=[resolved_by])
-
-    __table_args__ = (
-        Index(
-            "ix_rule_verify__rule_hour_unique",
-            "rule_id",
-            "processing_date_hour",
-            unique=True,
-        ),
-        Index("ix_rule_verify__rule_hour", "rule_id", "processing_date_hour"),
-        Index(
-            "ix_rule_verify__status_hour", "constraint_status", "processing_date_hour"
-        ),
-        Index("ix_rule_verify__resolved_by", "resolved_by"),
-        Index("ix_rule_verify__is_resolved", "is_resolved"),
     )

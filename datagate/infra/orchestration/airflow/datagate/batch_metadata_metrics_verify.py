@@ -71,7 +71,6 @@ def get_active_table_ids(pg_hook, catalog_name, schema_name):
         FROM tables
         WHERE catalog_name = %s
           AND schema_name = %s
-          AND is_active = TRUE
         """,
         parameters=(catalog_name, validate_name(schema_name, "schema_name")),
     )
@@ -83,22 +82,20 @@ def get_metadata_rows(pg_hook, table_ids, processing_date_hour):
         """
         SELECT
             m.id,
-            b.id,
+            m.table_id,
             m.metric_name,
             m.min_threshold,
             m.max_threshold,
             m.severity_level,
-            b.batch_added_rows,
-            b.batch_added_files,
-            b.batch_added_files_size_bytes,
-            b.table_total_rows,
-            b.table_total_files,
-            b.table_total_size_bytes
-        FROM batch_table_metadata_manual_thresholds m
-        JOIN batch_table_metadata b
+            b.metric_value
+        FROM quality_thresholds m
+        JOIN quality_metric_observations b
           ON b.table_id = m.table_id
          AND b.processing_date_hour = %s
+         AND b.metric_scope = 'metadata'
+         AND b.metric_name = m.metric_name
         WHERE m.table_id = ANY(%s::uuid[])
+          AND m.metric_scope = 'metadata'
           AND m.is_active = TRUE
         """,
         parameters=(processing_date_hour, table_ids),
@@ -110,34 +107,22 @@ def build_metadata_results(rows, processing_date_hour):
     for row in rows:
         (
             threshold_id,
-            batch_id,
+            table_id,
             metric_name,
             min_th,
             max_th,
             severity,
-            added_rows,
-            added_files,
-            added_size,
-            total_rows,
-            total_files,
-            total_size,
+            actual_value,
         ) = row
-        values = {
-            "batch_added_rows": added_rows,
-            "batch_added_files": added_files,
-            "batch_added_files_size_bytes": added_size,
-            "table_total_rows": total_rows,
-            "table_total_files": total_files,
-            "table_total_size_bytes": total_size,
-        }
         if metric_name not in METADATA_METRICS:
             continue
-        actual_value = values.get(metric_name)
         results.append(
             (
                 str(uuid.uuid4()),
+                table_id,
+                "metadata_threshold",
                 threshold_id,
-                batch_id,
+                metric_name,
                 actual_value,
                 evaluate_status(actual_value, min_th, max_th),
                 min_th,
@@ -154,32 +139,20 @@ def save_metadata_results(pg_hook, rows):
         return
 
     sql = """
-        INSERT INTO batch_table_metadata_metrics_verify (
-            id,
-            metadata_manual_threshold_id,
-            batch_table_metadata_id,
-            actual_value,
-            status,
-            min_threshold,
-            max_threshold,
-            severity_level,
-            is_resolved,
-            processing_date_hour,
-            created_at,
-            updated_at
+        DELETE FROM quality_check_results
+        WHERE check_type = 'metadata_threshold'
+          AND processing_date_hour = %s
+          AND table_id = ANY(%s::uuid[])
+    """
+    pg_hook.run(sql, parameters=(rows[0][-1], list({row[1] for row in rows})))
+
+    sql = """
+        INSERT INTO quality_check_results (
+            id, table_id, check_type, threshold_id, metric_name, actual_value,
+            status, min_threshold, max_threshold, severity_level, is_resolved,
+            processing_date_hour, created_at, updated_at
         )
         VALUES %s
-        ON CONFLICT (metadata_manual_threshold_id, batch_table_metadata_id)
-        DO UPDATE SET
-            actual_value = EXCLUDED.actual_value,
-            status = EXCLUDED.status,
-            min_threshold = EXCLUDED.min_threshold,
-            max_threshold = EXCLUDED.max_threshold,
-            severity_level = EXCLUDED.severity_level,
-            is_resolved = FALSE,
-            resolved_by = NULL,
-            processing_date_hour = EXCLUDED.processing_date_hour,
-            updated_at = NOW()
     """
 
     conn = pg_hook.get_conn()
@@ -188,7 +161,7 @@ def save_metadata_results(pg_hook, rows):
             cursor,
             sql,
             rows,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, NOW(), NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, NOW(), NOW())",
         )
     conn.commit()
 

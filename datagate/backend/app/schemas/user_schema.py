@@ -9,12 +9,11 @@ class UserBase(BaseModel):
     username: str = Field(..., max_length=100)
     full_name: str | None = Field(default=None, max_length=255)
     email: EmailStr
-    is_active: bool = True
 
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6, max_length=128)
-    role_ids: list[UUID] = Field(default_factory=list)
+    role_id: UUID
 
 
 class UserUpdate(BaseModel):
@@ -22,8 +21,7 @@ class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = None
     password: str | None = Field(default=None, min_length=6, max_length=128)
-    is_active: bool | None = None
-    role_ids: list[UUID] | None = None
+    role_id: UUID | None = None
 
 
 class UserProfileUpdate(BaseModel):
@@ -33,19 +31,17 @@ class UserProfileUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=6, max_length=128)
 
 
-class UserRoleAssign(BaseModel):
-    role_ids: list[UUID] = Field(default_factory=list)
-
-
 class UserPasswordUpdate(BaseModel):
     password: str = Field(..., min_length=6, max_length=128)
 
 
 class UserOut(UserBase):
     id: UUID
+    role_id: UUID
     created_at: datetime
     updated_at: datetime
-    roles: list[RoleLiteOut] = []
+    role: RoleLiteOut | None = None
+    roles: list[RoleLiteOut] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -54,7 +50,6 @@ class UserLiteOut(BaseModel):
     username: str
     full_name: str | None = None
     email: EmailStr
-    is_active: bool
     model_config = ConfigDict(from_attributes=True)
 
 
