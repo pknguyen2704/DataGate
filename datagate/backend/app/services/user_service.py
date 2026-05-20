@@ -13,7 +13,6 @@ from app.schemas.user_schema import (
     UserUpdate,
 )
 
-
 class UserService:
     def __init__(self, db: Session):
         self.db = db
@@ -148,3 +147,8 @@ class UserService:
         data = UserOut.model_validate(user)
         data.roles = [data.role] if data.role else []
         return data
+
+    def delete_user(self, user_id: str) -> None:
+        user = self.get_user_or_404(user_id)
+        self.db.delete(user)
+        self.db.commit()

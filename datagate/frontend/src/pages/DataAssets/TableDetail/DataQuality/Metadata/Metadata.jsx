@@ -25,6 +25,12 @@ const Metadata = ({ detailData }) => {
           </Stack>
         </Stack>
       </Paper>
+      {detailData.description && (
+        <Paper variant="outlined" sx={{ p: 2, mt: 2, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.01)' }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700}>DESCRIPTION</Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>{detailData.description}</Typography>
+        </Paper>
+      )}
     </Box>
   );
 };

@@ -73,7 +73,14 @@ class RuleService:
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_rule_or_404(self, rule_id: str) -> Rule:
-        rule = self.db.query(Rule).filter(Rule.id == rule_id).first()
+        rule = (
+            self.db.query(Rule)
+            .options(
+                joinedload(Rule.created_by_user), joinedload(Rule.last_modified_by_user)
+            )
+            .filter(Rule.id == rule_id)
+            .first()
+        )
         if not rule:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found"

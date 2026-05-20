@@ -3,10 +3,10 @@ import {
   Box, Typography, Paper, Breadcrumbs, Link, Grid, TextField, 
   MenuItem, Table as MuiTable, TableBody, TableCell, TableHead, 
   TableRow, TableContainer, TablePagination, IconButton,
-  Button, Stack, Tooltip
+  Button, Stack, Tooltip, Chip
 } from "@mui/material";
 import { 
-  TableChartOutlined, FilterList, Search, Refresh,
+  TableChartOutlined, FilterList, Search,
   VisibilityOutlined, LayersOutlined
 } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
@@ -87,17 +87,6 @@ const DataAssets = () => {
               <Typography variant="body2" color="text.secondary">Manage and monitor your data lake tables.</Typography>
             </Box>
           </Box>
-          <Button 
-            variant="contained" 
-            startIcon={<Refresh />} 
-            onClick={() => {
-              tablesRes.reload();
-              variablesRes.reload();
-            }}
-            sx={{ borderRadius: 2, px: 3 }}
-          >
-            Refresh
-          </Button>
         </Paper>
 
         {/* Filters Section */}
@@ -168,6 +157,7 @@ const DataAssets = () => {
                 <TableRow>
                   <TableCell>Table Name</TableCell>
                   <TableCell>Catalog / Schema</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell>Latest Processed</TableCell>
                   <TableCell align="right">Action</TableCell>
                 </TableRow>
@@ -185,6 +175,15 @@ const DataAssets = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="caption" color="text.secondary">{table.catalog_name} / {table.schema_name}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={table.is_active ? "Active" : "Inactive"}
+                        color={table.is_active ? "success" : "default"}
+                        variant="outlined"
+                        sx={{ borderRadius: 1.5, fontWeight: 600 }}
+                      />
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">

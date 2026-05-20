@@ -10,9 +10,6 @@ import pyarrow.parquet as pq
 from tqdm import tqdm
 
 
-DEFAULT_OUTPUT_DIR = Path("experiments/data/tlc_yellow_tripdata")
-
-
 def parse_list_arg(value: Optional[str]) -> List[str]:
     if not value:
         return []
@@ -47,8 +44,10 @@ def parse_args():
 
     parser.add_argument(
         "--output-dir",
-        default=str(DEFAULT_OUTPUT_DIR),
-        help="Thư mục ghi parquet dirty khi xử lý một hoặc nhiều file.",
+        help=(
+            "Thư mục ghi parquet dirty khi xử lý một hoặc nhiều file. "
+            "Mặc định ghi cạnh file input."
+        ),
     )
     parser.add_argument(
         "--output-file",
@@ -88,6 +87,15 @@ def parse_args():
         required=True,
         help="Tỷ lệ dòng bị làm bẩn. Ví dụ 0.3 hoặc 30 là 30 phần trăm.",
     )
+    parser.add_argument(
+        "--dirty-mode",
+        choices=["strong", "notebook"],
+        default="strong",
+        help=(
+            "strong: inject nhiều feature nhưng vẫn pass clean_data.py; "
+            "notebook: mô phỏng synthetic anomaly trong notebook, có thể bị clean loại bớt."
+        ),
+    )
     parser.add_argument("--dirty-seed", type=int, default=2025)
     parser.add_argument("--batch-size", type=int, default=100_000)
     parser.add_argument("--overwrite", action="store_true")
@@ -123,7 +131,7 @@ def output_path_for(input_file: Path, args) -> Path:
     if args.output_file:
         return Path(args.output_file)
 
-    output_dir = Path(args.output_dir)
+    output_dir = Path(args.output_dir) if args.output_dir else input_file.parent
     return output_dir / f"{input_file.stem}{args.suffix}{input_file.suffix}"
 
 
@@ -173,12 +181,27 @@ def build_dirty_batch_mask(
     return mask
 
 
+def dirty_window_label(batch_time: pd.Timestamp) -> str:
+    batch_time = pd.to_datetime(batch_time)
+    if batch_time.hour == 12:
+        start_time = batch_time.normalize()
+        end_time = batch_time
+    elif batch_time.hour == 0:
+        end_time = batch_time
+        start_time = batch_time - pd.Timedelta(hours=12)
+    else:
+        return f"{batch_time} unsupported"
+
+    return f"{batch_time} covers [{start_time}, {end_time})"
+
+
 def inject_dirty_data_pandas(
     df: pd.DataFrame,
     date_hour: pd.Series,
     dirty_dates: Set[pd.Timestamp],
     dirty_date_hours: Set[pd.Timestamp],
     dirty_ratio: float,
+    dirty_mode: str,
     rng: np.random.Generator,
 ) -> Tuple[pd.DataFrame, int]:
     if dirty_ratio <= 0:
@@ -212,35 +235,41 @@ def inject_dirty_data_pandas(
 
     trip_distance_col = find_col_case_insensitive(df, "trip_distance")
     if trip_distance_col is not None:
-        idx = selected(0)
+        idx = dirty_idx if dirty_mode == "strong" else selected(0)
         if len(idx) > 0:
-            df.loc[idx, trip_distance_col] = (
-                pd.to_numeric(df.loc[idx, trip_distance_col], errors="coerce") * 5.0
-            )
+            current = pd.to_numeric(df.loc[idx, trip_distance_col], errors="coerce")
+            multiplier = 50.0 if dirty_mode == "strong" else 5.0
+            offset = 100.0 if dirty_mode == "strong" else 0.0
+            base = current.abs() if dirty_mode == "strong" else current
+            df.loc[idx, trip_distance_col] = base * multiplier + offset
 
     total_amount_col = find_col_case_insensitive(df, "total_amount")
     if total_amount_col is not None:
-        idx = selected(1)
+        idx = dirty_idx if dirty_mode == "strong" else selected(1)
         if len(idx) > 0:
-            df.loc[idx, total_amount_col] = (
-                pd.to_numeric(df.loc[idx, total_amount_col], errors="coerce") * 4.0
-            )
+            current = pd.to_numeric(df.loc[idx, total_amount_col], errors="coerce")
+            multiplier = 40.0 if dirty_mode == "strong" else 4.0
+            offset = 1000.0 if dirty_mode == "strong" else 0.0
+            base = current.abs() if dirty_mode == "strong" else current
+            df.loc[idx, total_amount_col] = base * multiplier + offset
 
     fare_amount_col = find_col_case_insensitive(df, "fare_amount")
     if fare_amount_col is not None:
-        idx = selected(2)
+        idx = dirty_idx if dirty_mode == "strong" else selected(2)
         if len(idx) > 0:
-            df.loc[idx, fare_amount_col] = (
-                pd.to_numeric(df.loc[idx, fare_amount_col], errors="coerce") * 4.0
-            )
+            current = pd.to_numeric(df.loc[idx, fare_amount_col], errors="coerce")
+            multiplier = 40.0 if dirty_mode == "strong" else 4.0
+            offset = 800.0 if dirty_mode == "strong" else 0.0
+            base = current.abs() if dirty_mode == "strong" else current
+            df.loc[idx, fare_amount_col] = base * multiplier + offset
 
     store_flag_col = find_col_case_insensitive(df, "store_and_fwd_flag")
     if store_flag_col is not None:
         idx = selected(3)
         if len(idx) > 0:
-            df.loc[idx, store_flag_col] = "X"
+            df.loc[idx, store_flag_col] = "Y" if dirty_mode == "strong" else "X"
 
-    idx = selected(4)
+    idx = dirty_idx if dirty_mode == "strong" else selected(4)
     if len(idx) > 0:
         pu_location_col = find_col_case_insensitive(df, "PULocationID")
         do_location_col = find_col_case_insensitive(df, "DOLocationID")
@@ -251,6 +280,21 @@ def inject_dirty_data_pandas(
             df.loc[idx, do_location_col] = 999
 
     return df, n_dirty
+
+
+def update_dirty_scope_counts(scope_counts: dict, date_hour: pd.Series, args) -> None:
+    date_hour = pd.to_datetime(date_hour)
+
+    if args.dirty_dates:
+        counts = date_hour[date_hour.dt.normalize().isin(args.dirty_dates)].dt.normalize().value_counts()
+        for day, count in sorted(counts.items()):
+            key = f"dirty_date={day.date()}"
+            scope_counts[key] = scope_counts.get(key, 0) + int(count)
+
+    for batch_time in sorted(args.dirty_date_hours):
+        mask = build_dirty_batch_mask(date_hour, {batch_time})
+        key = dirty_window_label(batch_time)
+        scope_counts[key] = scope_counts.get(key, 0) + int(mask.sum())
 
 
 def write_table(
@@ -283,6 +327,7 @@ def process_file(input_file: Path, output_file: Path, args) -> Tuple[int, int]:
     print(
         "[DIRTY]   "
         f"ratio={args.dirty_ratio:.4f} | "
+        f"mode={args.dirty_mode} | "
         f"dirty_dates={sorted(str(x.date()) for x in args.dirty_dates)} | "
         f"dirty_date_hours={sorted(str(x) for x in args.dirty_date_hours)} | "
         f"seed={args.dirty_seed}"
@@ -297,6 +342,7 @@ def process_file(input_file: Path, output_file: Path, args) -> Tuple[int, int]:
     writer = None
     written = 0
     dirtied = 0
+    dirty_scope_counts = {}
 
     try:
         with tqdm(total=total_rows) as pbar:
@@ -318,12 +364,15 @@ def process_file(input_file: Path, output_file: Path, args) -> Tuple[int, int]:
                 if df.empty:
                     continue
 
+                update_dirty_scope_counts(dirty_scope_counts, date_hour, args)
+
                 df, dirty_count = inject_dirty_data_pandas(
                     df=df,
                     date_hour=date_hour,
                     dirty_dates=args.dirty_dates,
                     dirty_date_hours=args.dirty_date_hours,
                     dirty_ratio=args.dirty_ratio,
+                    dirty_mode=args.dirty_mode,
                     rng=rng,
                 )
 
@@ -336,6 +385,9 @@ def process_file(input_file: Path, output_file: Path, args) -> Tuple[int, int]:
 
     if written == 0:
         raise RuntimeError(f"No rows written for {input_file}")
+
+    for scope, count in dirty_scope_counts.items():
+        print(f"[SCOPE]   {scope} eligible_rows={count}")
 
     print(f"[DONE] written={written} | dirtied={dirtied}")
     return written, dirtied

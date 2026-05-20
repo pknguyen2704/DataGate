@@ -6,33 +6,34 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.providers.trino.hooks.trino import TrinoHook
 from psycopg2.extras import execute_values
 
+# Log
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-
+# Validation
 def validate_name(value, field_name):
-    value = str(value or "").strip()
-    if not value:
-        raise ValueError(f"{field_name} must not be empty.")
+    if value is None or str(value).strip() == "":
+        raise ValueError(f"{field_name} must not be None or empty.")
+    value = str(value).strip()
     for char in value:
         if not (char.isalnum() or char == "_" or char == " "):
             raise ValueError(f"Invalid {field_name}: {value}.")
     return value
 
-
+# Normalize processing date hour
 def normalize_processing_date_hour(processing_date_hour):
     if processing_date_hour is None:
-        raise ValueError("processing_date_hour must not be None.")
+        raise ValueError("processing_date_hour must not be None or empty.")
     value = str(processing_date_hour).strip().replace("T", " ")
     if value == "":
         raise ValueError("processing_date_hour must not be empty.")
     dt = datetime.fromisoformat(value)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-
+# Get connection_config from Datagate database
 def get_connection_config(pg_hook, connection_name):
     if connection_name is None or str(connection_name).strip() == "":
-        raise ValueError("connection_name must not be empty.")
+        raise ValueError("connection_name must not be None or empty.")
     connection_name = str(connection_name).strip()
     row = pg_hook.get_first(
         """
@@ -45,37 +46,35 @@ def get_connection_config(pg_hook, connection_name):
           AND is_active = TRUE
         LIMIT 1
         """,
-        parameters=(connection_name,),
+        parameters=(connection_name)
     )
     if row is None:
-        raise ValueError(
-            f"No active connection found with connection_name={connection_name}"
-        )
+        raise ValueError(f"No active connection found with connection_name={connection_name}")
     connection_id = str(row[0])
     connection_name = str(row[1])
-    iceberg_catalog_name = validate_name(
-        row[2],
-        "iceberg_catalog_name",
-    )
+    iceberg_catalog_name = validate_name(row[2], "iceberg_catalog_name")
+
     return {
         "connection_id": connection_id,
         "connection_name": connection_name,
         "iceberg_catalog_name": iceberg_catalog_name,
     }
 
-
-def get_active_tables(pg_hook, catalog_name, schema_name):
+# Get active tables from Datagate database
+def get_active_tables(pg_hook, connection_id, catalog_name, schema_name):
     rows = pg_hook.get_records(
         """
         SELECT
             id,
             table_name
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name = %s
+          AND is_active = TRUE
         ORDER BY table_name
         """,
-        parameters=(catalog_name, schema_name),
+        parameters=(connection_id, catalog_name, schema_name)
     )
     tables = []
     for table_id, table_name in rows:
@@ -103,13 +102,8 @@ def fetch_one_as_dict(trino_hook, sql):
         with suppress(Exception):
             cursor.close()
 
-
-def build_batch_table_metadata_sql(
-    catalog_name,
-    schema_name,
-    table_name,
-    processing_date_hour,
-):
+# Build SQL query to get batch table metadata
+def build_batch_table_metadata_sql(catalog_name, schema_name, table_name, processing_date_hour):
     snapshots_table = f'{catalog_name}.{schema_name}."{table_name}$snapshots"'
     files_table = f'{catalog_name}.{schema_name}."{table_name}$files"'
 
@@ -153,51 +147,45 @@ def build_batch_table_metadata_sql(
     CROSS JOIN current_table_stats t
     """
 
-
+# Upsert batch table metadata to Datagate database
 def upsert_batch_table_metadata(pg_hook, table_id, metadata):
     sql = """
-        INSERT INTO quality_metric_observations (
-            id, table_id, metric_scope, column_name, metric_name, metric_value,
-            extra_data, processing_date_hour, created_at, updated_at
+        INSERT INTO batch_table_metadata (
+            id, table_id, batch_added_rows, batch_added_files,
+            batch_added_files_size_bytes, table_total_rows, table_total_files,
+            table_total_size_bytes, processing_date_hour, created_at, updated_at
         )
         VALUES %s
+        ON CONFLICT (table_id, processing_date_hour)
+        DO UPDATE SET
+            batch_added_rows = EXCLUDED.batch_added_rows,
+            batch_added_files = EXCLUDED.batch_added_files,
+            batch_added_files_size_bytes = EXCLUDED.batch_added_files_size_bytes,
+            table_total_rows = EXCLUDED.table_total_rows,
+            table_total_files = EXCLUDED.table_total_files,
+            table_total_size_bytes = EXCLUDED.table_total_size_bytes,
+            updated_at = NOW()
     """
     values = [
         (
             str(uuid.uuid4()),
             table_id,
-            "metadata",
-            None,
-            metric_name,
-            metadata.get(metric_name),
-            None,
+            metadata.get("batch_added_rows"),
+            metadata.get("batch_added_files"),
+            metadata.get("batch_added_files_size_bytes"),
+            metadata.get("table_total_rows"),
+            metadata.get("table_total_files"),
+            metadata.get("table_total_size_bytes"),
             metadata["processing_date_hour"],
-        )
-        for metric_name in (
-            "batch_added_rows",
-            "batch_added_files",
-            "batch_added_files_size_bytes",
-            "table_total_rows",
-            "table_total_files",
-            "table_total_size_bytes",
         )
     ]
     conn = pg_hook.get_conn()
     with conn.cursor() as cursor:
-        cursor.execute(
-            """
-            DELETE FROM quality_metric_observations
-            WHERE table_id = %s
-              AND processing_date_hour = %s
-              AND metric_scope = 'metadata'
-            """,
-            (table_id, metadata["processing_date_hour"]),
-        )
         execute_values(
             cursor,
             sql,
             values,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
         )
     conn.commit()
 
@@ -244,11 +232,10 @@ def collect_one_table_metadata(
         processing_date_hour,
     )
 
-
+# Close hook connection
 def close_hook_connection(hook):
     if hook is None:
         return
-
     for attr_name in ("conn", "_conn"):
         with suppress(Exception):
             conn = getattr(hook, attr_name, None)
@@ -278,6 +265,7 @@ def collect_metadata(
         catalog_name = connection_config["iceberg_catalog_name"]
         active_tables = get_active_tables(
             pg_hook=pg_hook,
+            connection_id=connection_config["connection_id"],
             catalog_name=catalog_name,
             schema_name=schema_name,
         )

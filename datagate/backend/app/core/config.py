@@ -78,9 +78,7 @@ class Config:
         _get_env("NOTEBOOK_URL", default="http://localhost:8888/lab")
     )
     notebook_token: str = _get_env(
-        "JUPITER_TOKEN",
         "JUPYTER_TOKEN",
-        "NOTEBOOK_TOKEN",
         default="dev-token",
     )
 

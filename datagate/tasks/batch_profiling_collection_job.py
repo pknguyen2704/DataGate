@@ -1,6 +1,5 @@
 import argparse
 import gc
-import json
 import logging
 import os
 import sys
@@ -87,21 +86,16 @@ def validate_name(value, field_name):
 def normalize_processing_date_hour(processing_date_hour):
     if processing_date_hour is None:
         raise ValueError("processing_date_hour must not be None.")
-
     value = str(processing_date_hour).strip().replace("T", " ")
-
     if value == "":
         raise ValueError("processing_date_hour must not be empty.")
-
     dt = datetime.fromisoformat(value)
-
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def get_connection_config(pg_hook, connection_name):
     if connection_name is None:
         raise ValueError("connection_name must not be None.")
-
     connection_name = str(connection_name).strip()
 
     if connection_name == "":
@@ -110,6 +104,7 @@ def get_connection_config(pg_hook, connection_name):
     row = pg_hook.get_first(
         """
         SELECT
+            id,
             connection_name,
             iceberg_rest_url,
             iceberg_warehouse,
@@ -129,28 +124,31 @@ def get_connection_config(pg_hook, connection_name):
         raise ValueError(f"No active connection found with name={connection_name}")
 
     return {
-        "connection_name": row[0],
-        "iceberg_rest_url": row[1],
-        "iceberg_warehouse": row[2],
-        "iceberg_catalog_name": validate_name(row[3], "iceberg_catalog_name"),
-        "minio_endpoint_url": row[4],
-        "minio_access_key": row[5],
-        "minio_secret_key": row[6],
+        "connection_id": str(row[0]),
+        "connection_name": row[1],
+        "iceberg_rest_url": row[2],
+        "iceberg_warehouse": row[3],
+        "iceberg_catalog_name": validate_name(row[4], "iceberg_catalog_name"),
+        "minio_endpoint_url": row[5],
+        "minio_access_key": row[6],
+        "minio_secret_key": row[7],
     }
 
 
-def get_active_tables(pg_hook, catalog_name, schema_name):
+def get_active_tables(pg_hook, connection_id, catalog_name, schema_name):
     rows = pg_hook.get_records(
         """
         SELECT
             id,
             table_name
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name = %s
+          AND is_active = TRUE
         ORDER BY table_name
         """,
-        parameters=(catalog_name, schema_name),
+        parameters=(connection_id, catalog_name, schema_name),
     )
 
     tables = []
@@ -174,47 +172,48 @@ def save_profiling_rows(pg_hook, rows):
         return
 
     sql = """
-        INSERT INTO quality_metric_observations (
-            id, table_id, metric_scope, column_name, metric_name, metric_value,
-            extra_data, processing_date_hour, created_at, updated_at
+        INSERT INTO batch_table_profiling (
+            id, table_id, column_name, data_type, completeness, mean,
+            standard_deviation, minimum, maximum, min_length, max_length,
+            distinctness, approx_count_distinct, processing_date_hour,
+            created_at, updated_at
         )
         VALUES %s
-        ON CONFLICT (table_id, processing_date_hour, metric_scope, column_name, metric_name)
+        ON CONFLICT (table_id, processing_date_hour, column_name)
         DO UPDATE SET
-            metric_value = EXCLUDED.metric_value,
-            extra_data = EXCLUDED.extra_data,
+            data_type = EXCLUDED.data_type,
+            completeness = EXCLUDED.completeness,
+            mean = EXCLUDED.mean,
+            standard_deviation = EXCLUDED.standard_deviation,
+            minimum = EXCLUDED.minimum,
+            maximum = EXCLUDED.maximum,
+            min_length = EXCLUDED.min_length,
+            max_length = EXCLUDED.max_length,
+            distinctness = EXCLUDED.distinctness,
+            approx_count_distinct = EXCLUDED.approx_count_distinct,
             updated_at = NOW()
     """
 
-    metric_names = (
-        "completeness",
-        "mean",
-        "standard_deviation",
-        "minimum",
-        "maximum",
-        "distinctness",
-    )
     values = []
     for row in rows:
-        extra_data = {
-            "data_type": row["data_type"],
-            "min_length": row["min_length"],
-            "max_length": row["max_length"],
-            "approx_count_distinct": row["approx_count_distinct"],
-        }
-        for metric_name in metric_names:
-            values.append(
-                (
-                    str(uuid.uuid4()),
-                    row["table_id"],
-                    "profiling",
-                    row["column_name"],
-                    metric_name,
-                    row[metric_name],
-                    json.dumps(extra_data),
-                    row["processing_date_hour"],
-                )
+        values.append(
+            (
+                str(uuid.uuid4()),
+                row["table_id"],
+                row["column_name"],
+                row["data_type"],
+                row["completeness"],
+                row["mean"],
+                row["standard_deviation"],
+                row["minimum"],
+                row["maximum"],
+                row["min_length"],
+                row["max_length"],
+                row["distinctness"],
+                row["approx_count_distinct"],
+                row["processing_date_hour"],
             )
+        )
 
     conn = pg_hook.get_conn()
 
@@ -223,7 +222,7 @@ def save_profiling_rows(pg_hook, rows):
             cursor,
             sql,
             values,
-            template="(%s, %s, %s, %s, %s, %s, %s::jsonb, %s, NOW(), NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
         )
 
     conn.commit()
@@ -435,7 +434,6 @@ def collect_one_table_profiling(spark, pg_hook, table_info, processing_date_hour
 def close_pg_hook(pg_hook):
     if pg_hook is None:
         return
-
     with suppress(Exception):
         conn = getattr(pg_hook, "conn", None)
         if conn is not None and not conn.closed:
@@ -445,7 +443,6 @@ def close_pg_hook(pg_hook):
 def stop_spark_session(spark):
     if spark is None:
         return
-
     with suppress(Exception):
         spark.catalog.clearCache()
     with suppress(Exception):
@@ -474,6 +471,7 @@ def main():
 
         active_tables = get_active_tables(
             pg_hook=pg_hook,
+            connection_id=connection_config["connection_id"],
             catalog_name=catalog_name,
             schema_name=schema_name,
         )

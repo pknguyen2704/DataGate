@@ -54,7 +54,7 @@ def evaluate_status(value, min_threshold, max_threshold):
 def get_connection_config(pg_hook, connection_name):
     row = pg_hook.get_first(
         """
-        SELECT iceberg_catalog_name
+        SELECT id, iceberg_catalog_name
         FROM connections
         WHERE connection_name = %s
           AND is_active = TRUE
@@ -64,18 +64,23 @@ def get_connection_config(pg_hook, connection_name):
     )
     if row is None:
         raise ValueError(f"No active connection found: {connection_name}")
-    return {"catalog_name": validate_name(row[0], "iceberg_catalog_name")}
+    return {
+        "connection_id": str(row[0]),
+        "catalog_name": validate_name(row[1], "iceberg_catalog_name"),
+    }
 
 
-def get_active_table_ids(pg_hook, catalog_name, schema_name):
+def get_active_table_ids(pg_hook, connection_id, catalog_name, schema_name):
     rows = pg_hook.get_records(
         """
         SELECT id
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name = %s
+          AND is_active = TRUE
         """,
-        parameters=(catalog_name, validate_name(schema_name, "schema_name")),
+        parameters=(connection_id, catalog_name, validate_name(schema_name, "schema_name")),
     )
     return [str(row[0]) for row in rows]
 
@@ -91,14 +96,22 @@ def get_profiling_rows(pg_hook, table_ids, processing_date_hour):
             m.min_threshold,
             m.max_threshold,
             m.severity_level,
-            p.metric_value
+            CASE m.metric_name
+                WHEN 'completeness' THEN p.completeness
+                WHEN 'mean' THEN p.mean
+                WHEN 'standard_deviation' THEN p.standard_deviation
+                WHEN 'minimum' THEN p.minimum
+                WHEN 'maximum' THEN p.maximum
+                WHEN 'min_length' THEN p.min_length::float
+                WHEN 'max_length' THEN p.max_length::float
+                WHEN 'distinctness' THEN p.distinctness
+                WHEN 'approx_count_distinct' THEN p.approx_count_distinct::float
+            END AS actual_value
         FROM quality_thresholds m
-        JOIN quality_metric_observations p
+        JOIN batch_table_profiling p
           ON p.table_id = m.table_id
          AND p.column_name = m.column_name
          AND p.processing_date_hour = %s
-         AND p.metric_scope = 'profiling'
-         AND p.metric_name = m.metric_name
         WHERE m.table_id = ANY(%s::uuid[])
           AND m.metric_scope = 'profiling'
           AND m.is_active = TRUE
@@ -191,7 +204,12 @@ def evaluate_profiling_metrics(
 
     try:
         config = get_connection_config(pg_hook, connection_name)
-        table_ids = get_active_table_ids(pg_hook, config["catalog_name"], schema_name)
+        table_ids = get_active_table_ids(
+            pg_hook,
+            config["connection_id"],
+            config["catalog_name"],
+            schema_name,
+        )
 
         if not table_ids:
             logger.info(
@@ -205,8 +223,8 @@ def evaluate_profiling_metrics(
         results = build_profiling_results(rows, processing_date_hour)
         save_profiling_results(pg_hook, results)
 
-        passed = sum(row[4] == "pass" for row in results)
-        failed = sum(row[4] == "fail" for row in results)
+        passed = sum(row[7] == "pass" for row in results)
+        failed = sum(row[7] == "fail" for row in results)
 
         logger.info(
             "Profiling metrics evaluated | connection=%s | schema=%s | hour=%s | total=%s | pass=%s | fail=%s",

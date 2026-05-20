@@ -1,17 +1,5 @@
 import uuid
-
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Enum,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    Text,
-    func,
-)
+from sqlalchemy import Boolean, Column,DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -26,18 +14,11 @@ class Rule(Base):
     __tablename__ = "rules"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    table_id = Column(
-        UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False
-    )
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
 
-    source = Column(
-        Enum("system", "manual", name="rule_source"), nullable=False, default="manual"
-    )
+    source = Column(String(50), nullable=False, default="manual")
     is_active = Column(Boolean, default=True, nullable=False)
-    severity_level = Column(
-        Enum("warning", "critical", name="manual_threshold_severity_level"),
-        nullable=False,
-    )
+    severity_level = Column(String(50), nullable=False, default="warning")
 
     column_name = Column(String(255), nullable=True)
     constraint_name = Column(String(512), nullable=True)
@@ -47,22 +28,11 @@ class Rule(Base):
     code_for_constraint = Column(String(512), nullable=False)
     frequency = Column(Integer, nullable=False, default=1)
 
-    created_by = Column(
-        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-    last_modified_by = Column(
-        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    created_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    last_modified_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     table = relationship("Table", back_populates="rules")
 

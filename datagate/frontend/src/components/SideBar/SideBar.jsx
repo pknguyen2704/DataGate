@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import {
   DashboardOutlined as DashboardIcon,
-  MenuBookOutlined as NotebookIcon,
+  MenuBookOutlined as AnalysisIcon,
   SettingsOutlined as SettingsIcon,
   TableChartOutlined as TablesIcon,
 } from "@mui/icons-material";
@@ -32,12 +32,11 @@ const getNavItems = () => [
     text: "Data Assets",
     icon: <TablesIcon />,
     path: "/app/data-assets",
-    permission: "table:view",
   },
   {
-    text: "Notebook",
-    icon: <NotebookIcon />,
-    path: "/app/notebook",
+    text: "Analysis",
+    icon: <AnalysisIcon />,
+    path: "/app/analysis",
     permission: "lab:view",
   },
 ];
@@ -173,7 +172,7 @@ const SideBar = ({ isCollapsed }) => {
       <Divider />
 
       {/* Settings at the bottom */}
-      {(hasPermission("user:manage") || hasPermission("connection:view") || hasPermission("model_config:view")) && (
+      {(hasPermission("user:manage") || hasPermission("connection:manage") || hasPermission("model_config:view")) && (
         <List sx={{ px: 1, pb: 1, pt: 0.5 }}>
           <Tooltip title={isCollapsed ? "Settings" : ""} placement="right">
             <ListItemButton

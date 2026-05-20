@@ -20,18 +20,10 @@ class Role(Base):
     description = Column(Text, nullable=True)
     permissions = Column(JSONB, nullable=True)
 
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     users = relationship("User", back_populates="role", foreign_keys="User.role_id")
-
     __table_args__ = (
         Index("ix_roles__name", "name", unique=True),
     )

@@ -3,19 +3,17 @@ import {
   Box, Button, Table, TableBody, TableCell, TableHead, TableRow,
   Paper, Typography, Stack, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Switch, Grid, Tooltip, TablePagination, TableContainer, Chip, CircularProgress
+  Grid, Tooltip, TablePagination, TableContainer, Chip, CircularProgress
 } from "@mui/material";
 import {
-  RefreshOutlined, AddOutlined, EditOutlined,
-  VisibilityOutlined, SaveOutlined, PowerSettingsNewOutlined, BugReportOutlined, ArrowBackOutlined
+  AddOutlined,
+  VisibilityOutlined, SaveOutlined, BugReportOutlined, ArrowBackOutlined
 } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { connectionsApi } from "~/apis/connectionsApi";
-import { StateBox, TabButton, TabContainer } from "~/components/Common/DataDisplay";
+import { StateBox, TabButton, TabContainer, StatusChip } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
 import { toast } from "react-toastify";
-
-import { useConfirm } from "material-ui-confirm";
 
 import ListTable from "./ListTable/ListTable";
 import Connection from "./Connection/Connection";
@@ -36,7 +34,7 @@ const INITIAL_CONNECTION = {
   is_active: true
 };
 
-function ConnectionDetailWrapper({ connectionId, onBack, canUpdate, canDelete, canUpdateTable, canCreateTable, canDeleteTable }) {
+function ConnectionDetailWrapper({ connectionId, onBack, onEdit, canUpdate, canDelete, canUpdateTable, canCreateTable, canDeleteTable }) {
   const [tab, setTab] = useState("config");
   const connection = useApiResource(() => connectionsApi.get(connectionId));
 
@@ -60,6 +58,7 @@ function ConnectionDetailWrapper({ connectionId, onBack, canUpdate, canDelete, c
           connection={connection.data} 
           canUpdate={canUpdate}
           canDelete={canDelete}
+          onEdit={onEdit}
           onReload={() => connection.reload()}
           onDeleted={onBack}
         />
@@ -91,30 +90,8 @@ export default function PlatformConnection() {
   const canUpdateTable = isAdmin || user?.permissions?.some(p => p === "table:manage" || p?.code === "table:manage");
   const canDeleteTable = isAdmin || user?.permissions?.some(p => p === "table:delete" || p?.code === "table:delete");
 
-  const confirm = useConfirm();
-
-  const handleDeactivate = (id) => {
-    confirm({
-      title: "Deactivate Connection",
-      description: "Are you sure you want to deactivate this connection?",
-      confirmationText: "Deactivate",
-      cancellationText: "Cancel",
-      confirmationButtonProps: { color: "error", variant: "contained" }
-    })
-      .then(async () => {
-        try {
-          await connectionsApi.deactivate(id);
-          toast.success("Deactivated");
-          connections.reload();
-        } catch (error) {
-          console.error(error);
-          toast.error("Failed to deactivate");
-        }
-      })
-      .catch(() => {});
-  };
-
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
+  const [detailVersion, setDetailVersion] = useState(0);
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -146,22 +123,6 @@ export default function PlatformConnection() {
     setOpenDialog(true);
   };
 
-  const handleToggleActive = async (row) => {
-    try {
-      if (row.is_active) {
-        await connectionsApi.deactivate(row.id);
-        toast.success("Deactivated");
-      } else {
-        await connectionsApi.activate(row.id);
-        toast.success("Activated");
-      }
-      connections.reload();
-    } catch (error) {
-      console.error(error);
-      toast.error("Action failed");
-    }
-  };
-
   const handleTest = async () => {
     if (editingId) {
       setTesting(true);
@@ -189,6 +150,9 @@ export default function PlatformConnection() {
       }
       setOpenDialog(false);
       connections.reload();
+      if (selectedConnectionId) {
+        setDetailVersion((prev) => prev + 1);
+      }
     } catch (err) {
       toast.error(err.response?.data?.detail || "Save failed");
     } finally {
@@ -196,39 +160,116 @@ export default function PlatformConnection() {
     }
   };
 
-  if (selectedConnectionId) {
-    return (
-      <ConnectionDetailWrapper 
-        connectionId={selectedConnectionId} 
-        onBack={() => {
-          setSelectedConnectionId(null);
-          connections.reload();
-        }}
-        canUpdate={canUpdate}
-        canDelete={canDelete}
-        canUpdateTable={canUpdateTable}
-        canCreateTable={canCreateTable}
-        canDeleteTable={canDeleteTable}
-      />
-    );
-  }
-
   let rows = [];
   if (connections.data && connections.data.items) {
     rows = connections.data.items;
   }
 
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>
-        <Button startIcon={<RefreshOutlined />} variant="outlined" size="small" onClick={connections.reload} sx={{ borderRadius: 1.5 }}>
-          Refresh
-        </Button>
-        {canCreate && (
-          <Button startIcon={<AddOutlined />} variant="contained" size="small" onClick={handleOpenAdd} sx={{ borderRadius: 1.5 }}>
-            Add Connection
+  const connectionDialog = (
+    <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ fontWeight: 'bold' }}>
+        {editingId ? "Edit" : "New"} Connection
+      </DialogTitle>
+      <DialogContent dividers>
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+          <Grid item xs={12} md={6}>
+            <TextField label="Name" fullWidth size="small" value={form.connection_name} onChange={e => setForm({ ...form, connection_name: e.target.value })} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField label="Description" fullWidth size="small" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          </Grid>
+
+          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>TRINO</Typography></Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Host" fullWidth size="small" value={form.trino_host} onChange={e => setForm({ ...form, trino_host: e.target.value })} />
+          </Grid>
+          <Grid item xs={12} md={2}>
+            <TextField label="Port" type="number" fullWidth size="small" value={form.trino_port} onChange={e => setForm({ ...form, trino_port: parseInt(e.target.value) })} />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="User" fullWidth size="small" value={form.trino_user} onChange={e => setForm({ ...form, trino_user: e.target.value })} />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Password" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.trino_password} onChange={e => setForm({ ...form, trino_password: e.target.value })} />
+          </Grid>
+
+          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>ICEBERG</Typography></Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Catalog" fullWidth size="small" value={form.iceberg_catalog_name} onChange={e => setForm({ ...form, iceberg_catalog_name: e.target.value })} />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="REST URL" fullWidth size="small" value={form.iceberg_rest_url} onChange={e => setForm({ ...form, iceberg_rest_url: e.target.value })} />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Warehouse" fullWidth size="small" value={form.iceberg_warehouse} onChange={e => setForm({ ...form, iceberg_warehouse: e.target.value })} />
+          </Grid>
+
+          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>STORAGE (MINIO/S3)</Typography></Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Endpoint" fullWidth size="small" value={form.minio_endpoint_url} onChange={e => setForm({ ...form, minio_endpoint_url: e.target.value })} />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Access Key" fullWidth size="small" value={form.minio_access_key} onChange={e => setForm({ ...form, minio_access_key: e.target.value })} />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField label="Secret Key" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.minio_secret_key} onChange={e => setForm({ ...form, minio_secret_key: e.target.value })} />
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+        <Box>
+          {editingId && (
+            <Button startIcon={<BugReportOutlined />} color="info" onClick={handleTest} disabled={testing}>
+              {testing ? "Testing..." : "Test Connection"}
+            </Button>
+          )}
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Button onClick={() => setOpenDialog(false)} color="inherit">Cancel</Button>
+          <Button variant="contained" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save"}
           </Button>
-        )}
+        </Stack>
+      </DialogActions>
+    </Dialog>
+  );
+
+  if (selectedConnectionId) {
+    return (
+      <>
+        <ConnectionDetailWrapper
+          key={`${selectedConnectionId}-${detailVersion}`}
+          connectionId={selectedConnectionId}
+          onBack={() => {
+            setSelectedConnectionId(null);
+            connections.reload();
+          }}
+          onEdit={handleOpenEdit}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
+          canUpdateTable={canUpdateTable}
+          canCreateTable={canCreateTable}
+          canDeleteTable={canDeleteTable}
+        />
+        {connectionDialog}
+      </>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 0 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'center' }}>
+        <Box>
+          <Typography variant="h5" fontWeight={800} color="primary">Platform Connections</Typography>
+          <Typography variant="body2" color="text.secondary">Configure and manage connections to data sources and platforms.</Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          {canCreate && (
+            <Button startIcon={<AddOutlined />} variant="contained" onClick={handleOpenAdd}>
+              Add Connection
+            </Button>
+          )}
+        </Stack>
       </Box>
 
       <StateBox loading={connections.loading} error={connections.error} empty={!rows.length}>
@@ -244,26 +285,11 @@ export default function PlatformConnection() {
             </TableHead>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.id} hover>
-                  <TableCell onClick={() => setSelectedConnectionId(row.id)} sx={{ cursor: 'pointer', fontWeight: 600 }}>{row.connection_name}</TableCell>
+                <TableRow key={row.id} hover onClick={() => setSelectedConnectionId(row.id)} sx={{ cursor: 'pointer' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>{row.connection_name}</TableCell>
                   <TableCell>{row.description || "—"}</TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch
-                        size="small"
-                        checked={row.is_active}
-                        onChange={() => handleToggleActive(row)}
-                        color="success"
-                        disabled={!canUpdate}
-                      />
-                      <Chip
-                        label={row.is_active ? "Active" : "Inactive"}
-                        size="small"
-                        variant="outlined"
-                        color={row.is_active ? "success" : "default"}
-                        sx={{ ml: 1, border: 'none', fontWeight: 600 }}
-                      />
-                    </Box>
+                    <StatusChip value={row.is_active ? "active" : "inactive"} />
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -272,22 +298,6 @@ export default function PlatformConnection() {
                           <VisibilityOutlined fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      {canUpdate && (
-                        <>
-                          <Tooltip title="Edit">
-                            <IconButton size="small" color="info" onClick={() => handleOpenEdit(row)}>
-                              <EditOutlined fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {row.is_active && (
-                            <Tooltip title="Deactivate">
-                              <IconButton size="small" color="error" onClick={() => handleDeactivate(row.id)}>
-                                <PowerSettingsNewOutlined fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </>
-                      )}
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -309,72 +319,7 @@ export default function PlatformConnection() {
         </TableContainer>
       </StateBox>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>
-          {editingId ? "Edit" : "New"} Connection
-        </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12} md={6}>
-              <TextField label="Name" fullWidth size="small" value={form.connection_name} onChange={e => setForm({ ...form, connection_name: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField label="Description" fullWidth size="small" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-            </Grid>
-
-            <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>TRINO</Typography></Grid>
-            <Grid item xs={12} md={4}>
-              <TextField label="Host" fullWidth size="small" value={form.trino_host} onChange={e => setForm({ ...form, trino_host: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField label="Port" type="number" fullWidth size="small" value={form.trino_port} onChange={e => setForm({ ...form, trino_port: parseInt(e.target.value) })} />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField label="User" fullWidth size="small" value={form.trino_user} onChange={e => setForm({ ...form, trino_user: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField label="Password" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.trino_password} onChange={e => setForm({ ...form, trino_password: e.target.value })} />
-            </Grid>
-
-            <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>ICEBERG</Typography></Grid>
-            <Grid item xs={12} md={4}>
-              <TextField label="Catalog" fullWidth size="small" value={form.iceberg_catalog_name} onChange={e => setForm({ ...form, iceberg_catalog_name: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField label="REST URL" fullWidth size="small" value={form.iceberg_rest_url} onChange={e => setForm({ ...form, iceberg_rest_url: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField label="Warehouse" fullWidth size="small" value={form.iceberg_warehouse} onChange={e => setForm({ ...form, iceberg_warehouse: e.target.value })} />
-            </Grid>
-
-            <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>STORAGE (MINIO/S3)</Typography></Grid>
-            <Grid item xs={12} md={4}>
-              <TextField label="Endpoint" fullWidth size="small" value={form.minio_endpoint_url} onChange={e => setForm({ ...form, minio_endpoint_url: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField label="Access Key" fullWidth size="small" value={form.minio_access_key} onChange={e => setForm({ ...form, minio_access_key: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField label="Secret Key" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.minio_secret_key} onChange={e => setForm({ ...form, minio_secret_key: e.target.value })} />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
-          <Box>
-            {editingId && (
-              <Button startIcon={<BugReportOutlined />} color="info" onClick={handleTest} disabled={testing}>
-                {testing ? "Testing..." : "Test Connection"}
-              </Button>
-            )}
-          </Box>
-          <Stack direction="row" spacing={1}>
-            <Button onClick={() => setOpenDialog(false)} color="inherit">Cancel</Button>
-            <Button variant="contained" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save"}
-            </Button>
-          </Stack>
-        </DialogActions>
-      </Dialog>
+      {connectionDialog}
     </Box>
   );
 }

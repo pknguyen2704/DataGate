@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permission
+from app.api.deps import get_current_user, require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
@@ -32,7 +32,7 @@ def list_tables(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1),
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+    _user: User = Depends(get_current_user),
 ):
     # Handle empty string from frontend filters
     conn_id = connection_id if connection_id and connection_id.strip() != "" else None
@@ -52,7 +52,7 @@ def list_tables(
 def create_table(
     data: TableCreate,
     service: TableService = Depends(get_table_service),
-    current_user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+    current_user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.create_table(data=data, owner_id=str(current_user.id))
 
@@ -61,7 +61,7 @@ def create_table(
 def get_table(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+    _user: User = Depends(get_current_user),
 ):
     table = service.get_table_or_404(str(table_id))
     service.validate_table_accessible(table)
@@ -73,7 +73,7 @@ def update_table(
     table_id: UUID,
     data: TableUpdate,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.update_table(table_id=str(table_id), data=data)
 
@@ -84,7 +84,7 @@ def update_table(
 def list_table_columns(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+    _user: User = Depends(get_current_user),
 ):
     table = service.get_table_or_404(str(table_id))
     service.validate_table_accessible(table)
@@ -97,7 +97,7 @@ def list_table_columns(
 def list_table_processing_hours(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_VIEW)),
+    _user: User = Depends(get_current_user),
 ):
     table = service.get_table_or_404(str(table_id))
     service.validate_table_accessible(table)
@@ -108,7 +108,7 @@ def list_table_processing_hours(
 def delete_table(
     table_id: UUID,
     service: TableService = Depends(get_table_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_DELETE)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     service.delete_table(str(table_id))
     return None

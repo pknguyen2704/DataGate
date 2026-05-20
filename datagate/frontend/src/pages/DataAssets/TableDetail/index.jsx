@@ -1,7 +1,7 @@
 import React from "react";
 import { 
   Box, Typography, Paper, Tabs, Tab, Breadcrumbs, Link, 
-  Grid, Divider, Skeleton, Stack, Button
+  Grid, Divider, Skeleton, Stack, Button, Chip
 } from "@mui/material";
 import { 
   useParams, useNavigate, useLocation, Outlet, Link as RouterLink
@@ -77,8 +77,17 @@ const TableDetail = () => {
                 <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.main', display: 'flex' }}>
                   <TableChartOutlined />
                 </Box>
-                <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Typography variant="h4" fontWeight={800} sx={{ lineHeight: 1.2 }}>{table?.table_name}</Typography>
+                  {table && (
+                    <Chip
+                      size="small"
+                      label={table.is_active ? "Active" : "Inactive"}
+                      color={table.is_active ? "success" : "default"}
+                      variant="outlined"
+                      sx={{ borderRadius: 1.5, fontWeight: 600 }}
+                    />
+                  )}
                 </Box>
               </Box>
               

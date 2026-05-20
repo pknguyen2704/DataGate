@@ -51,7 +51,7 @@ def evaluate_status(value, min_threshold, max_threshold):
 def get_connection_config(pg_hook, connection_name):
     row = pg_hook.get_first(
         """
-        SELECT iceberg_catalog_name
+        SELECT id, iceberg_catalog_name
         FROM connections
         WHERE connection_name = %s
           AND is_active = TRUE
@@ -61,18 +61,23 @@ def get_connection_config(pg_hook, connection_name):
     )
     if row is None:
         raise ValueError(f"No active connection found: {connection_name}")
-    return {"catalog_name": validate_name(row[0], "iceberg_catalog_name")}
+    return {
+        "connection_id": str(row[0]),
+        "catalog_name": validate_name(row[1], "iceberg_catalog_name"),
+    }
 
 
-def get_active_table_ids(pg_hook, catalog_name, schema_name):
+def get_active_table_ids(pg_hook, connection_id, catalog_name, schema_name):
     rows = pg_hook.get_records(
         """
         SELECT id
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name = %s
+          AND is_active = TRUE
         """,
-        parameters=(catalog_name, validate_name(schema_name, "schema_name")),
+        parameters=(connection_id, catalog_name, validate_name(schema_name, "schema_name")),
     )
     return [str(row[0]) for row in rows]
 
@@ -87,13 +92,18 @@ def get_metadata_rows(pg_hook, table_ids, processing_date_hour):
             m.min_threshold,
             m.max_threshold,
             m.severity_level,
-            b.metric_value
+            CASE m.metric_name
+                WHEN 'batch_added_rows' THEN b.batch_added_rows::float
+                WHEN 'batch_added_files' THEN b.batch_added_files::float
+                WHEN 'batch_added_files_size_bytes' THEN b.batch_added_files_size_bytes::float
+                WHEN 'table_total_rows' THEN b.table_total_rows::float
+                WHEN 'table_total_files' THEN b.table_total_files::float
+                WHEN 'table_total_size_bytes' THEN b.table_total_size_bytes::float
+            END AS actual_value
         FROM quality_thresholds m
-        JOIN quality_metric_observations b
+        JOIN batch_table_metadata b
           ON b.table_id = m.table_id
          AND b.processing_date_hour = %s
-         AND b.metric_scope = 'metadata'
-         AND b.metric_name = m.metric_name
         WHERE m.table_id = ANY(%s::uuid[])
           AND m.metric_scope = 'metadata'
           AND m.is_active = TRUE
@@ -184,7 +194,12 @@ def evaluate_metadata_metrics(
 
     try:
         config = get_connection_config(pg_hook, connection_name)
-        table_ids = get_active_table_ids(pg_hook, config["catalog_name"], schema_name)
+        table_ids = get_active_table_ids(
+            pg_hook,
+            config["connection_id"],
+            config["catalog_name"],
+            schema_name,
+        )
 
         if not table_ids:
             logger.info(
@@ -198,8 +213,8 @@ def evaluate_metadata_metrics(
         results = build_metadata_results(rows, processing_date_hour)
         save_metadata_results(pg_hook, results)
 
-        passed = sum(row[4] == "pass" for row in results)
-        failed = sum(row[4] == "fail" for row in results)
+        passed = sum(row[6] == "pass" for row in results)
+        failed = sum(row[6] == "fail" for row in results)
 
         logger.info(
             "Metadata metrics evaluated | connection=%s | schema=%s | hour=%s | total=%s | pass=%s | fail=%s",

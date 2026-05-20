@@ -7,5 +7,5 @@ export const usersApi = {
   create: (data) => api.post(BASE_URL, data),
   get: (id) => api.get(`${BASE_URL}/${id}`),
   update: (id, data) => api.patch(`${BASE_URL}/${id}`, data),
-  updatePassword: (id, password) => api.patch(`${BASE_URL}/${id}/password`, { password }),
+  delete: (id) => api.delete(`${BASE_URL}/${id}`),
 };

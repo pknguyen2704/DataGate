@@ -1,2 +1,2 @@
-mkdir -p ./dags ./logs ./plugins ./config
+mkdir -p ./logs ./plugins ./config
 echo -e "AIRFLOW_UID=$(id -u)" > .env

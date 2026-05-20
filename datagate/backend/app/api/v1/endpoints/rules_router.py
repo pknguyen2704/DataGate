@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permission
+from app.api.deps import get_current_user, require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
@@ -80,7 +80,7 @@ def resolve_rule_verify_result(
 def create_rule(
     data: RuleCreate,
     service: RuleService = Depends(get_rule_service),
-    current_user: User = Depends(require_permission(PermissionCode.RULE_SUGGEST)),
+    current_user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.create_rule(data, str(current_user.id))
 
@@ -99,7 +99,7 @@ def update_rule(
     rule_id: UUID,
     data: RuleUpdate,
     service: RuleService = Depends(get_rule_service),
-    current_user: User = Depends(require_permission(PermissionCode.RULE_SUGGEST)),
+    current_user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.update_rule(str(rule_id), data, str(current_user.id))
 

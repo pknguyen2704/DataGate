@@ -66,8 +66,6 @@ class ModelConfigBase(BaseModel):
     target_sample_per_group: int = Field(default=10000, ge=1)
     test_size: float = Field(..., gt=0, lt=1)
     random_state: int = Field(..., ge=0)
-    p_value_alpha: float = Field(default=0.05, gt=0, lt=1)
-    min_history_auc_points: int = Field(default=20, ge=1)
     exclude_cols: list[str] = Field(default_factory=list)
     categorical_cols: list[str] = Field(default_factory=list)
     numeric_cols: list[str] = Field(default_factory=list)
@@ -86,8 +84,6 @@ class ModelConfigUpdate(BaseModel):
     target_sample_per_group: int | None = Field(default=None, ge=1)
     test_size: float | None = Field(default=None, gt=0, lt=1)
     random_state: int | None = Field(default=None, ge=0)
-    p_value_alpha: float | None = Field(default=None, gt=0, lt=1)
-    min_history_auc_points: int | None = Field(default=None, ge=1)
     exclude_cols: list[str] | None = None
     categorical_cols: list[str] | None = None
     numeric_cols: list[str] | None = None
@@ -146,9 +142,8 @@ class AUCResultBase(BaseModel):
     model_parameter_id: UUID
     processing_date_hour: datetime
     auc_score: float | None = Field(default=None, ge=0, le=1)
-    p_value: float | None = None
     parameter_snapshot: dict | None = None
-    feature_config_snapshot: dict | None = None
+    config_snapshot: dict | None = None
 
 
 class AUCResultCreate(AUCResultBase):
@@ -157,9 +152,8 @@ class AUCResultCreate(AUCResultBase):
 
 class AUCResultUpdate(BaseModel):
     auc_score: float | None = Field(default=None, ge=0, le=1)
-    p_value: float | None = None
     parameter_snapshot: dict | None = None
-    feature_config_snapshot: dict | None = None
+    config_snapshot: dict | None = None
 
 
 class AUCResultOut(AUCResultBase):
@@ -175,7 +169,7 @@ class AUCResultListOut(PaginatedResponse[AUCResultOut]):
 
 
 class SHAPResultBase(BaseModel):
-    auc_result_id: UUID
+    anomaly_result_id: UUID
     feature_name: str = Field(..., max_length=255)
     shap_score: float
     shap_rank: int

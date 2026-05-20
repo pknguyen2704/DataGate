@@ -1,5 +1,5 @@
 from pydantic import BaseModel
 
 
-class NotebookEmbedUrlOut(BaseModel):
+class AnalysisEmbedUrlOut(BaseModel):
     url: str

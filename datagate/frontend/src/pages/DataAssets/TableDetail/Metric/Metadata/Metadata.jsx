@@ -6,7 +6,7 @@ import {
   DialogActions, TextField, MenuItem, Grid, Stack,
   Tooltip, Switch
 } from "@mui/material";
-import { Edit, Delete, InfoOutlined, Add } from "@mui/icons-material";
+import { Edit, Delete, InfoOutlined, Add, VisibilityOutlined } from "@mui/icons-material";
 import { metricsApi } from "~/apis/metricsApi";
 import { useApiResource } from "~/hooks/useApiResource";
 import { StateBox } from "~/components/Common/DataDisplay";
@@ -32,6 +32,8 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({});
+  const [openDetailDialog, setOpenDetailDialog] = useState(false);
+  const [selectedDetail, setSelectedDetail] = useState(null);
 
   const metadataRes = useApiResource(() => metricsApi.listMetadata(tableId), [tableId]);
 
@@ -52,6 +54,21 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
     }
     setOpenDialog(true);
   }, [tableId]);
+
+  const handleOpenDetail = (row) => {
+    setSelectedDetail(row);
+    setOpenDetailDialog(true);
+  };
+
+  const handleEditFromDetail = () => {
+    setOpenDetailDialog(false);
+    handleOpenDialog(selectedDetail);
+  };
+
+  const handleDeleteFromDetail = () => {
+    setOpenDetailDialog(false);
+    handleDelete(selectedDetail.id);
+  };
 
   useEffect(() => {
     if (addTrigger > 0) {
@@ -102,13 +119,17 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
 
   const handleToggleActive = async (item) => {
     try {
-      const data = { ...item, is_active: !item.is_active };
+      const newActive = !item.is_active;
+      const data = { ...item, is_active: newActive };
       delete data.updated_at;
       delete data.created_at;
       delete data.created_by_user;
       delete data.last_modified_by_user;
       await metricsApi.updateMetadata(data.id, data);
       metadataRes.reload();
+      if (selectedDetail && selectedDetail.id === item.id) {
+        setSelectedDetail(prev => ({ ...prev, is_active: newActive }));
+      }
     } catch (error) {
       console.error(error);
       alert("Toggle status failed");
@@ -140,16 +161,13 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
                 <TableCell>Min</TableCell>
                 <TableCell>Max</TableCell>
                 <TableCell>Severity</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Created By</TableCell>
-                <TableCell>Updated By</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredData.length === 0 ? (
-                <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>No records found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>No records found</TableCell></TableRow>
               ) : (
                 filteredData.map((row) => (
                   <TableRow key={row.id} hover>
@@ -168,17 +186,6 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
                         variant="outlined"
                         sx={{ fontWeight: 600, textTransform: 'capitalize' }}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {row.description || "-"}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{row.created_by_user?.full_name || row.created_by_user?.username || 'System'}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{row.last_modified_by_user?.full_name || row.last_modified_by_user?.username || 'System'}</Typography>
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -200,16 +207,11 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
                     </TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                        {canManage && (
-                          <>
-                            <IconButton size="small" color="primary" onClick={() => handleOpenDialog(row)}>
-                              <Edit fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" color="error" onClick={() => handleDelete(row.id)}>
-                              <Delete fontSize="small" />
-                            </IconButton>
-                          </>
-                        )}
+                        <Tooltip title="View Details">
+                          <IconButton size="small" color="primary" onClick={() => handleOpenDetail(row)}>
+                            <VisibilityOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -285,6 +287,124 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
         <DialogActions>
           <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
           <Button onClick={handleSave} variant="contained" color="primary">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Detail Dialog */}
+      <Dialog open={openDetailDialog} onClose={() => setOpenDetailDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <InfoOutlined color="primary" /> Threshold Details
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedDetail && (
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              <Grid item xs={12}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>METRIC</Typography>
+                  <Typography variant="h6" fontWeight={800} color="primary.main" sx={{ mt: 0.5 }}>
+                    {METRIC_TYPES.find(m => m.value === selectedDetail.metric_name)?.label || selectedDetail.metric_name}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>MIN THRESHOLD</Typography>
+                  <Typography variant="body1" fontWeight={600} sx={{ mt: 0.5 }}>
+                    {selectedDetail.min_threshold ?? 'None'}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>MAX THRESHOLD</Typography>
+                  <Typography variant="body1" fontWeight={600} sx={{ mt: 0.5 }}>
+                    {selectedDetail.max_threshold ?? 'None'}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>SEVERITY LEVEL</Typography>
+                  <Box sx={{ mt: 0.5 }}>
+                    <Chip
+                      label={selectedDetail.severity_level}
+                      size="small"
+                      color={SEVERITY_COLORS[selectedDetail.severity_level]}
+                      variant="outlined"
+                      sx={{ fontWeight: 600, textTransform: 'capitalize' }}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>CREATED BY</Typography>
+                  <Typography variant="body2" fontWeight={600} sx={{ mt: 0.5 }}>
+                    {selectedDetail.created_by_user?.full_name || selectedDetail.created_by_user?.username || 'System'}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>UPDATED BY</Typography>
+                  <Typography variant="body2" fontWeight={600} sx={{ mt: 0.5 }}>
+                    {selectedDetail.last_modified_by_user?.full_name || selectedDetail.last_modified_by_user?.username || 'System'}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>DESCRIPTION</Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {selectedDetail.description || 'No description provided.'}
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+          <Button onClick={() => setOpenDetailDialog(false)} color="inherit">Close</Button>
+          {canManage && selectedDetail && (
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                <Switch
+                  size="small"
+                  checked={selectedDetail.is_active}
+                  onChange={() => handleToggleActive(selectedDetail)}
+                  color="success"
+                />
+                <Chip
+                  label={selectedDetail.is_active ? "Active" : "Inactive"}
+                  size="small"
+                  variant="outlined"
+                  color={selectedDetail.is_active ? "success" : "default"}
+                  sx={{ ml: 1, border: 'none', fontWeight: 600 }}
+                />
+              </Box>
+              <Button
+                variant="outlined"
+                startIcon={<Edit fontSize="small" />}
+                onClick={handleEditFromDetail}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<Delete fontSize="small" />}
+                onClick={handleDeleteFromDetail}
+              >
+                Delete
+              </Button>
+            </Stack>
+          )}
         </DialogActions>
       </Dialog>
     </>

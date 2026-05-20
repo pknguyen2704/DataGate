@@ -82,36 +82,37 @@ export const Stat = ({ label, value, tone = "blue", subtitle }) => {
 
 export const StatusChip = ({ value }) => {
   const normalized = String(value || "unknown").toLowerCase();
-  const isError = ["fail", "failure", "critical", "inactive", "no"].some((text) => normalized.includes(text));
+  const isActive = normalized === "active";
+  const isInactive = normalized === "inactive";
+  const isError = !isActive && ["fail", "failure", "critical", "inactive", "no"].some((text) => normalized.includes(text));
   const isWarning = ["warning", "warn"].some((text) => normalized.includes(text));
-  const isSuccess = ["pass", "success", "active", "yes"].some((text) => normalized.includes(text));
+  const isSuccess = !isInactive && ["pass", "success", "active", "yes"].some((text) => normalized.includes(text));
   const isPending = normalized.includes("pending");
   const isDefault = normalized.includes("unknown") || normalized.includes("manual");
 
-  const label = isError ? "FAIL" : isSuccess ? "PASS" : normalized.toUpperCase();
-  const bgcolor = isError
-    ? statusColors.error
+  let label = normalized.toUpperCase();
+  if (isError && !isInactive) label = "FAIL";
+  else if (isSuccess && !isActive) label = "PASS";
+
+  const chipColor = isError
+    ? (isInactive ? "default" : "error")
     : isWarning
-      ? statusColors.warning
+      ? "warning"
       : isSuccess
-        ? statusColors.success
+        ? "success"
         : isPending
-          ? statusColors.pending
-          : isDefault
-            ? statusColors.default
-            : statusColors.success;
+          ? "primary"
+          : "default";
 
   return (
     <Chip
       size="small"
       label={label}
+      variant="outlined"
+      color={chipColor}
       sx={{
-        bgcolor,
-        color: "white",
-        fontWeight: 700,
+        fontWeight: 600,
         fontSize: "0.72rem",
-        borderRadius: "6px",
-        height: 22,
         textTransform: "uppercase",
       }}
     />

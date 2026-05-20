@@ -242,7 +242,10 @@ class ConnectionService:
             .first()
         )
         if existing:
-            return existing
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Table '{table_name}' is already registered under this connection.",
+            )
 
         table = Table(
             connection_id=connection_id,

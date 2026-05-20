@@ -2,17 +2,18 @@ import uuid
 
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     Column,
     DateTime,
-    Enum,
     Float,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -22,57 +23,75 @@ def gen_uuid() -> str:
     return str(uuid.uuid4())
 
 
-class QualityMetricObservation(Base):
-    __tablename__ = "quality_metric_observations"
+class BatchTableMetadata(Base):
+    __tablename__ = "batch_table_metadata"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    table_id = Column(
-        UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False
-    )
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
 
-    metric_scope = Column(
-        Enum("metadata", "profiling", "anomaly", name="metric_scope"),
-        nullable=False,
-    )
-    column_name = Column(String(255), nullable=True)
-    metric_name = Column(String(255), nullable=False)
-    metric_value = Column(Float, nullable=True)
-    extra_data = Column(JSONB, nullable=True)
+    batch_added_rows = Column(BigInteger, nullable=True)
+    batch_added_files = Column(Integer, nullable=True)
+    batch_added_files_size_bytes = Column(BigInteger, nullable=True)
+    table_total_rows = Column(BigInteger, nullable=True)
+    table_total_files = Column(Integer, nullable=True)
+    table_total_size_bytes = Column(BigInteger, nullable=True)
 
     processing_date_hour = Column(DateTime, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    table = relationship("Table", back_populates="quality_metric_observations")
+    table = relationship("Table", back_populates="batch_table_metadata")
 
     __table_args__ = (
         Index(
-            "ix_quality_metric_observations__table_hour_scope_column_metric",
+            "ix_batch_table_metadata__table_hour",
             "table_id",
             "processing_date_hour",
-            "metric_scope",
+            unique=True,
+        ),
+        Index("ix_batch_table_metadata__processing_date_hour", "processing_date_hour"),
+    )
+
+
+class BatchTableProfiling(Base):
+    __tablename__ = "batch_table_profiling"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
+
+    column_name = Column(String(255), nullable=False)
+    data_type = Column(String(100), nullable=True)
+    completeness = Column(Float, nullable=True)
+    mean = Column(Float, nullable=True)
+    standard_deviation = Column(Float, nullable=True)
+    minimum = Column(Float, nullable=True)
+    maximum = Column(Float, nullable=True)
+    min_length = Column(Integer, nullable=True)
+    max_length = Column(Integer, nullable=True)
+    distinctness = Column(Float, nullable=True)
+    approx_count_distinct = Column(BigInteger, nullable=True)
+
+    processing_date_hour = Column(DateTime, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    table = relationship("Table", back_populates="batch_table_profiling")
+
+    __table_args__ = (
+        Index(
+            "ix_batch_table_profiling__table_hour_column",
+            "table_id",
+            "processing_date_hour",
             "column_name",
-            "metric_name",
             unique=True,
         ),
         Index(
-            "ix_quality_metric_observations__table_hour",
+            "ix_batch_table_profiling__table_column_hour",
             "table_id",
+            "column_name",
             "processing_date_hour",
         ),
-        Index(
-            "ix_quality_metric_observations__table_scope_metric",
-            "table_id",
-            "metric_scope",
-            "metric_name",
-        ),
+        Index("ix_batch_table_profiling__processing_date_hour", "processing_date_hour"),
     )
 
 
@@ -80,25 +99,16 @@ class QualityThreshold(Base):
     __tablename__ = "quality_thresholds"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    table_id = Column(
-        UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False
-    )
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
 
-    metric_scope = Column(
-        Enum("metadata", "profiling", "anomaly", name="metric_scope"),
-        nullable=False,
-    )
+    metric_scope = Column(String(50), nullable=False)
     column_name = Column(String(255), nullable=True)
     metric_name = Column(String(255), nullable=False)
 
     min_threshold = Column(Float, nullable=True)
     max_threshold = Column(Float, nullable=True)
 
-    severity_level = Column(
-        Enum("warning", "critical", name="severity_level"),
-        nullable=False,
-        default="warning",
-    )
+    severity_level = Column(String(50),nullable=False,default="warning")
     is_active = Column(Boolean, default=True, nullable=False)
     description = Column(Text, nullable=True)
 
@@ -140,33 +150,12 @@ class QualityCheckResult(Base):
     __tablename__ = "quality_check_results"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    table_id = Column(
-        UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False
-    )
+    table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
 
-    check_type = Column(
-        Enum(
-            "metadata_threshold",
-            "profiling_threshold",
-            "rule",
-            "anomaly_auc",
-            name="check_type",
-        ),
-        nullable=False,
-    )
-    threshold_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("quality_thresholds.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    rule_id = Column(
-        UUID(as_uuid=False), ForeignKey("rules.id", ondelete="SET NULL"), nullable=True
-    )
-    anomaly_result_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("anomaly_results.id", ondelete="SET NULL"),
-        nullable=True,
-    )
+    check_type = Column(String(50), nullable=False)
+    threshold_id = Column(UUID(as_uuid=False),ForeignKey("quality_thresholds.id", ondelete="SET NULL"), nullable=True)
+    rule_id = Column(UUID(as_uuid=False), ForeignKey("rules.id", ondelete="SET NULL"), nullable=True)
+    anomaly_result_id = Column(UUID(as_uuid=False),ForeignKey("anomaly_results.id", ondelete="SET NULL"),nullable=True)
 
     column_name = Column(String(255), nullable=True)
     metric_name = Column(String(255), nullable=True)
@@ -174,28 +163,16 @@ class QualityCheckResult(Base):
     min_threshold = Column(Float, nullable=True)
     max_threshold = Column(Float, nullable=True)
 
-    status = Column(Enum("pass", "fail", "error", name="check_status"), nullable=False)
-    severity_level = Column(
-        Enum("warning", "critical", name="severity_level"), nullable=True
-    )
+    status = Column(String(50), nullable=False)
+    severity_level = Column(String(50),nullable=False,default="warning")
     message = Column(Text, nullable=True)
 
     is_resolved = Column(Boolean, default=False, nullable=False)
-    resolved_by = Column(
-        UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    resolved_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
-
     processing_date_hour = Column(DateTime, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     table = relationship("Table", back_populates="quality_check_results")
     threshold = relationship("QualityThreshold", back_populates="results")

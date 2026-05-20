@@ -4,10 +4,10 @@ import {
   TableHead, TableRow, TableContainer, Button, IconButton,
   Chip, Grid, Stack, TextField, MenuItem, FormControl,
   InputLabel, Select, Tooltip, CircularProgress,
-  Tabs, Tab, TablePagination
+  Tabs, Tab, TablePagination, Alert, Dialog, DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 import {
-  ArrowBack, CheckCircle, Refresh, CheckCircleOutline
+  ArrowBack, CheckCircle, CheckCircleOutline, VisibilityOutlined, InfoOutlined
 } from "@mui/icons-material";
 import { useParams } from "react-router-dom";
 import { dataQualityApi } from "~/apis/dataQualityApi";
@@ -114,7 +114,6 @@ const DataQuality = () => {
             {showRules && <Tab label="Data Rules" />}
             {showAnomaly && <Tab label="Anomaly Results" />}
           </Tabs>
-          <Button startIcon={<Refresh />} onClick={() => { summaryRes.reload(); resultsRes.reload(); }}>Refresh</Button>
         </Box>
 
         {/* Filter Bar */}
@@ -130,9 +129,9 @@ const DataQuality = () => {
               </Grid>
               <Grid item xs={12} md={4}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Status</InputLabel>
-                  <Select value={filters.status} label="Status" onChange={(e) => handleFilterChange("status", e.target.value)}>
-                    <MenuItem value="">All Status</MenuItem>
+                  <InputLabel>Result</InputLabel>
+                  <Select value={filters.status} label="Result" onChange={(e) => handleFilterChange("status", e.target.value)}>
+                    <MenuItem value="">All Results</MenuItem>
                     <MenuItem value="pass">Pass</MenuItem>
                     <MenuItem value="fail">Fail</MenuItem>
                   </Select>
@@ -180,6 +179,7 @@ const GenericTab = ({ type, results, total, page, pageSize, setPage, setPageSize
   const [selectedId, setSelectedId] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [openDetailDialog, setOpenDetailDialog] = useState(false);
 
   React.useEffect(() => {
     const loadDetail = async (id) => {
@@ -205,126 +205,136 @@ const GenericTab = ({ type, results, total, page, pageSize, setPage, setPageSize
 
   const DetailComponent = type === "metadata" ? Metadata : type === "profiling" ? Profile : Rule;
 
+  const handleClose = () => {
+    setOpenDetailDialog(false);
+    setSelectedId(null);
+    setDetailData(null);
+  };
+
   return (
     <Box sx={{ width: '100%' }}>
-      <Grid container spacing={selectedId ? 3 : 0}>
-        <Grid item xs={selectedId ? 7 : 12}>
-          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'primary.main' }}>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Target</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Metric / Rule</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
-                  {!selectedId && <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Severity</TableCell>}
-                  {!selectedId && <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Value</TableCell>}
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Execution Date</TableCell>
-                  {!selectedId && <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {results.map((r) => (
-                  <TableRow 
-                    key={r.id} 
-                    hover
-                    onClick={() => setSelectedId(r.id)} 
-                    selected={selectedId === r.id}
-                    sx={{ cursor: 'pointer' }}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>{r.column_name || 'Table'}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{r.metric_name || r.message || '-'}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <StatusChip value={r.status} />
-                    </TableCell>
-                    {!selectedId && (
-                      <TableCell>
-                        {r.severity_level && (
-                          <Chip 
-                            label={r.severity_level} 
-                            size="small" 
-                            variant="outlined" 
-                            color={r.severity_level === 'critical' ? 'error' : 'warning'} 
-                            sx={{ height: 20, fontSize: '0.65rem', textTransform: 'capitalize' }} 
-                          />
-                        )}
-                      </TableCell>
-                    )}
-                    {!selectedId && (
-                      <TableCell>
-                        <Typography variant="body2">
-                          {r.actual_value !== null && r.actual_value !== undefined ? Number(r.actual_value).toFixed(4) : '-'}
-                          {r.threshold_value !== null && r.threshold_value !== undefined && (
-                            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                              ({Number(r.threshold_value).toFixed(4)})
-                            </Typography>
-                          )}
-                        </Typography>
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <Typography variant="caption" color="text.secondary">
-                        {format(new Date(r.processing_date_hour), "yyyy-MM-dd HH:mm")}
+      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'primary.main' }}>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Target</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Metric / Rule</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Result</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Severity</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Value</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Execution Date</TableCell>
+              <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {results.map((r) => (
+              <TableRow 
+                key={r.id} 
+                hover
+                onClick={() => { setSelectedId(r.id); setOpenDetailDialog(true); }}
+                sx={{ cursor: 'pointer' }}
+              >
+                <TableCell>
+                  <Typography variant="body2" fontWeight={600}>{r.column_name || 'Table'}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.metric_name || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <StatusChip value={r.status} />
+                </TableCell>
+                <TableCell>
+                  {r.severity_level && (
+                    <Chip 
+                      label={r.severity_level} 
+                      size="small" 
+                      variant="outlined" 
+                      color={r.severity_level === 'critical' ? 'error' : 'warning'} 
+                      sx={{ fontWeight: 600, textTransform: 'capitalize' }} 
+                    />
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">
+                    {r.actual_value !== null && r.actual_value !== undefined ? Number(r.actual_value).toFixed(4) : '-'}
+                    {r.threshold_value !== null && r.threshold_value !== undefined && (
+                      <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                        ({Number(r.threshold_value).toFixed(4)})
                       </Typography>
-                    </TableCell>
-                    {!selectedId && (
-                      <TableCell align="center">
-                        <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
-                          {r.status?.toLowerCase() === 'fail' && !r.is_resolved && canResolve && (
-                            <Tooltip title="Mark as Resolved">
-                              <IconButton size="small" color="error" onClick={() => handleResolve(type, r.id)}>
-                                <CheckCircleOutline fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {r.is_resolved && <CheckCircle color="success" fontSize="small" />}
-                        </Stack>
-                      </TableCell>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={total}
-              rowsPerPage={pageSize}
-              page={page}
-              onPageChange={(e, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(e) => {
-                setPageSize(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-            />
-          </TableContainer>
-      </Grid>
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="caption" color="text.secondary">
+                    {format(new Date(r.processing_date_hour), "yyyy-MM-dd HH:mm")}
+                  </Typography>
+                </TableCell>
+                <TableCell align="center">
+                  <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
+                    <Tooltip title="View Details">
+                      <IconButton size="small" color="primary" onClick={() => { setSelectedId(r.id); setOpenDetailDialog(true); }}>
+                        <VisibilityOutlined fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {r.is_resolved && (
+                      <Tooltip title="Resolved">
+                        <CheckCircle color="success" fontSize="small" sx={{ alignSelf: 'center' }} />
+                      </Tooltip>
+                    )}
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={total}
+          rowsPerPage={pageSize}
+          page={page}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setPageSize(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+        />
+      </TableContainer>
 
-      {selectedId && (
-        <Grid item xs={5}>
-          <Box sx={{ position: 'sticky', top: 20 }}>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
-            ) : detailData ? (
-              <Box>
-                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="h6" fontWeight={800}>Analysis: {format(new Date(detailData.processing_date_hour), "yyyy-MM-dd HH:mm")}</Typography>
-                  <Tooltip title="Back to results">
-                    <IconButton onClick={() => setSelectedId(null)} size="small">
-                      <ArrowBack fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-                <DetailComponent detailData={detailData} />
-              </Box>
-            ) : null}
-          </Box>
-        </Grid>
-      )}
-    </Grid>
+      {/* Details Dialog Modal */}
+      <Dialog open={openDetailDialog} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <InfoOutlined color="primary" /> Quality Check Details
+        </DialogTitle>
+        <DialogContent dividers sx={{ minHeight: 120 }}>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}><CircularProgress /></Box>
+          ) : detailData ? (
+            <DetailComponent detailData={detailData} />
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+          <Button onClick={handleClose} color="inherit">Close</Button>
+          {detailData && detailData.status?.toLowerCase() === 'fail' && !detailData.is_resolved && canResolve && (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<CheckCircleOutline />}
+              onClick={async () => {
+                await handleResolve(type, detailData.id);
+                setDetailData(prev => ({ ...prev, is_resolved: true }));
+              }}
+            >
+              Resolve Alert
+            </Button>
+          )}
+          {detailData && detailData.is_resolved && (
+            <Chip label="Resolved Successfully" color="success" icon={<CheckCircle />} sx={{ fontWeight: 600 }} />
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
@@ -333,6 +343,7 @@ const AnomalyTab = ({ results, total, page, pageSize, setPage, setPageSize, hand
   const [selectedId, setSelectedId] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [openDetailDialog, setOpenDetailDialog] = useState(false);
 
   React.useEffect(() => {
     const loadDetail = async (id) => {
@@ -352,91 +363,103 @@ const AnomalyTab = ({ results, total, page, pageSize, setPage, setPageSize, hand
     }
   }, [selectedId]);
 
+  const handleClose = () => {
+    setOpenDetailDialog(false);
+    setSelectedId(null);
+    setDetailData(null);
+  };
+
   return (
     <Box sx={{ width: '100%' }}>
-      <Grid container spacing={selectedId ? 3 : 0}>
-        <Grid item xs={selectedId ? 4 : 12}>
-          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'primary.main' }}>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>AUC</TableCell>
-                  {!selectedId && <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {results.map((r) => (
-                  <TableRow 
-                    key={r.id} 
-                    hover 
-                    onClick={() => setSelectedId(r.id)} 
-                    selected={selectedId === r.id}
-                    sx={{ cursor: 'pointer' }}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {format(new Date(r.processing_date_hour), "yyyy-MM-dd HH:mm")}
-                      </Typography>
-                    </TableCell>
-                    <TableCell><StatusChip value={r.status} /></TableCell>
-                    <TableCell><Typography variant="body2" fontWeight={700}>{r.actual_value !== null ? Number(r.actual_value).toFixed(4) : "N/A"}</Typography></TableCell>
-                    {!selectedId && (
-                      <TableCell align="center">
-                        <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
-                          {(r.status?.toLowerCase().includes('fail') || r.status?.toLowerCase().includes('failure')) && !r.is_resolved && canResolve && (
-                            <Tooltip title="Mark as Resolved">
-                              <IconButton size="small" color="error" onClick={() => handleResolve("anomaly", r.id)}>
-                                <CheckCircleOutline fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {r.is_resolved && <CheckCircle color="success" fontSize="small" />}
-                        </Stack>
-                      </TableCell>
+      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'primary.main' }}>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Result</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>AUC</TableCell>
+              <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {results.map((r) => (
+              <TableRow 
+                key={r.id} 
+                hover 
+                onClick={() => { setSelectedId(r.id); setOpenDetailDialog(true); }} 
+                sx={{ cursor: 'pointer' }}
+              >
+                <TableCell>
+                  <Typography variant="body2" color="text.secondary">
+                    {format(new Date(r.processing_date_hour), "yyyy-MM-dd HH:mm")}
+                  </Typography>
+                </TableCell>
+                <TableCell><StatusChip value={r.status} /></TableCell>
+                <TableCell><Typography variant="body2" fontWeight={700}>{r.actual_value !== null ? Number(r.actual_value).toFixed(4) : "N/A"}</Typography></TableCell>
+                <TableCell align="center">
+                  <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
+                    <Tooltip title="View Details">
+                      <IconButton size="small" color="primary" onClick={() => { setSelectedId(r.id); setOpenDetailDialog(true); }}>
+                        <VisibilityOutlined fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {r.is_resolved && (
+                      <Tooltip title="Resolved">
+                        <CheckCircle color="success" fontSize="small" sx={{ alignSelf: 'center' }} />
+                      </Tooltip>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={total}
-              rowsPerPage={pageSize}
-              page={page}
-              onPageChange={(e, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(e) => {
-                setPageSize(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-            />
-          </TableContainer>
-      </Grid>
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={total}
+          rowsPerPage={pageSize}
+          page={page}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setPageSize(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+        />
+      </TableContainer>
 
-      {selectedId && (
-        <Grid item xs={8} sx={{ pr: { xs: 0, md: 2 } }}>
-          <Box sx={{ position: 'sticky', top: 20 }}>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
-            ) : detailData ? (
-              <Box>
-                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="h6" fontWeight={800}>Analysis: {format(new Date(detailData.processing_date_hour), "yyyy-MM-dd HH:mm")}</Typography>
-                  <Tooltip title="Back to anomaly results">
-                    <IconButton onClick={() => setSelectedId(null)} size="small">
-                      <ArrowBack fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-                <AnomalyDetection detailData={detailData} />
-              </Box>
-            ) : null}
-          </Box>
-        </Grid>
-      )}
-    </Grid>
+      {/* Details Dialog Modal */}
+      <Dialog open={openDetailDialog} onClose={handleClose} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <InfoOutlined color="primary" /> Anomaly Check Details
+        </DialogTitle>
+        <DialogContent dividers sx={{ minHeight: 120 }}>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}><CircularProgress /></Box>
+          ) : detailData ? (
+            <AnomalyDetection detailData={detailData} />
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+          <Button onClick={handleClose} color="inherit">Close</Button>
+          {detailData && detailData.status?.toLowerCase()?.includes('fail') && !detailData.is_resolved && canResolve && (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<CheckCircleOutline />}
+              onClick={async () => {
+                await handleResolve("anomaly", detailData.id);
+                setDetailData(prev => ({ ...prev, is_resolved: true }));
+              }}
+            >
+              Resolve Alert
+            </Button>
+          )}
+          {detailData && detailData.is_resolved && (
+            <Chip label="Resolved Successfully" color="success" icon={<CheckCircle />} sx={{ fontWeight: 600 }} />
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

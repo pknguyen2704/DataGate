@@ -10,14 +10,10 @@ function ModelConfig() {
 
   return (
     <Box>
-      <Box sx={{ px: 3, pt: 3 }}>
-        <Typography variant="h5" fontWeight={800} color="primary" sx={{ mb: 2 }}>
-          Model configurations
-        </Typography>
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs
           value={tab}
           onChange={(event, value) => setTab(value)}
-          sx={{ borderBottom: 1, borderColor: "divider" }}
         >
           <Tab icon={<TuneOutlined fontSize="small" />} iconPosition="start" label="Parameter" />
           <Tab icon={<SettingsSuggestOutlined fontSize="small" />} iconPosition="start" label="Config" />

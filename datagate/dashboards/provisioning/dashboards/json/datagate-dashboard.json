@@ -2,19 +2,21 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "ads54vs",
+    "name": "advd7nq",
     "namespace": "default",
-    "uid": "ecc7e572-97f6-43cd-860f-e4ad05631436",
-    "resourceVersion": "1778997798326987",
-    "generation": 1,
-    "creationTimestamp": "2026-05-17T06:03:18Z",
+    "uid": "320b8a1b-e504-4dc1-9566-a22dc5b8e31b",
+    "resourceVersion": "1779250365021988",
+    "generation": 2,
+    "creationTimestamp": "2026-05-20T04:12:22Z",
     "labels": {
-      "grafana.app/deprecatedInternalID": "2250461850013696"
+      "grafana.app/deprecatedInternalID": "3309710149754880"
     },
     "annotations": {
-      "grafana.app/createdBy": "user:cfmaye81je6m8e",
+      "grafana.app/createdBy": "user:efmlk7ecgz474c",
       "grafana.app/folder": "",
-      "grafana.app/saved-from-ui": "Grafana v13.0.1 (a100054f)"
+      "grafana.app/saved-from-ui": "Grafana v13.0.1 (a100054f)",
+      "grafana.app/updatedBy": "user:efmlk7ecgz474c",
+      "grafana.app/updatedTimestamp": "2026-05-20T04:12:45Z"
     }
   },
   "spec": {
@@ -2325,7 +2327,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    column_name AS \"Column\",\n    data_type AS \"Type\",\n    completeness AS \"Completeness\",\n    distinctness AS \"Distinctness\",\n    approx_count_distinct AS \"Approx Distinct\",\n    mean AS \"Mean\",\n    standard_deviation AS \"Std Dev\",\n    minimum AS \"Min\",\n    maximum AS \"Max\",\n    min_length AS \"Min Length\",\n    max_length AS \"Max Length\"\nFROM batch_table_profiling\nWHERE table_id = '$table_id'\nAND processing_date_hour = (\n    SELECT MAX(processing_date_hour AT TIME ZONE 'Asia/Ho_Chi_Minh')  \n    FROM batch_table_profiling \n    WHERE table_id = '$table_id'\n)\nORDER BY column_name;",
+                        "rawSql": "SELECT \n    column_name AS \"Column\",\n    data_type AS \"Type\",\n    completeness AS \"Completeness\",\n    distinctness AS \"Distinctness\",\n    approx_count_distinct AS \"Approx Distinct\",\n    mean AS \"Mean\",\n    standard_deviation AS \"Std Dev\",\n    minimum AS \"Min\",\n    maximum AS \"Max\",\n    min_length AS \"Min Length\",\n    max_length AS \"Max Length\"\nFROM batch_table_profiling\nWHERE table_id = '$table_id'\nAND processing_date_hour = (\n    SELECT MAX(processing_date_hour)\n    FROM batch_table_profiling \n    WHERE table_id = '$table_id'\n)\nORDER BY column_name;",
                         "sql": {
                           "columns": [
                             {
@@ -2888,8 +2890,8 @@
         "spec": {
           "name": "table_id",
           "current": {
-            "text": "b3f3955b-52cf-4740-83c5-e92c9ca3a2ee",
-            "value": "b3f3955b-52cf-4740-83c5-e92c9ca3a2ee"
+            "text": "7e07f5e2-fead-4e1b-94b6-00bbe9267c37",
+            "value": "7e07f5e2-fead-4e1b-94b6-00bbe9267c37"
           },
           "label": "Table ID",
           "hide": "hideVariable",

@@ -29,7 +29,7 @@ def list_connections(
     page_size: int = Query(default=50, ge=1, le=100),
     is_active: bool | None = Query(default=None),
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.list_connections(page=page, page_size=page_size, is_active=is_active)
 
@@ -49,7 +49,7 @@ def create_connection(
 def get_connection(
     connection_id: UUID,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     return service.get_connection_or_404(str(connection_id))
 
@@ -96,7 +96,7 @@ def discover_tables(
     connection_id: UUID,
     schema: str | None = Query(default=None),
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     if not schema:
         return service.list_schemas(str(connection_id))
@@ -110,7 +110,7 @@ def add_managed_table(
     schema: str,
     table_name: str,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_MANAGE)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     # This logic should be in ConnectionService, I'll add it there.
     return service.add_managed_table(str(connection_id), catalog, schema, table_name)
@@ -123,7 +123,7 @@ def remove_managed_table(
     connection_id: UUID,
     table_id: UUID,
     service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.TABLE_DELETE)),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
 ):
     service.remove_managed_table(str(table_id))
     return None

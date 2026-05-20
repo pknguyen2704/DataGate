@@ -3,7 +3,7 @@ import {
   Box, Typography, Paper, Tabs, Tab, Button, TextField, MenuItem, Grid, Stack,
   FormControl, InputLabel, Select
 } from "@mui/material";
-import { Refresh, Search, FilterList, Add } from "@mui/icons-material";
+import { Search, FilterList, Add } from "@mui/icons-material";
 import { useParams } from "react-router-dom";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
 import { useApiResource } from "~/hooks/useApiResource";
@@ -48,7 +48,6 @@ const Metric = () => {
           {isSilver && <Tab label="Anomaly Thresholds" />}
         </Tabs>
         <Stack direction="row" spacing={1}>
-          <Button startIcon={<Refresh />} size="small" onClick={() => window.location.reload()}>Refresh</Button>
           {canManage && (
             <Button 
               variant="contained" 
@@ -66,21 +65,6 @@ const Metric = () => {
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, bgcolor: 'background.default' }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search by metric, column, description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: <Search fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={2}>
-            {/* Placeholder to match Rules layout spacing */}
-          </Grid>
-          <Grid item xs={12} md={2}>
             <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
               <Select
@@ -94,7 +78,7 @@ const Metric = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Severity</InputLabel>
               <Select
@@ -108,7 +92,7 @@ const Metric = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} md={4}>
             <Button 
               fullWidth 
               variant="contained" 

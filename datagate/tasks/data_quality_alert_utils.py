@@ -73,16 +73,18 @@ def get_connection_config(pg_hook, connection_name):
     }
 
 
-def get_active_tables(pg_hook, catalog_name, schema_name):
+def get_active_tables(pg_hook, connection_id, catalog_name, schema_name):
     schema_name = validate_name(schema_name, "schema_name")
     rows = pg_hook.get_records(
         """
         SELECT id
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name = %s
+          AND is_active = TRUE
         """,
-        parameters=(catalog_name, schema_name),
+        parameters=(connection_id, catalog_name, schema_name),
     )
     return [str(row[0]) for row in rows]
 
@@ -187,7 +189,7 @@ def fetch_quality_failure_details(
           AND x.status = 'fail'
           AND x.is_resolved = FALSE
         ORDER BY
-            CASE severity_level
+            CASE x.severity_level
                 WHEN 'critical' THEN 1
                 WHEN 'warning' THEN 2
                 ELSE 3
@@ -346,6 +348,7 @@ def run_quality_gate(
 
         table_ids = get_active_tables(
             pg_hook,
+            connection_config["connection_id"],
             connection_config["catalog_name"],
             schema_name,
         )

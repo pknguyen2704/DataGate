@@ -19,7 +19,7 @@ class MetricsService:
     def _anomaly_threshold_payload(self, threshold: QualityThreshold) -> dict:
         return {
             "id": threshold.id,
-            "model_parameter_id": threshold.table_id,
+            "table_id": threshold.table_id,
             "auc_threshold": threshold.min_threshold,
             "severity_level": threshold.severity_level,
             "is_active": threshold.is_active,

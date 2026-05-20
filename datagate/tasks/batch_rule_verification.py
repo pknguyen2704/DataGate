@@ -51,7 +51,7 @@ def normalize_processing_date_hour(value):
 def get_connection_config(pg_hook, connection_name):
     row = pg_hook.get_first(
         """
-        SELECT connection_name, iceberg_rest_url, iceberg_warehouse, iceberg_catalog_name,
+        SELECT id, connection_name, iceberg_rest_url, iceberg_warehouse, iceberg_catalog_name,
                minio_endpoint_url, minio_access_key, minio_secret_key
         FROM connections
         WHERE connection_name = %s
@@ -65,28 +65,31 @@ def get_connection_config(pg_hook, connection_name):
         raise ValueError(f"No active connection found: {connection_name}")
 
     return {
-        "connection_name": row[0],
-        "iceberg_rest_url": row[1],
-        "iceberg_warehouse": row[2],
-        "catalog_name": validate_name(row[3], "iceberg_catalog_name"),
-        "minio_endpoint_url": row[4],
-        "minio_access_key": row[5],
-        "minio_secret_key": row[6],
+        "connection_id": str(row[0]),
+        "connection_name": row[1],
+        "iceberg_rest_url": row[2],
+        "iceberg_warehouse": row[3],
+        "catalog_name": validate_name(row[4], "iceberg_catalog_name"),
+        "minio_endpoint_url": row[5],
+        "minio_access_key": row[6],
+        "minio_secret_key": row[7],
     }
 
 
-def get_active_tables(pg_hook, catalog_name, schema_name):
+def get_active_tables(pg_hook, connection_id, catalog_name, schema_name):
     schema_name = validate_name(schema_name, "schema_name")
 
     rows = pg_hook.get_records(
         """
         SELECT id, table_name
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name = %s
+          AND is_active = TRUE
         ORDER BY table_name
         """,
-        parameters=(catalog_name, schema_name),
+        parameters=(connection_id, catalog_name, schema_name),
     )
 
     return [
@@ -395,7 +398,10 @@ def main():
         pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
         connection_config = get_connection_config(pg_hook, args.connection_name)
         tables = get_active_tables(
-            pg_hook, connection_config["catalog_name"], schema_name
+            pg_hook,
+            connection_config["connection_id"],
+            connection_config["catalog_name"],
+            schema_name,
         )
 
         if not tables:

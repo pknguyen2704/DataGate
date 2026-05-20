@@ -4,11 +4,11 @@ import {
   Paper, Stack, IconButton, Dialog, DialogTitle, DialogContent, 
   DialogActions, TextField,
   Typography, Tooltip, MenuItem, Select, FormControl, InputLabel,
-  TablePagination, TableContainer
+  TablePagination, TableContainer, Grid
 } from "@mui/material";
-import { 
-  RefreshOutlined, EditOutlined, AddOutlined, SaveOutlined, 
-  PersonOutline, KeyOutlined
+import {
+  EditOutlined, AddOutlined, SaveOutlined,
+  PersonOutline, VisibilityOutlined, ArrowBackOutlined, DeleteOutline
 } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { usersApi } from "~/apis/usersApi";
@@ -16,6 +16,7 @@ import { rolesApi } from "~/apis/rolesApi";
 import { StateBox, StatusChip } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
 import { toast } from "react-toastify";
+import { useConfirm } from "material-ui-confirm";
 
 function UserManagement() {
   const { user: currentUser } = useSelector(state => state.auth);
@@ -25,6 +26,7 @@ function UserManagement() {
   
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedId, setSelectedId] = useState(null);
   
   const users = useApiResource(() => usersApi.list({ 
     page: page + 1, 
@@ -32,12 +34,10 @@ function UserManagement() {
   }), [page, pageSize]);
   
   const roles = useApiResource(() => rolesApi.list());
+  const confirm = useConfirm();
 
   const [openUser, setOpenUser] = useState(false);
-  const [openPassword, setOpenPassword] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-
-  const refresh = () => users.reload();
 
   const handleOpenAdd = () => {
     setEditingUser(null);
@@ -49,14 +49,126 @@ function UserManagement() {
     setOpenUser(true);
   };
 
-  const handleOpenPassword = (user) => {
-    setEditingUser(user);
-    setOpenPassword(true);
+  const handleDelete = (id) => {
+    confirm({
+      title: "Delete User",
+      description: "Are you sure you want to permanently delete this user?",
+      confirmationText: "Delete",
+      cancellationText: "Cancel",
+      confirmationButtonProps: { color: "error", variant: "contained" }
+    })
+      .then(async () => {
+        try {
+          await usersApi.delete(id);
+          toast.success("User deleted successfully");
+          setSelectedId(null);
+          users.reload();
+        } catch (error) {
+          console.error(error);
+          toast.error(error.response?.data?.detail || "Failed to delete user");
+        }
+      })
+      .catch(() => {});
   };
 
   let userItems = [];
   if (users.data && users.data.items) {
     userItems = users.data.items;
+  }
+
+  const selectedUser = userItems.find(u => u.id === selectedId);
+
+  const userDialog = (
+    <UserDialog 
+      open={openUser} 
+      onClose={() => {
+        setOpenUser(false);
+        if (selectedId) {
+          users.reload();
+        }
+      }} 
+      user={editingUser} 
+      roles={roles.data?.items || []}
+      onSuccess={() => users.reload()}
+    />
+  );
+
+  if (selectedUser) {
+    return (
+      <Box sx={{ p: 0, pt: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <IconButton onClick={() => setSelectedId(null)} sx={{ mr: 1 }} color="primary">
+            <ArrowBackOutlined />
+          </IconButton>
+          <Typography variant="h6" fontWeight={700}>User Details</Typography>
+        </Box>
+
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3, pb: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 2 }}>
+                <PersonOutline sx={{ fontSize: 40 }} />
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" fontWeight={700}>USERNAME</Typography>
+                <Typography variant="h6" fontWeight={800}>
+                  {selectedUser.username}
+                </Typography>
+              </Box>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              {canManage && (
+                <>
+                  <Button size="small" variant="outlined" startIcon={<EditOutlined />} onClick={() => handleOpenEdit(selectedUser)}>
+                    Edit
+                  </Button>
+                  <Button size="small" variant="outlined" color="error" startIcon={<DeleteOutline />} onClick={() => handleDelete(selectedUser.id)}>
+                    Delete
+                  </Button>
+                </>
+              )}
+            </Stack>
+          </Stack>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6} md={4}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: 'action.hover' }}>
+                <Typography variant="caption" color="text.secondary" fontWeight={700}>FULL NAME</Typography>
+                <Typography variant="body1" fontWeight={600} sx={{ overflowWrap: 'anywhere', mt: 0.5 }}>
+                  {selectedUser.full_name || "—"}
+                </Typography>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: 'action.hover' }}>
+                <Typography variant="caption" color="text.secondary" fontWeight={700}>EMAIL ADDRESS</Typography>
+                <Typography variant="body1" fontWeight={600} sx={{ mt: 0.5 }}>
+                  {selectedUser.email || "—"}
+                </Typography>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: 'action.hover' }}>
+                <Typography variant="caption" color="text.secondary" fontWeight={700}>ASSIGNED ROLE</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  {selectedUser.role || selectedUser.roles?.[0] ? (
+                    <Typography variant="caption" sx={{ display: 'inline-block', bgcolor: 'primary.50', color: 'primary.main', px: 1.5, py: 0.5, borderRadius: 1, fontWeight: 700 }}>
+                      {(selectedUser.role || selectedUser.roles[0]).name}
+                    </Typography>
+                  ) : (
+                    <Typography variant="body1" fontWeight={600} color="text.secondary">—</Typography>
+                  )}
+                </Box>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        {userDialog}
+      </Box>
+    );
   }
 
   return (
@@ -67,9 +179,6 @@ function UserManagement() {
           <Typography variant="body2" color="text.secondary">Create and manage system users and their access roles.</Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button startIcon={<RefreshOutlined />} variant="outlined" onClick={refresh}>
-            Refresh
-          </Button>
           {canManage && (
             <Button startIcon={<AddOutlined />} variant="contained" onClick={handleOpenAdd}>
               New User
@@ -91,7 +200,12 @@ function UserManagement() {
             </TableHead>
             <TableBody>
               {userItems.map((user) => (
-                <TableRow key={user.id} hover>
+                <TableRow
+                  key={user.id}
+                  hover
+                  onClick={() => setSelectedId(user.id)}
+                  sx={{ cursor: 'pointer' }}
+                >
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <Box sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
@@ -117,14 +231,9 @@ function UserManagement() {
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                       {canManage && (
                         <>
-                          <Tooltip title="Edit User">
-                            <IconButton size="small" color="primary" onClick={() => handleOpenEdit(user)}>
-                              <EditOutlined fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Reset Password">
-                            <IconButton size="small" color="secondary" onClick={() => handleOpenPassword(user)}>
-                              <KeyOutlined fontSize="small" />
+                          <Tooltip title="View details">
+                            <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); setSelectedId(user.id); }}>
+                              <VisibilityOutlined fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         </>
@@ -150,21 +259,7 @@ function UserManagement() {
         </TableContainer>
       </StateBox>
 
-      {/* User Dialog */}
-      <UserDialog 
-        open={openUser} 
-        onClose={() => setOpenUser(false)} 
-        user={editingUser} 
-        roles={roles.data?.items || []}
-        onSuccess={refresh}
-      />
-
-      {/* Password Dialog */}
-      <PasswordDialog 
-        open={openPassword} 
-        onClose={() => setOpenPassword(false)} 
-        user={editingUser} 
-      />
+      {userDialog}
     </Box>
   );
 }
@@ -193,18 +288,31 @@ function UserDialog({ open, onClose, user, roles, onSuccess }) {
       toast.warning("Please select a role");
       return;
     }
+    const password = form.password.trim();
+    if (!user && !password) {
+      toast.warning("Please enter a password");
+      return;
+    }
+    if (password && password.length < 6) {
+      toast.warning("Password must be at least 6 characters");
+      return;
+    }
     setSaving(true);
     try {
       if (user) {
-        await usersApi.update(user.id, {
+        const payload = {
           username: form.username,
           full_name: form.full_name,
           email: form.email,
           role_id: form.role_id
-        });
+        };
+        if (password) {
+          payload.password = password;
+        }
+        await usersApi.update(user.id, payload);
         toast.success("User updated");
       } else {
-        await usersApi.create(form);
+        await usersApi.create({ ...form, password });
         toast.success("User created");
       }
       onSuccess();
@@ -224,7 +332,14 @@ function UserDialog({ open, onClose, user, roles, onSuccess }) {
           <TextField label="Username" fullWidth size="small" value={form.username} onChange={e => setForm({...form, username: e.target.value})} disabled={!!user} />
           <TextField label="Full Name" fullWidth size="small" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} />
           <TextField label="Email" fullWidth size="small" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-          {!user && <TextField label="Password" type="password" fullWidth size="small" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />}
+          <TextField
+            label={user ? "New Password (leave blank to keep current)" : "Password"}
+            type="password"
+            fullWidth
+            size="small"
+            value={form.password}
+            onChange={e => setForm({...form, password: e.target.value})}
+          />
           
           <FormControl fullWidth size="small">
             <InputLabel id="user-role-label">Role</InputLabel>
@@ -246,52 +361,6 @@ function UserDialog({ open, onClose, user, roles, onSuccess }) {
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save User"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function PasswordDialog({ open, onClose, user }) {
-  const [password, setPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    if (!password) return toast.warning("Password cannot be empty");
-    setSaving(true);
-    try {
-      await usersApi.updatePassword(user.id, password);
-      toast.success("Password reset successfully");
-      onClose();
-      setPassword("");
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to reset password");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700 }}>Reset Password</DialogTitle>
-      <DialogContent dividers>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Set a new password for user: <strong>{user?.username}</strong>
-        </Typography>
-        <TextField 
-          label="New Password" 
-          type="password" 
-          fullWidth 
-          size="small" 
-          value={password} 
-          onChange={e => setPassword(e.target.value)}
-          autoFocus
-        />
-      </DialogContent>
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" color="secondary" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving}>
-          {saving ? "Resetting..." : "Reset Password"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -20,11 +20,13 @@ class TableUpdate(BaseModel):
     catalog_name: str | None = Field(default=None, max_length=255)
     schema_name: str | None = Field(default=None, max_length=255)
     table_name: str | None = Field(default=None, max_length=255)
+    is_active: bool | None = None
 
 
 class TableOut(TableBase):
     id: UUID
     connection_id: UUID
+    is_active: bool
     created_at: datetime
     updated_at: datetime
     latest_processing_date_hour: datetime | None = None
@@ -41,6 +43,7 @@ class TableLiteOut(BaseModel):
     catalog_name: str
     schema_name: str
     table_name: str
+    is_active: bool | None = None
     latest_processing_date_hour: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 

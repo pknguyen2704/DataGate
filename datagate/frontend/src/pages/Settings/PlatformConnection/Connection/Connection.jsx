@@ -1,14 +1,14 @@
 import React from 'react';
 import {
-  Box, Button, Typography, Switch, Grid, Chip, Paper
+  Box, Button, Typography, Switch, Grid, Chip, Paper, Stack
 } from "@mui/material";
-import { DeleteOutline } from "@mui/icons-material";
+import { DeleteOutline, EditOutlined } from "@mui/icons-material";
 import { connectionsApi } from "~/apis/connectionsApi";
 import { toast } from "react-toastify";
 
 import { useConfirm } from "material-ui-confirm";
 
-function Connection({ connection, canUpdate, canDelete, onReload, onDeleted }) {
+function Connection({ connection, canUpdate, canDelete, onEdit, onReload, onDeleted }) {
   const confirm = useConfirm();
 
   const handleToggleActive = async () => {
@@ -50,37 +50,41 @@ function Connection({ connection, canUpdate, canDelete, onReload, onDeleted }) {
   return (
     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
       <Grid container spacing={3}>
-        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider', pb: 1, mb: 1 }}>
+        <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, borderBottom: '1px solid', borderColor: 'divider', pb: 1, mb: 1 }}>
           <Typography variant="h6" color="primary" fontWeight={700}>General Info</Typography>
-          {canDelete && (
-            <Button variant="outlined" color="error" size="small" startIcon={<DeleteOutline />} onClick={handleDelete}>
-              Delete Connection
-            </Button>
-          )}
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Switch
+                size="small"
+                checked={connection.is_active}
+                onChange={handleToggleActive}
+                color="success"
+                disabled={!canUpdate}
+              />
+              <Chip
+                label={connection.is_active ? "Active" : "Inactive"}
+                size="small"
+                variant="outlined"
+                color={connection.is_active ? "success" : "default"}
+                sx={{ ml: 0.5, border: 'none', fontWeight: 600 }}
+              />
+            </Box>
+            {canUpdate && (
+              <Button variant="outlined" color="primary" size="small" startIcon={<EditOutlined />} onClick={() => onEdit(connection)}>
+                Edit
+              </Button>
+            )}
+            {canDelete && (
+              <Button variant="outlined" color="error" size="small" startIcon={<DeleteOutline />} onClick={handleDelete}>
+                Delete
+              </Button>
+            )}
+          </Stack>
         </Grid>
         
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>DESCRIPTION</Typography>
           <Typography variant="body2">{connection.description || "N/A"}</Typography>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Typography variant="caption" color="text.secondary" fontWeight={700}>STATUS</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-            <Switch
-              size="small"
-              checked={connection.is_active}
-              onChange={handleToggleActive}
-              color="success"
-              disabled={!canUpdate}
-            />
-            <Chip
-              label={connection.is_active ? "Active" : "Inactive"}
-              size="small"
-              variant="outlined"
-              color={connection.is_active ? "success" : "default"}
-              sx={{ ml: 1, border: 'none', fontWeight: 600 }}
-            />
-          </Box>
         </Grid>
 
         <Grid item xs={12}>

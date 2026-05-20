@@ -60,6 +60,7 @@ class MetadataResultDetail(BaseModel):
     threshold_value: float | None = None
     min_threshold: float | None = None
     max_threshold: float | None = None
+    description: str | None = None
     is_resolved: bool
     processing_date_hour: datetime
     created_at: datetime | None = None
@@ -79,6 +80,7 @@ class ProfilingResultDetail(BaseModel):
     threshold_value: float | None = None
     min_threshold: float | None = None
     max_threshold: float | None = None
+    description: str | None = None
     is_resolved: bool
     processing_date_hour: datetime
     created_at: datetime | None = None
@@ -111,8 +113,8 @@ class AnomalyResultDetail(BaseModel):
     severity_level: str
     processing_date_hour: datetime
     is_resolved: bool
-    auc_score: float
-    auc_threshold: float
+    auc_score: float | None = None
+    auc_threshold: float | None = None
     model_config_params: dict | None = None
     top_features: list[dict] = Field(default_factory=list)
     created_at: datetime

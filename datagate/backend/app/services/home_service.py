@@ -2,7 +2,13 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from app.models import Connection, QualityCheckResult, QualityMetricObservation, Table
+from app.models import (
+    BatchTableMetadata,
+    BatchTableProfiling,
+    Connection,
+    QualityCheckResult,
+    Table,
+)
 
 
 class HomeService:
@@ -158,7 +164,7 @@ class HomeService:
 
     def processing_hours(self) -> list[datetime]:
         hours = set()
-        for model in (QualityMetricObservation, QualityCheckResult):
+        for model in (BatchTableMetadata, BatchTableProfiling, QualityCheckResult):
             rows = self.db.query(model.processing_date_hour).distinct().all()
             hours.update(row[0] for row in rows if row[0])
         return sorted(hours, reverse=True)

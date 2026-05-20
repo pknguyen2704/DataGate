@@ -78,10 +78,6 @@ from .observability_schema import (
     ManagedSchemaNodeOut,
 )
 
-from .lab_schema import (
-    NotebookEmbedUrlOut,
-)
-
 from .auth_schema import (
     LoginRequest,
     MessageResponse,

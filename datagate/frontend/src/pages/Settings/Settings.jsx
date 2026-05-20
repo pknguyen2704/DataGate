@@ -11,10 +11,10 @@ const SETTINGS_MENU = [
     text: "Platform Connections",
     icon: <SettingsInputComponentOutlined />,
     path: `${SETTINGS_BASE_PATH}/connections`,
-    permission: "connection:view",
+    permission: "connection:manage",
   },
   {
-    text: "Model Configurations",
+    text: "Anomaly Configurations",
     icon: <ModelTrainingOutlined />,
     path: `${SETTINGS_BASE_PATH}/model-configs`,
     permission: "model_config:view",

@@ -6,11 +6,11 @@ export { connectionsApi } from "./connectionsApi";
 export { dataAssetsApi } from "./dataAssetsApi";
 export { rulesApi } from "./rulesApi";
 export { homeApi } from "./homeApi";
-export { labApi } from "./labApi";
 export { observabilityApi } from "./observabilityApi";
 export { metricsApi } from "./metricsApi";
 export { dataQualityApi } from "./dataQualityApi";
 export { anomalyJobConfigsApi, modelParametersApi } from "./modelConfigsApi";
+export { labApi } from "./labApi";
 
 const getDefaultApiUrl = () => {
   const { protocol, hostname } = window.location;

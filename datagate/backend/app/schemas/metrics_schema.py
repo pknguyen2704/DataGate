@@ -102,7 +102,7 @@ class AnomalyThresholdUpdate(BaseModel):
 
 class AnomalyThresholdOut(AnomalyThresholdBase):
     id: UUID
-    model_parameter_id: UUID
+    table_id: UUID
     created_at: datetime
     updated_at: datetime
     created_by: UUID | None = None

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -15,29 +15,24 @@ class Table(Base):
     __tablename__ = "tables"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    connection_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("connections.id", ondelete="CASCADE"),
-        nullable=False,
-    )
+    # Cascade xoa connection thi xoa toan bo bang
+    connection_id = Column(UUID(as_uuid=False),ForeignKey("connections.id", ondelete="CASCADE"),nullable=False)
 
     catalog_name = Column(String(255), nullable=False)
     schema_name = Column(String(255), nullable=False)
     table_name = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
 
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now(),nullable=False)
 
+    # Relationship
     connection = relationship("Connection", back_populates="tables")
-    quality_metric_observations = relationship(
-        "QualityMetricObservation", back_populates="table", cascade="all, delete-orphan"
+    batch_table_metadata = relationship(
+        "BatchTableMetadata", back_populates="table", cascade="all, delete-orphan"
+    )
+    batch_table_profiling = relationship(
+        "BatchTableProfiling", back_populates="table", cascade="all, delete-orphan"
     )
     quality_thresholds = relationship(
         "QualityThreshold", back_populates="table", cascade="all, delete-orphan"
@@ -47,7 +42,7 @@ class Table(Base):
         "QualityCheckResult", back_populates="table", cascade="all, delete-orphan"
     )
     anomaly_config = relationship(
-        "AnomalyConfig",
+        "ModelConfig",
         back_populates="table",
         uselist=False,
         cascade="all, delete-orphan",
@@ -66,4 +61,5 @@ class Table(Base):
             unique=True,
         ),
         Index("ix_tables__connection_id", "connection_id"),
+        Index("ix_tables__is_active", "is_active"),
     )

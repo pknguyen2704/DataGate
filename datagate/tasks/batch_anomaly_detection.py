@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timedelta
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from psycopg2.extras import Json
+from psycopg2.extras import Json, execute_values
 
 from pyspark import StorageLevel
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
@@ -38,6 +38,11 @@ JOB_NAME = "batch_anomaly_detection"
 
 DEFAULT_EXCLUDE_COLS = {
     "label",
+}
+
+DEFAULT_READINESS_CONFIG = {
+    "batch_time_col": "processing_date_hour",
+    "required_history_days": 30,
 }
 
 NUMERIC_TYPES = (
@@ -141,7 +146,7 @@ def as_list(value):
 def get_connection_config(pg_hook, connection_name):
     row = pg_hook.get_first(
         """
-        SELECT connection_name, iceberg_rest_url, iceberg_warehouse, iceberg_catalog_name,
+        SELECT id, connection_name, iceberg_rest_url, iceberg_warehouse, iceberg_catalog_name,
                minio_endpoint_url, minio_access_key, minio_secret_key
         FROM connections
         WHERE connection_name = %s
@@ -155,17 +160,19 @@ def get_connection_config(pg_hook, connection_name):
         raise ValueError(f"No active connection found: {connection_name}")
 
     return {
-        "connection_name": row[0],
-        "iceberg_rest_url": row[1],
-        "iceberg_warehouse": row[2],
-        "catalog_name": validate_identifier(row[3], "iceberg_catalog_name"),
-        "minio_endpoint_url": row[4],
-        "minio_access_key": row[5],
-        "minio_secret_key": row[6],
+        "connection_id": str(row[0]),
+        "connection_name": row[1],
+        "iceberg_rest_url": row[2],
+        "iceberg_warehouse": row[3],
+        "catalog_name": validate_identifier(row[4], "iceberg_catalog_name"),
+        "minio_endpoint_url": row[5],
+        "minio_access_key": row[6],
+        "minio_secret_key": row[7],
     }
 
 
-def get_active_tables(pg_hook, catalog_name, schema_name):
+def get_active_tables(pg_hook, connection_id, catalog_name, schema_name):
+    connection_id = str(connection_id)
     catalog_name = validate_identifier(catalog_name, "catalog_name")
     schema_name = validate_identifier(schema_name, "schema_name")
 
@@ -173,11 +180,13 @@ def get_active_tables(pg_hook, catalog_name, schema_name):
         """
         SELECT id, table_name
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name = %s
+          AND is_active = TRUE
         ORDER BY table_name
         """,
-        parameters=(catalog_name, schema_name),
+        parameters=(connection_id, catalog_name, schema_name),
     )
 
     return [
@@ -196,9 +205,16 @@ def get_anomaly_config(pg_hook, table_id):
         SELECT
             id,
             batch_time_col,
-            feature_config,
-            column_config
-        FROM anomaly_configs
+            required_history_days,
+            previous_batch_hours,
+            history_days,
+            target_sample_per_group,
+            test_size,
+            random_state,
+            exclude_cols,
+            categorical_cols,
+            numeric_cols
+        FROM model_configs
         WHERE table_id = %s
         LIMIT 1
         """,
@@ -209,32 +225,28 @@ def get_anomaly_config(pg_hook, table_id):
         return None
 
     cfg = {
-        "anomaly_config_id": str(row[0]),
+        "model_config_id": str(row[0]),
         "batch_time_col": validate_identifier(row[1], "batch_time_col"),
     }
-    feature_config = row[2] or {}
-    column_config = row[3] or {}
     cfg.update(
         {
-            "required_history_days": int(feature_config["required_history_days"]),
-            "previous_batch_hours": int(feature_config["previous_batch_hours"]),
-            "history_days": [int(x) for x in as_list(feature_config["history_days"])],
-            "target_sample_per_group": int(feature_config["target_sample_per_group"]),
-            "test_size": float(feature_config["test_size"]),
-            "random_state": int(feature_config["random_state"]),
-            "p_value_alpha": float(feature_config["p_value_alpha"]),
-            "min_history_auc_points": int(feature_config["min_history_auc_points"]),
+            "required_history_days": int(row[2]),
+            "previous_batch_hours": int(row[3]),
+            "history_days": [int(x) for x in as_list(row[4])],
+            "target_sample_per_group": int(row[5]),
+            "test_size": float(row[6]),
+            "random_state": int(row[7]),
             "exclude_cols": [
                 validate_identifier(col, "exclude_col")
-                for col in as_list(column_config.get("exclude_cols", []))
+                for col in as_list(row[8])
             ],
             "categorical_cols": [
                 validate_identifier(col, "categorical_col")
-                for col in as_list(column_config.get("categorical_cols", []))
+                for col in as_list(row[9])
             ],
             "numeric_cols": [
                 validate_identifier(col, "numeric_col")
-                for col in as_list(column_config.get("numeric_cols", []))
+                for col in as_list(row[10])
             ],
         }
     )
@@ -254,20 +266,17 @@ def get_anomaly_config(pg_hook, table_id):
     if cfg["test_size"] <= 0 or cfg["test_size"] >= 1:
         raise ValueError("test_size must be between 0 and 1.")
 
-    if cfg["p_value_alpha"] <= 0 or cfg["p_value_alpha"] >= 1:
-        raise ValueError("p_value_alpha must be between 0 and 1.")
-
-    if cfg["min_history_auc_points"] <= 0:
-        raise ValueError("min_history_auc_points must be greater than 0.")
-
     return cfg
 
 
 def get_model_parameter(pg_hook, table_id):
     row = pg_hook.get_first(
         """
-        SELECT id, model_parameters
-        FROM anomaly_configs
+        SELECT
+            id, learning_rate, num_leaves, max_depth, min_data_in_leaf,
+            bagging_fraction, bagging_freq, feature_fraction, lambda_l1,
+            lambda_l2, min_gain_to_split, max_bin, num_iterations
+        FROM model_parameters
         WHERE table_id = %s
         LIMIT 1
         """,
@@ -277,21 +286,20 @@ def get_model_parameter(pg_hook, table_id):
     if row is None:
         return None
 
-    params = row[1] or {}
     return {
         "parameter_id": str(row[0]),
-        "learningRate": float(params["learning_rate"]),
-        "numLeaves": int(params["num_leaves"]),
-        "maxDepth": int(params["max_depth"]),
-        "minDataInLeaf": int(params["min_data_in_leaf"]),
-        "baggingFraction": float(params["bagging_fraction"]),
-        "baggingFreq": int(params["bagging_freq"]),
-        "featureFraction": float(params["feature_fraction"]),
-        "lambdaL1": float(params["lambda_l1"]),
-        "lambdaL2": float(params["lambda_l2"]),
-        "minGainToSplit": float(params["min_gain_to_split"]),
-        "maxBin": int(params["max_bin"]),
-        "numIterations": int(params["num_iterations"]),
+        "learningRate": float(row[1]),
+        "numLeaves": int(row[2]),
+        "maxDepth": int(row[3]),
+        "minDataInLeaf": int(row[4]),
+        "baggingFraction": float(row[5]),
+        "baggingFreq": int(row[6]),
+        "featureFraction": float(row[7]),
+        "lambdaL1": float(row[8]),
+        "lambdaL2": float(row[9]),
+        "minGainToSplit": float(row[10]),
+        "maxBin": int(row[11]),
+        "numIterations": int(row[12]),
     }
 
 
@@ -325,28 +333,6 @@ def get_auc_threshold(pg_hook, table_id):
         "auc_threshold": float(row[1]),
         "severity_level": row[2],
     }
-
-
-def get_historical_auc_values(pg_hook, table_id, processing_hour):
-    rows = pg_hook.get_records(
-        """
-        SELECT auc_score
-        FROM anomaly_results
-        WHERE table_id = %s
-          AND processing_date_hour < %s
-          AND auc_score IS NOT NULL
-        ORDER BY processing_date_hour
-        """,
-        parameters=(table_id, processing_hour),
-    )
-
-    return [float(row[0]) for row in rows]
-
-
-def empirical_p_value(history_scores, current_auc):
-    return (sum(1 for score in history_scores if score >= current_auc) + 1) / (
-        len(history_scores) + 1
-    )
 
 
 def create_spark_session(connection_config):
@@ -431,6 +417,15 @@ def has_enough_history(spark, table_name, target_hour, anomaly_cfg):
         required_hour,
     )
     return True
+
+
+def fail_missing_config(table, config_name, processing_hour):
+    raise ValueError(
+        f"Missing {config_name} for anomaly detection after readiness check passed | "
+        f"table={table['full_table_name']} | "
+        f"table_id={table['table_id']} | "
+        f"processing_date_hour={processing_hour}"
+    )
 
 
 def read_batch(spark, table_name, hour, label, seed, anomaly_cfg):
@@ -799,7 +794,7 @@ def build_parameter_snapshot(cfg, runtime_cfg):
     }
 
 
-def build_feature_config_snapshot(anomaly_cfg, feature_cols):
+def build_config_snapshot(anomaly_cfg, feature_cols):
     return {
         "anomaly_config": {
             "batch_time_col": anomaly_cfg["batch_time_col"],
@@ -809,8 +804,6 @@ def build_feature_config_snapshot(anomaly_cfg, feature_cols):
             "target_sample_per_group": anomaly_cfg["target_sample_per_group"],
             "test_size": anomaly_cfg["test_size"],
             "random_state": anomaly_cfg["random_state"],
-            "p_value_alpha": anomaly_cfg["p_value_alpha"],
-            "min_history_auc_points": anomaly_cfg["min_history_auc_points"],
             "exclude_cols": anomaly_cfg["exclude_cols"],
             "categorical_cols": anomaly_cfg["categorical_cols"],
             "numeric_cols": anomaly_cfg["numeric_cols"],
@@ -828,29 +821,26 @@ def save_auc_result(
     feature_cols,
     processing_hour,
     auc_score,
-    p_value,
 ):
     sql = """
         INSERT INTO anomaly_results (
             id,
             table_id,
-            anomaly_config_id,
+            model_parameter_id,
             processing_date_hour,
             auc_score,
-            p_value,
             parameter_snapshot,
-            feature_config_snapshot,
+            config_snapshot,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
         ON CONFLICT (table_id, processing_date_hour)
         DO UPDATE SET
-            anomaly_config_id = EXCLUDED.anomaly_config_id,
+            model_parameter_id = EXCLUDED.model_parameter_id,
             auc_score = EXCLUDED.auc_score,
-            p_value = EXCLUDED.p_value,
             parameter_snapshot = EXCLUDED.parameter_snapshot,
-            feature_config_snapshot = EXCLUDED.feature_config_snapshot,
+            config_snapshot = EXCLUDED.config_snapshot,
             updated_at = NOW()
         RETURNING id
     """
@@ -863,12 +853,11 @@ def save_auc_result(
             (
                 str(uuid.uuid4()),
                 table_id,
-                anomaly_cfg["anomaly_config_id"],
+                cfg["parameter_id"],
                 processing_hour,
                 auc_score,
-                p_value,
                 Json(build_parameter_snapshot(cfg, runtime_cfg)),
-                Json(build_feature_config_snapshot(anomaly_cfg, feature_cols)),
+                Json(build_config_snapshot(anomaly_cfg, feature_cols)),
             ),
         )
         result_id = str(cur.fetchone()[0])
@@ -876,10 +865,9 @@ def save_auc_result(
     conn.commit()
 
     logger.info(
-        "Saved AUC result | result_id=%s | auc=%s | p_value=%s",
+        "Saved AUC result | result_id=%s | auc=%s",
         result_id,
         auc_score,
-        p_value,
     )
 
     return result_id
@@ -890,65 +878,74 @@ def save_shap(pg_hook, result_id, processing_hour, rows):
         return
 
     sql = """
-        UPDATE anomaly_results
-        SET shap_top_features = %s::jsonb,
+        INSERT INTO shap_results (
+            id, anomaly_result_id, feature_name, shap_score, shap_rank,
+            processing_date_hour, created_at, updated_at
+        )
+        VALUES %s
+        ON CONFLICT (anomaly_result_id, feature_name)
+        DO UPDATE SET
+            shap_score = EXCLUDED.shap_score,
+            shap_rank = EXCLUDED.shap_rank,
+            processing_date_hour = EXCLUDED.processing_date_hour,
             updated_at = NOW()
-        WHERE id = %s
     """
 
-    features = [
-        {
-            "feature_name": row["feature_name"],
-            "shap_score": row["shap_score"],
-            "rank": row["shap_rank"],
-        }
+    values = [
+        (
+            str(uuid.uuid4()),
+            result_id,
+            row["feature_name"],
+            row["shap_score"],
+            row["shap_rank"],
+            processing_hour,
+        )
         for row in rows
     ]
 
     conn = pg_hook.get_conn()
 
     with conn.cursor() as cur:
-        cur.execute(sql, (Json(features), result_id))
+        execute_values(
+            cur,
+            sql,
+            values,
+            template="(%s, %s, %s, %s, %s, %s, NOW(), NOW())",
+        )
+        cur.execute(
+            """
+            UPDATE anomaly_results
+            SET shap_top_features = %s::jsonb,
+                updated_at = NOW()
+            WHERE id = %s
+            """,
+            (
+                Json(
+                    [
+                        {
+                            "feature_name": row["feature_name"],
+                            "shap_score": row["shap_score"],
+                            "shap_rank": row["shap_rank"],
+                        }
+                        for row in rows
+                    ]
+                ),
+                result_id,
+            ),
+        )
 
     conn.commit()
 
     logger.info("Saved SHAP rows | result_id=%s | rows=%s", result_id, len(rows))
 
 
-def get_auc_p_value(threshold, history_scores, auc_score, anomaly_cfg):
-    if threshold:
-        return None
-
-    min_history_auc_points = anomaly_cfg["min_history_auc_points"]
-
-    if len(history_scores) < min_history_auc_points:
-        logger.info(
-            "Skip p-value: not enough historical AUC points | current=%s | required=%s",
-            len(history_scores),
-            min_history_auc_points,
-        )
-        return None
-
-    return empirical_p_value(history_scores, auc_score)
-
-
-def should_write_auc_verify(threshold, p_value):
-    return bool(threshold) or p_value is not None
-
-
 def save_auc_verify(
-    pg_hook, table_id, result_id, threshold, auc_score, p_value, processing_hour, anomaly_cfg
+    pg_hook, table_id, result_id, threshold, auc_score, processing_hour
 ):
-    if threshold:
-        status = "fail" if auc_score >= threshold["auc_threshold"] else "pass"
-        manual_threshold_id = threshold["manual_threshold_id"]
-        auc_threshold = threshold["auc_threshold"]
-        severity_level = threshold["severity_level"] if status == "fail" else None
-    else:
-        status = "fail" if p_value < anomaly_cfg["p_value_alpha"] else "pass"
-        manual_threshold_id = None
-        auc_threshold = None
-        severity_level = "warning" if status == "fail" else None
+    status = "fail" if auc_score >= threshold["auc_threshold"] else "pass"
+    manual_threshold_id = threshold["manual_threshold_id"]
+    auc_threshold = threshold["auc_threshold"]
+    severity_level = threshold["severity_level"] or "warning"
 
     sql = """
         DELETE FROM quality_check_results
@@ -989,13 +986,12 @@ def save_auc_verify(
     conn.commit()
 
     logger.info(
-        "Saved AUC verify | verify_id=%s | result_id=%s | status=%s | auc=%s | threshold=%s | p_value=%s",
+        "Saved AUC verify | verify_id=%s | result_id=%s | status=%s | auc=%s | threshold=%s",
         verify_id,
         result_id,
         status,
         auc_score,
         auc_threshold,
-        p_value,
     )
 
 
@@ -1007,30 +1003,22 @@ def run_table(spark, pg_hook, table, processing_hour, runtime_cfg):
     )
 
     anomaly_cfg = get_anomaly_config(pg_hook, table["table_id"])
-
-    if anomaly_cfg is None:
-        logger.info(
-            "Skip anomaly detection: no anomaly config | table=%s",
-            table["full_table_name"],
-        )
-        return
-
-    cfg = get_model_parameter(pg_hook, table["table_id"])
-
-    if not cfg:
-        logger.info(
-            "Skip anomaly detection: no model parameter | table=%s",
-            table["full_table_name"],
-        )
-        return
+    readiness_cfg = anomaly_cfg or DEFAULT_READINESS_CONFIG
 
     if not has_enough_history(
         spark=spark,
         table_name=table["full_table_name"],
         target_hour=processing_hour,
-        anomaly_cfg=anomaly_cfg,
+        anomaly_cfg=readiness_cfg,
     ):
         return
+
+    if anomaly_cfg is None:
+        fail_missing_config(table, "model config", processing_hour)
+
+    cfg = get_model_parameter(pg_hook, table["table_id"])
+    if not cfg:
+        fail_missing_config(table, "model parameter", processing_hour)
 
     work_df = None
     train_f = None
@@ -1063,19 +1051,6 @@ def run_table(spark, pg_hook, table, processing_hour, runtime_cfg):
 
         auc_score = evaluate_auc(pred)
 
-        history_scores = get_historical_auc_values(
-            pg_hook=pg_hook,
-            table_id=table["table_id"],
-            processing_hour=processing_hour,
-        )
-
-        p_value = get_auc_p_value(
-            threshold=threshold,
-            history_scores=history_scores,
-            auc_score=auc_score,
-            anomaly_cfg=anomaly_cfg,
-        )
-
         result_id = save_auc_result(
             pg_hook=pg_hook,
             table_id=table["table_id"],
@@ -1085,7 +1060,6 @@ def run_table(spark, pg_hook, table, processing_hour, runtime_cfg):
             feature_cols=pipeline.output_feature_cols,
             processing_hour=processing_hour,
             auc_score=auc_score,
-            p_value=p_value,
         )
 
         save_shap(
@@ -1095,31 +1069,25 @@ def run_table(spark, pg_hook, table, processing_hour, runtime_cfg):
             rows=shap_summary(pred, pipeline.output_feature_cols),
         )
 
-        if should_write_auc_verify(threshold, p_value):
+        if threshold:
             save_auc_verify(
                 pg_hook=pg_hook,
                 table_id=table["table_id"],
                 result_id=result_id,
                 threshold=threshold,
                 auc_score=auc_score,
-                p_value=p_value,
                 processing_hour=processing_hour,
-                anomaly_cfg=anomaly_cfg,
             )
         else:
             logger.info(
-                "Skip AUC verify | result_id=%s | no_threshold=True | history_auc_points=%s | required=%s",
+                "Skip AUC verify | result_id=%s | no active AUC threshold configured",
                 result_id,
-                len(history_scores),
-                anomaly_cfg["min_history_auc_points"],
             )
 
         logger.info(
-            "Completed anomaly detection | table=%s | auc=%s | p_value=%s | history_auc_points=%s | threshold_exists=%s",
+            "Completed anomaly detection | table=%s | auc=%s | threshold_exists=%s",
             table["full_table_name"],
             auc_score,
-            p_value,
-            len(history_scores),
             bool(threshold),
         )
 
@@ -1245,6 +1213,7 @@ def main():
 
         tables = get_active_tables(
             pg_hook=pg_hook,
+            connection_id=connection_config["connection_id"],
             catalog_name=connection_config["catalog_name"],
             schema_name=schema_name,
         )

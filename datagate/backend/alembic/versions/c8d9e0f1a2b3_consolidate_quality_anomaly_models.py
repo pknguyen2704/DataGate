@@ -19,10 +19,14 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-severity_level = postgresql.ENUM("warning", "critical", name="severity_level")
-check_status = postgresql.ENUM("pass", "fail", "error", name="check_status")
+severity_level = postgresql.ENUM(
+    "warning", "critical", name="severity_level", create_type=False
+)
+check_status = postgresql.ENUM(
+    "pass", "fail", "error", name="check_status", create_type=False
+)
 metric_scope = postgresql.ENUM(
-    "metadata", "profiling", "anomaly", name="metric_scope"
+    "metadata", "profiling", "anomaly", name="metric_scope", create_type=False
 )
 check_type = postgresql.ENUM(
     "metadata_threshold",
@@ -30,15 +34,28 @@ check_type = postgresql.ENUM(
     "rule",
     "anomaly_auc",
     name="check_type",
+    create_type=False,
 )
 
 
 def upgrade() -> None:
     bind = op.get_bind()
-    severity_level.create(bind, checkfirst=True)
-    check_status.create(bind, checkfirst=True)
-    metric_scope.create(bind, checkfirst=True)
-    check_type.create(bind, checkfirst=True)
+    postgresql.ENUM("warning", "critical", name="severity_level").create(
+        bind, checkfirst=True
+    )
+    postgresql.ENUM("pass", "fail", "error", name="check_status").create(
+        bind, checkfirst=True
+    )
+    postgresql.ENUM(
+        "metadata", "profiling", "anomaly", name="metric_scope"
+    ).create(bind, checkfirst=True)
+    postgresql.ENUM(
+        "metadata_threshold",
+        "profiling_threshold",
+        "rule",
+        "anomaly_auc",
+        name="check_type",
+    ).create(bind, checkfirst=True)
     op.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
 
     op.add_column("roles", sa.Column("permissions", postgresql.JSONB(), nullable=True))
@@ -94,8 +111,7 @@ def upgrade() -> None:
                     "rule:manage",
                     "quality:view",
                     "quality:resolve",
-                    "home:view",
-                    "lab:view"
+                    "home:view"
                 ]'::jsonb,
                 true,
                 true
@@ -118,8 +134,7 @@ def upgrade() -> None:
                     "rule:manage",
                     "quality:view",
                     "quality:resolve",
-                    "home:view",
-                    "lab:view"
+                    "home:view"
                 ]'::jsonb,
                 true,
                 true
@@ -136,8 +151,7 @@ def upgrade() -> None:
                     "rule:view",
                     "rule:suggest",
                     "quality:view",
-                    "home:view",
-                    "lab:view"
+                    "home:view"
                 ]'::jsonb,
                 true,
                 true

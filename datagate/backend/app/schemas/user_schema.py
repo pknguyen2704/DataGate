@@ -31,10 +31,6 @@ class UserProfileUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=6, max_length=128)
 
 
-class UserPasswordUpdate(BaseModel):
-    password: str = Field(..., min_length=6, max_length=128)
-
-
 class UserOut(UserBase):
     id: UUID
     role_id: UUID

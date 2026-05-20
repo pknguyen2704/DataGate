@@ -8,12 +8,12 @@ import MainLayout from "~/components/Layout/MainLayout";
 import Auth from "~/pages/Auth/Auth";
 import Home from "~/pages/Home/Home";
 import DataAssets from "~/pages/DataAssets/DataAssets";
-import Notebook from "~/pages/Notebook/Notebook";
+import Analysis from "~/pages/Analysis/Analysis";
 import TableDetail from "~/pages/DataAssets/TableDetail/index.jsx";
 import Settings from "~/pages/Settings/Settings";
 import { ObservabilityTab, MetricsTab, RulesTab, QualityTab } from "~/pages/DataAssets/TableDetail/index.jsx";
 import PlatformConnection from "~/pages/Settings/PlatformConnection/PlatformConnection";
-import ModelConfig from "~/pages/Settings/ModelConfig/ModelConfig";
+import ModelConfig from "~/pages/Settings/AnomalyConfig/AnomalyConfig";
 import UserManagement from "~/pages/Settings/UserManagement/UserManagement";
 
 function App() {
@@ -33,7 +33,10 @@ function App() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<Navigate to="/app/home" replace />} />
           <Route path="/app/home" element={<Home />} />
-          <Route path="/app/notebook" element={<Notebook />} />
+
+          <Route element={<ProtectedRoute permission="lab:view" />}>
+            <Route path="/app/analysis" element={<Analysis />} />
+          </Route>
 
           {/* Data Assets */}
           <Route path="/app/data-assets" element={<DataAssets />} />
@@ -49,7 +52,7 @@ function App() {
           <Route path="/app/settings" element={<Settings />}>
             <Route index element={null} />
             
-            <Route element={<ProtectedRoute permission="connection:view" />}>
+            <Route element={<ProtectedRoute permission="connection:manage" />}>
               <Route path="connections" element={<PlatformConnection />} />
             </Route>
 

@@ -20,16 +20,15 @@ LAB_VIEW_PERMISSION_ID = "8f0b8e2a-4c1d-4a5e-9c2a-111111111111"
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
     op.execute(
         f"""
         INSERT INTO permissions (id, code, name, permission_group, description)
         VALUES (
             '{LAB_VIEW_PERMISSION_ID}',
             'lab:view',
-            'View Jupiter Notebook',
+            'View Jupyter Notebook',
             'Lab',
-            'Access the embedded Jupiter Notebook lab.'
+            'Access the embedded Jupyter Notebook lab.'
         )
         ON CONFLICT (code) DO UPDATE
         SET
@@ -50,7 +49,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
     op.execute(
         """
         DELETE FROM role_permissions

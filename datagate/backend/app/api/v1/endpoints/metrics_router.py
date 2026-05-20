@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permission
+from app.api.deps import get_current_user, require_permission
 from app.db.session import get_db
 from app.models import User
 from app.rbac.permissions import PermissionCode
@@ -86,7 +86,7 @@ def update_metadata_threshold(
 def delete_metadata_threshold(
     threshold_id: UUID,
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_DELETE)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     service.delete_metadata_threshold(str(threshold_id))
     return None
@@ -149,7 +149,7 @@ def update_profiling_threshold(
 def delete_profiling_threshold(
     threshold_id: UUID,
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_DELETE)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     service.delete_profiling_threshold(str(threshold_id))
     return None
@@ -212,7 +212,7 @@ def update_anomaly_threshold(
 def delete_anomaly_threshold(
     threshold_id: UUID,
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_DELETE)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     service.delete_anomaly_threshold(str(threshold_id))
     return None

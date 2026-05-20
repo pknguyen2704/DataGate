@@ -71,7 +71,7 @@ def truncate(value, max_len):
 def get_connection_config(pg_hook, connection_name):
     row = pg_hook.get_first(
         """
-        SELECT connection_name, iceberg_rest_url, iceberg_warehouse, iceberg_catalog_name,
+        SELECT id, connection_name, iceberg_rest_url, iceberg_warehouse, iceberg_catalog_name,
                minio_endpoint_url, minio_access_key, minio_secret_key
         FROM connections
         WHERE connection_name = %s
@@ -83,27 +83,30 @@ def get_connection_config(pg_hook, connection_name):
     if row is None:
         raise ValueError(f"No active connection found: {connection_name}")
     return {
-        "connection_name": row[0],
-        "iceberg_rest_url": row[1],
-        "iceberg_warehouse": row[2],
-        "catalog_name": validate_name(row[3], "iceberg_catalog_name"),
-        "minio_endpoint_url": row[4],
-        "minio_access_key": row[5],
-        "minio_secret_key": row[6],
+        "connection_id": str(row[0]),
+        "connection_name": row[1],
+        "iceberg_rest_url": row[2],
+        "iceberg_warehouse": row[3],
+        "catalog_name": validate_name(row[4], "iceberg_catalog_name"),
+        "minio_endpoint_url": row[5],
+        "minio_access_key": row[6],
+        "minio_secret_key": row[7],
     }
 
 
-def get_active_tables(pg_hook, catalog_name, schema_names):
+def get_active_tables(pg_hook, connection_id, catalog_name, schema_names):
     placeholders = ", ".join(["%s"] * len(schema_names))
     rows = pg_hook.get_records(
         f"""
         SELECT id, schema_name, table_name
         FROM tables
-        WHERE catalog_name = %s
+        WHERE connection_id = %s
+          AND catalog_name = %s
           AND schema_name IN ({placeholders})
+          AND is_active = TRUE
         ORDER BY schema_name, table_name
         """,
-        parameters=tuple([catalog_name] + schema_names),
+        parameters=tuple([connection_id, catalog_name] + schema_names),
     )
     return [
         {
@@ -200,7 +203,6 @@ def build_rule_rows(table_info, result):
                 "current_value": truncate(item.get("current_value"), 255),
                 "suggesting_rule": truncate(item.get("suggesting_rule"), 255),
                 "code_for_constraint": truncate(code, 512),
-                "rule_description": item.get("rule_description"),
             }
         )
     return rows
@@ -223,7 +225,6 @@ def save_rules(pg_hook, rows):
             current_value,
             suggesting_rule,
             code_for_constraint,
-            rule_description,
             frequency,
             created_by,
             last_modified_by,
@@ -238,7 +239,6 @@ def save_rules(pg_hook, rows):
             description = EXCLUDED.description,
             current_value = EXCLUDED.current_value,
             suggesting_rule = EXCLUDED.suggesting_rule,
-            rule_description = EXCLUDED.rule_description,
             updated_at = NOW()
     """
 
@@ -255,7 +255,6 @@ def save_rules(pg_hook, rows):
             r["current_value"],
             r["suggesting_rule"],
             r["code_for_constraint"],
-            r["rule_description"],
             1,
             None,
             None,
@@ -270,7 +269,7 @@ def save_rules(pg_hook, rows):
             cur,
             sql,
             values,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
         )
 
     conn.commit()
@@ -329,7 +328,10 @@ def main():
         pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
         connection_config = get_connection_config(pg_hook, args.connection_name)
         active_tables = get_active_tables(
-            pg_hook, connection_config["catalog_name"], schema_names
+            pg_hook,
+            connection_config["connection_id"],
+            connection_config["catalog_name"],
+            schema_names,
         )
 
         if not active_tables:

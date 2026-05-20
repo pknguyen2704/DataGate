@@ -2,6 +2,19 @@ import React from 'react';
 import { Box, Typography, Paper, Stack, Divider, Grid } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
+const formatConfigValue = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Number.isInteger(value) ? value.toString() : Number(value.toPrecision(8)).toString();
+  }
+
+  const numericValue = Number(value);
+  if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(numericValue) && value.length > 10) {
+    return Number.isInteger(numericValue) ? numericValue.toString() : Number(numericValue.toPrecision(8)).toString();
+  }
+
+  return String(value ?? '-');
+};
+
 const AnomalyDetection = ({ detailData }) => {
   // Prepare all SHAP rows with guard rails
   const shapFeatures = detailData?.top_features || [];
@@ -18,22 +31,45 @@ const AnomalyDetection = ({ detailData }) => {
     });
   const shapChartHeight = Math.max(400, shapData.length * 34 + 80);
 
-  const aucScore = detailData?.auc_score ?? 0;
-  const aucThreshold = detailData?.auc_threshold ?? 0;
+  const formatMetricValue = (value) => (
+    value !== null && value !== undefined && Number.isFinite(Number(value))
+      ? Number(value).toFixed(4)
+      : ''
+  );
+  const aucScore = formatMetricValue(detailData?.auc_score);
+  const aucThreshold = formatMetricValue(detailData?.auc_threshold);
+  const metricValueSx = {
+    fontSize: "1.75rem",
+    lineHeight: 1.2,
+    maxWidth: "100%",
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+    letterSpacing: 0,
+  };
 
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} md={4}>
         <Typography variant="caption" color="text.secondary" fontWeight={700}>ANOMALY SCORE</Typography>
         <Paper variant="outlined" sx={{ p: 2, mt: 1, borderRadius: 3, mb: 3, bgcolor: '#f8fafc' }}>
-          <Stack direction="row" justifyContent="space-around" spacing={2} divider={<Divider orientation="vertical" flexItem />}>
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="primary.main" fontWeight={900}>{aucScore.toFixed(4)}</Typography>
-              <Typography variant="caption" fontWeight={600} color="text.secondary">AUC SCORE</Typography>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-around"
+            spacing={2}
+            divider={<Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" } }} />}
+            sx={{ minWidth: 0 }}
+          >
+            <Box sx={{ textAlign: 'center', flex: 1, minWidth: 0 }}>
+              <Typography variant="h4" color="primary.main" fontWeight={900} sx={metricValueSx}>
+                {aucScore}
+              </Typography>
+              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: "block" }}>AUC SCORE</Typography>
             </Box>
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="error.main" fontWeight={900}>{aucThreshold.toFixed(4)}</Typography>
-              <Typography variant="caption" fontWeight={600} color="text.secondary">THRESHOLD</Typography>
+            <Box sx={{ textAlign: 'center', flex: 1, minWidth: 0 }}>
+              <Typography variant="h4" color="error.main" fontWeight={900} sx={metricValueSx}>
+                {aucThreshold}
+              </Typography>
+              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: "block" }}>THRESHOLD</Typography>
             </Box>
           </Stack>
         </Paper>
@@ -43,12 +79,39 @@ const AnomalyDetection = ({ detailData }) => {
             <Typography variant="caption" color="text.secondary" fontWeight={700}>MODEL CONFIGURATION</Typography>
             <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: '#ffffff', borderRadius: 3 }}>
               <Grid container spacing={2}>
-                {Object.entries(detailData.model_config_params).map(([k, v]) => (
-                  <Grid item xs={6} key={k}>
-                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>{k.replace(/_/g, ' ')}</Typography>
-                    <Typography variant="body2" fontWeight={700}>{v}</Typography>
-                  </Grid>
-                ))}
+                {Object.entries(detailData.model_config_params).map(([k, v]) => {
+                  const displayValue = formatConfigValue(v);
+
+                  return (
+                    <Grid item xs={12} sm={6} key={k} sx={{ minWidth: 0 }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: 'block',
+                          textTransform: 'uppercase',
+                          fontSize: '0.65rem',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {k.replace(/_/g, ' ')}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        title={String(v ?? '-')}
+                        sx={{
+                          maxWidth: '100%',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {displayValue}
+                      </Typography>
+                    </Grid>
+                  );
+                })}
               </Grid>
             </Paper>
           </Box>

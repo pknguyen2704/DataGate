@@ -1,4 +1,5 @@
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from sqlalchemy.orm import Session
 
 
@@ -6,7 +7,7 @@ class LabService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_notebook_url(self) -> str:
+    def get_analysis_url(self) -> str:
         from app.core.config import config
 
         parts = urlsplit(config.notebook_url)

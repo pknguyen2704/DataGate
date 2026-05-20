@@ -19,19 +19,12 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    role_id = Column(
-        UUID(as_uuid=False), ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False
-    )
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    # Restrict to if an user has this role, this role can't be deleted
+    role_id = Column(UUID(as_uuid=False), ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now(),nullable=False)
 
+    # Relationship
     role = relationship("Role", back_populates="users", foreign_keys=[role_id])
     __table_args__ = (
         Index("ix_users__email", "email", unique=True),

@@ -11,15 +11,12 @@ from airflow.providers.slack.notifications.slack_webhook import (
     send_slack_webhook_notification,
 )
 
-from datagate.jobs.data_quality import (
-    check_data_quality_gate,
-    collect_metadata,
-    evaluate_metadata_metrics,
-    evaluate_profiling_metrics,
-    spark_job_path,
-)
-
 LOCAL_TZ = pendulum.timezone("Asia/Ho_Chi_Minh")
+from datagate import datagate_job_path
+from datagate.batch_metadata_collection_job import collect_metadata
+from datagate.batch_metadata_metrics_verify import evaluate_metadata_metrics
+from datagate.batch_profiling_metrics_verify import evaluate_profiling_metrics
+from datagate.data_quality_gate import check_data_quality_gate
 
 
 SIM_START = "2025-01-17 00:00:00"
@@ -28,7 +25,7 @@ SIM_STEP_HOURS = 12
 SIM_VAR_NAME = "yellow_tripdata_next_processing_date_hour"
 
 
-PYSPARK_JOB_PATH = "ETL_JOB_PATH", "/opt/airflow/etl/tlc_trip_data"
+PYSPARK_JOB_PATH = "/opt/airflow/etl/tlc_yellow_tripdata"
 PROCESSING_DATE_HOUR = "{{ ti.xcom_pull(task_ids='get_processing_date_hour') }}"
 
 CONNECTION_NAME = "my lakehouse"
@@ -178,7 +175,7 @@ with DAG(
 
     bronze_tables_profiling_collection = SparkSubmitOperator(
         task_id="bronze_tables_profiling_collection",
-        application=spark_job_path("profiling_collection"),
+        application=datagate_job_path("profiling_collection"),
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -254,7 +251,7 @@ with DAG(
 
     silver_tables_profiling_collection = SparkSubmitOperator(
         task_id="silver_tables_profiling_collection",
-        application=spark_job_path("profiling_collection"),
+        application=datagate_job_path("profiling_collection"),
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -294,7 +291,7 @@ with DAG(
 
     silver_batch_rule_verification = SparkSubmitOperator(
         task_id="silver_batch_rule_verification",
-        application=spark_job_path("rule_verification"),
+        application=datagate_job_path("rule_verification"),
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -312,7 +309,7 @@ with DAG(
 
     silver_batch_anomaly_detection = SparkSubmitOperator(
         task_id="silver_batch_anomaly_detection",
-        application=spark_job_path("anomaly_detection"),
+        application=datagate_job_path("anomaly_detection"),
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_ANOMALY_SPARK_CONF,
@@ -367,7 +364,7 @@ with DAG(
 
     gold_tables_profiling_collection = SparkSubmitOperator(
         task_id="gold_tables_profiling_collection",
-        application=spark_job_path("profiling_collection"),
+        application=datagate_job_path("profiling_collection"),
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -407,7 +404,7 @@ with DAG(
 
     gold_batch_rule_verification = SparkSubmitOperator(
         task_id="gold_batch_rule_verification",
-        application=spark_job_path("rule_verification"),
+        application=datagate_job_path("rule_verification"),
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -438,7 +435,7 @@ with DAG(
 
     batch_rule_suggestion = SparkSubmitOperator(
         task_id="batch_rule_suggestion",
-        application=spark_job_path("rule_suggestion"),
+        application=datagate_job_path("rule_suggestion"),
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -454,7 +451,6 @@ with DAG(
             PROCESSING_DATE_HOUR,
         ],
     )
-
     get_processing_date_hour_task >> ingest_data
 
     # ----------------------------

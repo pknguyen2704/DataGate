@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import (
     AnomalyConfig,
     AnomalyResult,
+    BatchTableMetadata,
+    BatchTableProfiling,
     Connection,
     QualityCheckResult,
-    QualityMetricObservation,
     Table,
 )
 from app.schemas.table_schema import TableCreate, TableUpdate
@@ -63,8 +64,13 @@ class TableService:
         hours = [
             row[0]
             for row in (
-                self.db.query(func.max(QualityMetricObservation.processing_date_hour))
-                .filter(QualityMetricObservation.table_id == table_id)
+                self.db.query(func.max(BatchTableMetadata.processing_date_hour))
+                .filter(BatchTableMetadata.table_id == table_id)
+                .union_all(
+                    self.db.query(func.max(BatchTableProfiling.processing_date_hour)).filter(
+                        BatchTableProfiling.table_id == table_id
+                    )
+                )
                 .union_all(
                     self.db.query(func.max(AnomalyResult.processing_date_hour)).filter(
                         AnomalyResult.table_id == table_id
@@ -89,7 +95,12 @@ class TableService:
             return {}
 
         latest_dates = {}
-        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
+        for model in (
+            BatchTableMetadata,
+            BatchTableProfiling,
+            AnomalyResult,
+            QualityCheckResult,
+        ):
             rows = (
                 self.db.query(model.table_id, func.max(model.processing_date_hour))
                 .filter(model.table_id.in_(table_ids))
@@ -138,12 +149,12 @@ class TableService:
         latest_hours = self.get_latest_processing_hours(table_ids)
 
         # Batch fetch anomaly configs
-        anomaly_configs = (
+        model_configs = (
             self.db.query(AnomalyConfig.table_id)
             .filter(AnomalyConfig.table_id.in_(table_ids))
             .all()
         )
-        anomaly_table_ids = {str(r[0]) for r in anomaly_configs}
+        anomaly_table_ids = {str(r[0]) for r in model_configs}
 
         for table in tables:
             tid = str(table.id)
@@ -242,34 +253,36 @@ class TableService:
         self.get_table_or_404(table_id)
         rows = (
             self.db.query(
-                QualityMetricObservation.column_name,
-                QualityMetricObservation.extra_data,
+                BatchTableProfiling.column_name,
+                BatchTableProfiling.data_type,
             )
             .filter(
-                QualityMetricObservation.table_id == table_id,
-                QualityMetricObservation.metric_scope == "profiling",
-                QualityMetricObservation.column_name.isnot(None),
+                BatchTableProfiling.table_id == table_id,
             )
             .order_by(
-                QualityMetricObservation.processing_date_hour.desc(),
-                QualityMetricObservation.column_name.asc(),
+                BatchTableProfiling.processing_date_hour.desc(),
+                BatchTableProfiling.column_name.asc(),
             )
             .all()
         )
         seen = set()
         columns = []
-        for column_name, extra_data in rows:
+        for column_name, data_type in rows:
             if column_name in seen:
                 continue
             seen.add(column_name)
-            data_type = (extra_data or {}).get("data_type")
             columns.append({"column_name": column_name, "data_type": data_type})
         return columns
 
     def list_processing_hours(self, table_id: str) -> list[dict]:
         self.get_table_or_404(table_id)
         hours = set()
-        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
+        for model in (
+            BatchTableMetadata,
+            BatchTableProfiling,
+            AnomalyResult,
+            QualityCheckResult,
+        ):
             rows = (
                 self.db.query(model.processing_date_hour)
                 .filter(model.table_id == table_id)

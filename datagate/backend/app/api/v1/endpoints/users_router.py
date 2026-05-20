@@ -11,7 +11,6 @@ from app.schemas.user_schema import (
     UserListOut,
     UserOut,
     UserUpdate,
-    UserPasswordUpdate,
 )
 from app.services.user_service import UserService
 
@@ -62,13 +61,11 @@ def update_user(
     return service.update_user(user_id=str(user_id), data=data)
 
 
-@users_router.patch("/{user_id}/password", response_model=UserOut)
-def update_password(
+@users_router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
     user_id: UUID,
-    data: UserPasswordUpdate,
     service: UserService = Depends(get_user_service),
     _user: User = Depends(require_permission(PermissionCode.USER_MANAGE)),
 ):
-    return service.update_user(
-        user_id=str(user_id), data=UserUpdate(password=data.password)
-    )
+    service.delete_user(str(user_id))
+

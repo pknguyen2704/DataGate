@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     AnomalyResult,
+    BatchTableMetadata,
+    BatchTableProfiling,
     QualityCheckResult,
-    QualityMetricObservation,
     Table,
 )
 
@@ -15,14 +16,24 @@ class ObservabilityService:
 
     def processing_hours(self) -> list[datetime]:
         hours = set()
-        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
+        for model in (
+            BatchTableMetadata,
+            BatchTableProfiling,
+            AnomalyResult,
+            QualityCheckResult,
+        ):
             rows = self.db.query(model.processing_date_hour).distinct().all()
             hours.update(row[0] for row in rows if row[0])
         return sorted(hours, reverse=True)
 
     def get_table_processing_hours(self, table_id: str) -> list[datetime]:
         hours = set()
-        for model in (QualityMetricObservation, AnomalyResult, QualityCheckResult):
+        for model in (
+            BatchTableMetadata,
+            BatchTableProfiling,
+            AnomalyResult,
+            QualityCheckResult,
+        ):
             rows = (
                 self.db.query(model.processing_date_hour)
                 .filter(model.table_id == table_id)
