@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from "react-toastify";
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, 
   TableHead, TableRow, TableContainer, Button, IconButton, 
@@ -11,9 +12,11 @@ import {
   CheckCircle, DoNotDisturb, HourglassEmpty, Search, FilterList, VisibilityOutlined
 } from "@mui/icons-material";
 import { useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { rulesApi } from "~/apis/rulesApi";
 import { useApiResource } from "~/hooks/useApiResource";
-import { useSelector } from "react-redux";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 import { StateBox } from "~/components/Common/DataDisplay";
 
 import { useConfirm } from "material-ui-confirm";
@@ -46,11 +49,9 @@ const Rule = () => {
   const [formData, setFormData] = useState({});
   const [openDetailDialog, setOpenDetailDialog] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState(null);
-
-  // Permissions
-  const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
+  const { hasPermission } = useRBAC();
   
-  const canManage = isAdmin || user?.permissions?.some(p => p === "rule:manage" || p?.code === "rule:manage");
+  const canManage = hasPermission(PermissionCode.RULE_MANAGE);
   const canCreateUpdate = canManage;
   const canApproveDeactivate = canManage;
   const canDelete = canManage;
@@ -127,14 +128,16 @@ const Rule = () => {
         const res = await rulesApi.update(editingId, formData);
         setSelectedDetail(res.data);
         setIsEditing(false);
+        toast.success("Quality rule updated successfully");
         rulesRes.reload();
       } else {
         await rulesApi.create(formData);
         setOpenDetailDialog(false);
+        toast.success("Quality rule created successfully");
         rulesRes.reload();
       }
     } catch (error) {
-      alert(error.response?.data?.detail || "Failed to save rule");
+      toast.error(error.response?.data?.detail || "Failed to save rule");
     }
   };
 
@@ -149,11 +152,12 @@ const Rule = () => {
       .then(async () => {
         try {
           await rulesApi.delete(id);
+          toast.success("Quality rule deleted successfully");
           setOpenDetailDialog(false);
           rulesRes.reload();
         } catch (error) {
           console.error(error);
-          alert("Delete failed");
+          toast.error("Delete failed");
         }
       })
       .catch(() => {});
@@ -167,13 +171,14 @@ const Rule = () => {
       } else {
         await rulesApi.approve(rule.id);
       }
+      toast.success(`Rule ${newActive ? "activated" : "deactivated"} successfully`);
       rulesRes.reload();
       if (selectedDetail && selectedDetail.id === rule.id) {
         setSelectedDetail(prev => ({ ...prev, is_active: newActive }));
       }
     } catch (error) {
       console.error(error);
-      alert("Toggle status failed");
+      toast.error("Toggle status failed");
     }
   };
 
@@ -193,7 +198,7 @@ const Rule = () => {
       {/* Filter Bar */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2, bgcolor: 'background.default' }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Source</InputLabel>
               <Select value={filters.source} label="Source" onChange={(e) => handleFilterChange("source", e.target.value)}>
@@ -203,7 +208,7 @@ const Rule = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
               <Select value={filters.rule_status} label="Status" onChange={(e) => handleFilterChange("rule_status", e.target.value)}>
@@ -213,7 +218,7 @@ const Rule = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Severity</InputLabel>
               <Select value={filters.severity_level} label="Severity" onChange={(e) => handleFilterChange("severity_level", e.target.value)}>
@@ -222,23 +227,6 @@ const Rule = () => {
                 <MenuItem value="critical">Critical</MenuItem>
               </Select>
             </FormControl>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Button 
-              fullWidth 
-              variant="contained" 
-              startIcon={<FilterList />} 
-              onClick={() => rulesRes.reload()}
-              sx={{ 
-                bgcolor: 'primary.main', 
-                color: 'white',
-                '&:hover': { bgcolor: 'primary.dark' },
-                fontWeight: 700,
-                borderRadius: 1.5
-              }}
-            >
-              Filter
-            </Button>
           </Grid>
         </Grid>
       </Paper>

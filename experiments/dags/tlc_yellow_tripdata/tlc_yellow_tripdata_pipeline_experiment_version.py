@@ -12,24 +12,25 @@ from airflow.providers.slack.notifications.slack_webhook import (
 )
 
 LOCAL_TZ = pendulum.timezone("Asia/Ho_Chi_Minh")
-from datagate import datagate_job_path
-from datagate.batch_metadata_collection_job import collect_metadata
-from datagate.batch_metadata_metrics_verify import evaluate_metadata_metrics
-from datagate.batch_profiling_metrics_verify import evaluate_profiling_metrics
-from datagate.data_quality_gate import check_data_quality_gate
 
+from datagate.batch_metadata_metric_collection import batch_metadata_metric_collection
+from datagate.batch_metadata_metric_verification import batch_metadata_metric_verification
+from datagate.batch_profiling_metric_verification import batch_profiling_metric_verification
+from datagate.batch_anomaly_verification import batch_anomaly_verification
+from datagate.data_quality_gate import data_quality_gate
 
-SIM_START = "2025-01-17 00:00:00"
-SIM_END = "2025-01-27 12:00:00"
+SIM_START = "2025-01-18 12:00:00"
+SIM_END = "2025-01-19 00:00:00"
 SIM_STEP_HOURS = 12
 SIM_VAR_NAME = "yellow_tripdata_next_processing_date_hour"
 
 
 PYSPARK_JOB_PATH = "/opt/airflow/etl/tlc_yellow_tripdata"
+DATAGATE_TASK_PATH = "/opt/airflow/datagate"
 PROCESSING_DATE_HOUR = "{{ ti.xcom_pull(task_ids='get_processing_date_hour') }}"
 
-CONNECTION_NAME = "my lakehouse"
-TRINO_CONN_ID = "trino_default"
+CONNECTION_NAME = "my_dataplatform"
+QUERY_ENGINE_CONN_ID = "trino_default"
 DATAGATE_DB_CONN_ID = "datagate_db_default"
 SLACK_AIRFLOW_FAILURES_CONN_ID = "slack_airflow_failures"
 SLACK_DQ_CONN_ID = "slack_dq"
@@ -77,8 +78,6 @@ DATAGATE_ANOMALY_JOB_ARGS = [
     "30",
     "--py4j-cleanup-timeout-seconds",
     "5",
-    "--db-cleanup-timeout-seconds",
-    "10",
 ]
 
 task_fail_slack_alert = send_slack_webhook_notification(
@@ -93,7 +92,7 @@ task_fail_slack_alert = send_slack_webhook_notification(
             "*Run ID*: `{{ run_id }}`",
             "*Try*: `{{ ti.try_number }}`",
             "*Execution Time*: `{{ ts }}`",
-            "*Processing Date Hour*: `{{ dag_run.conf.get('processing_date_hour', params.processing_date_hour) if dag_run else params.processing_date_hour }}`",
+            "*Processing Date Hour*: `{{ dag_run.conf.get('processing_date_hour', params.get('processing_date_hour', '')) if dag_run else params.get('processing_date_hour', '') }}`",
             "",
             "*Log*: <{{ ti.log_url }}|Open task log>",
         ]
@@ -139,6 +138,9 @@ with DAG(
     max_active_runs=1,
     is_paused_upon_creation=True,
     tags=["datagate", "iceberg", "yellow_tripdata", "simulation"],
+    params={
+        "processing_date_hour": "2025-01-18 12:00:00",
+    },
 ) as dag:
     get_processing_date_hour_task = PythonOperator(
         task_id="get_processing_date_hour",
@@ -163,9 +165,9 @@ with DAG(
 
     bronze_tables_metadata_collection = PythonOperator(
         task_id="bronze_tables_metadata_collection",
-        python_callable=collect_metadata,
+        python_callable=batch_metadata_metric_collection,
         op_kwargs={
-            "trino_conn_id": TRINO_CONN_ID,
+            "query_engine_conn_id": QUERY_ENGINE_CONN_ID,
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
             "schema_name": "bronze",
@@ -175,7 +177,7 @@ with DAG(
 
     bronze_tables_profiling_collection = SparkSubmitOperator(
         task_id="bronze_tables_profiling_collection",
-        application=datagate_job_path("profiling_collection"),
+        application=f"{DATAGATE_TASK_PATH}/batch_profiling_metric_collection.py",
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -193,7 +195,7 @@ with DAG(
 
     bronze_tables_metadata_metrics_verify = PythonOperator(
         task_id="bronze_tables_metadata_metrics_verify",
-        python_callable=evaluate_metadata_metrics,
+        python_callable=batch_metadata_metric_verification,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
@@ -204,7 +206,7 @@ with DAG(
 
     bronze_tables_profiling_metrics_verify = PythonOperator(
         task_id="bronze_tables_profiling_metrics_verify",
-        python_callable=evaluate_profiling_metrics,
+        python_callable=batch_profiling_metric_verification,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
@@ -215,7 +217,7 @@ with DAG(
 
     bronze_data_quality_gate = PythonOperator(
         task_id="bronze_data_quality_gate",
-        python_callable=check_data_quality_gate,
+        python_callable=data_quality_gate,
         retries=0,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
@@ -239,9 +241,9 @@ with DAG(
 
     silver_tables_metadata_collection = PythonOperator(
         task_id="silver_tables_metadata_collection",
-        python_callable=collect_metadata,
+        python_callable=batch_metadata_metric_collection,
         op_kwargs={
-            "trino_conn_id": TRINO_CONN_ID,
+            "query_engine_conn_id": QUERY_ENGINE_CONN_ID,
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
             "schema_name": "silver",
@@ -251,7 +253,7 @@ with DAG(
 
     silver_tables_profiling_collection = SparkSubmitOperator(
         task_id="silver_tables_profiling_collection",
-        application=datagate_job_path("profiling_collection"),
+        application=f"{DATAGATE_TASK_PATH}/batch_profiling_metric_collection.py",
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -269,7 +271,7 @@ with DAG(
 
     silver_tables_metadata_metrics_verify = PythonOperator(
         task_id="silver_tables_metadata_metrics_verify",
-        python_callable=evaluate_metadata_metrics,
+        python_callable=batch_metadata_metric_verification,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
@@ -280,7 +282,7 @@ with DAG(
 
     silver_tables_profiling_metrics_verify = PythonOperator(
         task_id="silver_tables_profiling_metrics_verify",
-        python_callable=evaluate_profiling_metrics,
+        python_callable=batch_profiling_metric_verification,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
@@ -291,7 +293,7 @@ with DAG(
 
     silver_batch_rule_verification = SparkSubmitOperator(
         task_id="silver_batch_rule_verification",
-        application=datagate_job_path("rule_verification"),
+        application=f"{DATAGATE_TASK_PATH}/batch_rule_verification.py",
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -309,7 +311,7 @@ with DAG(
 
     silver_batch_anomaly_detection = SparkSubmitOperator(
         task_id="silver_batch_anomaly_detection",
-        application=datagate_job_path("anomaly_detection"),
+        application=f"{DATAGATE_TASK_PATH}/batch_anomaly_detection.py",
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_ANOMALY_SPARK_CONF,
@@ -326,9 +328,20 @@ with DAG(
         ],
     )
 
+    silver_batch_anomaly_verification = PythonOperator(
+        task_id="silver_batch_anomaly_verification",
+        python_callable=batch_anomaly_verification,
+        op_kwargs={
+            "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
+            "connection_name": CONNECTION_NAME,
+            "schema_name": "silver",
+            "processing_date_hour": PROCESSING_DATE_HOUR,
+        },
+    )
+
     silver_data_quality_gate = PythonOperator(
         task_id="silver_data_quality_gate",
-        python_callable=check_data_quality_gate,
+        python_callable=data_quality_gate,
         retries=0,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
@@ -352,9 +365,9 @@ with DAG(
 
     gold_tables_metadata_collection = PythonOperator(
         task_id="gold_tables_metadata_collection",
-        python_callable=collect_metadata,
+        python_callable=batch_metadata_metric_collection,
         op_kwargs={
-            "trino_conn_id": TRINO_CONN_ID,
+            "query_engine_conn_id": QUERY_ENGINE_CONN_ID,
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
             "schema_name": "gold",
@@ -364,7 +377,7 @@ with DAG(
 
     gold_tables_profiling_collection = SparkSubmitOperator(
         task_id="gold_tables_profiling_collection",
-        application=datagate_job_path("profiling_collection"),
+        application=f"{DATAGATE_TASK_PATH}/batch_profiling_metric_collection.py",
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -382,7 +395,7 @@ with DAG(
 
     gold_tables_metadata_metrics_verify = PythonOperator(
         task_id="gold_tables_metadata_metrics_verify",
-        python_callable=evaluate_metadata_metrics,
+        python_callable=batch_metadata_metric_verification,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
@@ -393,7 +406,7 @@ with DAG(
 
     gold_tables_profiling_metrics_verify = PythonOperator(
         task_id="gold_tables_profiling_metrics_verify",
-        python_callable=evaluate_profiling_metrics,
+        python_callable=batch_profiling_metric_verification,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
             "connection_name": CONNECTION_NAME,
@@ -404,7 +417,7 @@ with DAG(
 
     gold_batch_rule_verification = SparkSubmitOperator(
         task_id="gold_batch_rule_verification",
-        application=datagate_job_path("rule_verification"),
+        application=f"{DATAGATE_TASK_PATH}/batch_rule_verification.py",
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -422,7 +435,7 @@ with DAG(
 
     gold_data_quality_gate = PythonOperator(
         task_id="gold_data_quality_gate",
-        python_callable=check_data_quality_gate,
+        python_callable=data_quality_gate,
         retries=0,
         op_kwargs={
             "datagate_db_conn_id": DATAGATE_DB_CONN_ID,
@@ -435,7 +448,7 @@ with DAG(
 
     batch_rule_suggestion = SparkSubmitOperator(
         task_id="batch_rule_suggestion",
-        application=datagate_job_path("rule_suggestion"),
+        application=f"{DATAGATE_TASK_PATH}/batch_rule_suggestion.py",
         conn_id="spark_default",
         deploy_mode="client",
         conf=DATAGATE_SPARK_CONF,
@@ -486,6 +499,7 @@ with DAG(
         ]
         >> silver_batch_rule_verification
         >> silver_batch_anomaly_detection
+        >> silver_batch_anomaly_verification
         >> silver_data_quality_gate
         >> transform_data
     )

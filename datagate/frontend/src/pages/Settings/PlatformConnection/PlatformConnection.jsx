@@ -7,9 +7,10 @@ import {
 } from "@mui/material";
 import {
   AddOutlined,
-  VisibilityOutlined, SaveOutlined, BugReportOutlined, ArrowBackOutlined
+  VisibilityOutlined, SaveOutlined, ArrowBackOutlined
 } from "@mui/icons-material";
-import { useSelector } from "react-redux";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 import { connectionsApi } from "~/apis/connectionsApi";
 import { StateBox, TabButton, TabContainer, StatusChip } from "~/components/Common/DataDisplay";
 import { useApiResource } from "~/hooks/useApiResource";
@@ -21,16 +22,16 @@ import Connection from "./Connection/Connection";
 const INITIAL_CONNECTION = {
   connection_name: "",
   description: "",
-  trino_host: "",
-  trino_port: 8080,
-  trino_user: "admin",
-  trino_password: "",
-  iceberg_rest_url: "",
-  iceberg_catalog_name: "iceberg",
-  iceberg_warehouse: "",
-  minio_endpoint_url: "",
-  minio_access_key: "",
-  minio_secret_key: "",
+  query_engine_host: "",
+  query_engine_port: "",
+  query_engine_user: "",
+  query_engine_password: "",
+  rest_url: "",
+  catalog_name: "",
+  catalog_warehouse: "",
+  storage_endpoint_url: "",
+  storage_access_key: "",
+  storage_secret_key: "",
   is_active: true
 };
 
@@ -54,8 +55,8 @@ function ConnectionDetailWrapper({ connectionId, onBack, onEdit, canUpdate, canD
       </TabContainer>
 
       {tab === "config" && (
-        <Connection 
-          connection={connection.data} 
+        <Connection
+          connection={connection.data}
           canUpdate={canUpdate}
           canDelete={canDelete}
           onEdit={onEdit}
@@ -64,12 +65,12 @@ function ConnectionDetailWrapper({ connectionId, onBack, onEdit, canUpdate, canD
         />
       )}
       {tab === "tables" && (
-        <ListTable 
-          connectionId={connectionId} 
-          connectionData={connection.data} 
-          canUpdateTable={canUpdateTable} 
-          canCreateTable={canCreateTable} 
-          canDeleteTable={canDeleteTable} 
+        <ListTable
+          connectionId={connectionId}
+          connectionData={connection.data}
+          canUpdateTable={canUpdateTable}
+          canCreateTable={canCreateTable}
+          canDeleteTable={canDeleteTable}
         />
       )}
     </Box>
@@ -77,18 +78,17 @@ function ConnectionDetailWrapper({ connectionId, onBack, onEdit, canUpdate, canD
 }
 
 export default function PlatformConnection() {
-  const { user } = useSelector(state => state.auth);
-  const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  
-  const canManage = isAdmin || user?.permissions?.some(p => p === "connection:manage" || p?.code === "connection:manage");
-  
+  const { hasPermission } = useRBAC();
+
+  const canManage = hasPermission(PermissionCode.CONNECTION_MANAGE);
+
   const canCreate = canManage;
   const canUpdate = canManage;
   const canDelete = canManage;
-  
-  const canCreateTable = isAdmin || user?.permissions?.some(p => p === "table:manage" || p?.code === "table:manage");
-  const canUpdateTable = isAdmin || user?.permissions?.some(p => p === "table:manage" || p?.code === "table:manage");
-  const canDeleteTable = isAdmin || user?.permissions?.some(p => p === "table:delete" || p?.code === "table:delete");
+
+  const canCreateTable = canManage;
+  const canUpdateTable = canManage;
+  const canDeleteTable = canManage;
 
   const [selectedConnectionId, setSelectedConnectionId] = useState(null);
   const [detailVersion, setDetailVersion] = useState(0);
@@ -105,7 +105,6 @@ export default function PlatformConnection() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_CONNECTION);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
 
   const handleOpenAdd = () => {
     setForm(INITIAL_CONNECTION);
@@ -116,26 +115,11 @@ export default function PlatformConnection() {
   const handleOpenEdit = (row) => {
     setForm({
       ...row,
-      trino_password: "", // Don't show old password
-      minio_secret_key: "", // Don't show old secret
+      query_engine_password: "", // Don't show old password
+      storage_secret_key: "", // Don't show old secret
     });
     setEditingId(row.id);
     setOpenDialog(true);
-  };
-
-  const handleTest = async () => {
-    if (editingId) {
-      setTesting(true);
-      try {
-        const res = await connectionsApi.test(editingId);
-        if (res.data.success) toast.success(res.data.message);
-        else toast.error(res.data.message);
-      } catch (err) {
-        toast.error("Test failed: " + (err.response?.data?.detail || err.message));
-      } finally {
-        setTesting(false);
-      }
-    }
   };
 
   const handleSave = async () => {
@@ -179,57 +163,48 @@ export default function PlatformConnection() {
             <TextField label="Description" fullWidth size="small" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
           </Grid>
 
-          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>TRINO</Typography></Grid>
+          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>QUERY ENGINE</Typography></Grid>
           <Grid item xs={12} md={4}>
-            <TextField label="Host" fullWidth size="small" value={form.trino_host} onChange={e => setForm({ ...form, trino_host: e.target.value })} />
+            <TextField label="Host" fullWidth size="small" value={form.query_engine_host} onChange={e => setForm({ ...form, query_engine_host: e.target.value })} />
           </Grid>
           <Grid item xs={12} md={2}>
-            <TextField label="Port" type="number" fullWidth size="small" value={form.trino_port} onChange={e => setForm({ ...form, trino_port: parseInt(e.target.value) })} />
+            <TextField label="Port" type="number" fullWidth size="small" value={form.query_engine_port} onChange={e => setForm({ ...form, query_engine_port: parseInt(e.target.value) })} />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="User" fullWidth size="small" value={form.trino_user} onChange={e => setForm({ ...form, trino_user: e.target.value })} />
+            <TextField label="User" fullWidth size="small" value={form.query_engine_user} onChange={e => setForm({ ...form, query_engine_user: e.target.value })} />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Password" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.trino_password} onChange={e => setForm({ ...form, trino_password: e.target.value })} />
+            <TextField label="Password" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.query_engine_password} onChange={e => setForm({ ...form, query_engine_password: e.target.value })} />
           </Grid>
 
-          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>ICEBERG</Typography></Grid>
+          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>TABLE FORMAT</Typography></Grid>
           <Grid item xs={12} md={4}>
-            <TextField label="Catalog" fullWidth size="small" value={form.iceberg_catalog_name} onChange={e => setForm({ ...form, iceberg_catalog_name: e.target.value })} />
+            <TextField label="Catalog" fullWidth size="small" value={form.catalog_name} onChange={e => setForm({ ...form, catalog_name: e.target.value })} />
           </Grid>
           <Grid item xs={12} md={4}>
-            <TextField label="REST URL" fullWidth size="small" value={form.iceberg_rest_url} onChange={e => setForm({ ...form, iceberg_rest_url: e.target.value })} />
+            <TextField label="Rest url" fullWidth size="small" value={form.rest_url} onChange={e => setForm({ ...form, rest_url: e.target.value })} />
           </Grid>
           <Grid item xs={12} md={4}>
-            <TextField label="Warehouse" fullWidth size="small" value={form.iceberg_warehouse} onChange={e => setForm({ ...form, iceberg_warehouse: e.target.value })} />
+            <TextField label="Warehouse" fullWidth size="small" value={form.catalog_warehouse} onChange={e => setForm({ ...form, catalog_warehouse: e.target.value })} />
           </Grid>
 
-          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>STORAGE (MINIO/S3)</Typography></Grid>
+          <Grid item xs={12}><Typography variant="caption" color="primary" fontWeight={800}>STORAGE</Typography></Grid>
           <Grid item xs={12} md={4}>
-            <TextField label="Endpoint" fullWidth size="small" value={form.minio_endpoint_url} onChange={e => setForm({ ...form, minio_endpoint_url: e.target.value })} />
+            <TextField label="Endpoint" fullWidth size="small" value={form.storage_endpoint_url} onChange={e => setForm({ ...form, storage_endpoint_url: e.target.value })} />
           </Grid>
           <Grid item xs={12} md={4}>
-            <TextField label="Access Key" fullWidth size="small" value={form.minio_access_key} onChange={e => setForm({ ...form, minio_access_key: e.target.value })} />
+            <TextField label="Access Key" fullWidth size="small" value={form.storage_access_key} onChange={e => setForm({ ...form, storage_access_key: e.target.value })} />
           </Grid>
           <Grid item xs={12} md={4}>
-            <TextField label="Secret Key" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.minio_secret_key} onChange={e => setForm({ ...form, minio_secret_key: e.target.value })} />
+            <TextField label="Secret Key" type="password" fullWidth size="small" placeholder={editingId ? "••••••••" : ""} value={form.storage_secret_key} onChange={e => setForm({ ...form, storage_secret_key: e.target.value })} />
           </Grid>
         </Grid>
       </DialogContent>
-      <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
-        <Box>
-          {editingId && (
-            <Button startIcon={<BugReportOutlined />} color="info" onClick={handleTest} disabled={testing}>
-              {testing ? "Testing..." : "Test Connection"}
-            </Button>
-          )}
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button onClick={() => setOpenDialog(false)} color="inherit">Cancel</Button>
-          <Button variant="contained" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save"}
-          </Button>
-        </Stack>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={() => setOpenDialog(false)} color="inherit">Cancel</Button>
+        <Button variant="contained" startIcon={<SaveOutlined />} onClick={handleSave} disabled={saving}>
+          {saving ? "Saving..." : "Save"}
+        </Button>
       </DialogActions>
     </Dialog>
   );

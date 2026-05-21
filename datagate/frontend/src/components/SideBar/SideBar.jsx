@@ -20,13 +20,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import DataGateLogo from "~/assets/images/datagate.svg";
 import { datagateColors } from "~/theme";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 
 const getNavItems = () => [
   {
     text: "Home",
     icon: <DashboardIcon />,
     path: "/app/home",
-    permission: "home:view",
+    permission: PermissionCode.HOME_VIEW,
   },
   {
     text: "Data Assets",
@@ -37,7 +39,7 @@ const getNavItems = () => [
     text: "Analysis",
     icon: <AnalysisIcon />,
     path: "/app/analysis",
-    permission: "lab:view",
+    permission: PermissionCode.LAB_VIEW,
   },
 ];
 
@@ -45,22 +47,16 @@ const SideBar = ({ isCollapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
-  const { user } = useSelector((state) => state.auth);
-  const permissions = user?.permissions || [];
+  const { hasPermission, hasAnyPermission } = useRBAC();
 
   const navItems = getNavItems();
-
-  const hasPermission = (permCode) => {
-    if (!permCode) return true;
-    return permissions.includes(permCode);
-  };
 
   const isActive = (path) => {
     if (path === "/home") return location.pathname === "/home";
     return location.pathname.startsWith(path);
   };
 
-  const visibleItems = navItems.filter((item) => hasPermission(item.permission));
+  const visibleItems = navItems.filter((item) => !item.permission || hasPermission(item.permission));
 
   return (
       <Box
@@ -172,7 +168,11 @@ const SideBar = ({ isCollapsed }) => {
       <Divider />
 
       {/* Settings at the bottom */}
-      {(hasPermission("user:manage") || hasPermission("connection:manage") || hasPermission("model_config:view")) && (
+      {hasAnyPermission([
+        PermissionCode.USER_MANAGE,
+        PermissionCode.CONNECTION_MANAGE,
+        PermissionCode.MODEL_CONFIG_VIEW
+      ]) && (
         <List sx={{ px: 1, pb: 1, pt: 0.5 }}>
           <Tooltip title={isCollapsed ? "Settings" : ""} placement="right">
             <ListItemButton

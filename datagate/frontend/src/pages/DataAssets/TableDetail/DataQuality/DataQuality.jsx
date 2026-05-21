@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from "react-toastify";
 import {
   Box, Typography, Paper, Table, TableBody, TableCell,
   TableHead, TableRow, TableContainer, Button, IconButton,
@@ -13,7 +14,8 @@ import { useParams } from "react-router-dom";
 import { dataQualityApi } from "~/apis/dataQualityApi";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
 import { useApiResource } from "~/hooks/useApiResource";
-import { useSelector } from "react-redux";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 import { format } from "date-fns";
 import { Panel, Stat, StateBox, StatusChip } from "~/components/Common/DataDisplay";
 
@@ -24,27 +26,19 @@ import Rule from "./Rule/Rule";
 
 const DataQuality = () => {
   const { tableId } = useParams();
-  const { user } = useSelector(state => state.auth);
-  const [activeTab, setActiveTab] = useState(0);
-
-  // Filters
-  const [filters, setFilters] = useState({
-    processing_date_hour: "",
-    status: "",
-    severity_level: ""
-  });
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
-
-  // Permissions
-  const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const hasResolvePerm = user?.permissions?.some(p => p === "quality:resolve" || p?.code === "quality:resolve");
-  const canResolve = isAdmin || hasResolvePerm;
+  const { hasPermission } = useRBAC();
+  const canResolve = hasPermission(PermissionCode.QUALITY_RESOLVE);
 
   // API Resources
   const tableRes = useApiResource(() => dataAssetsApi.get(tableId), [tableId]);
   const summaryRes = useApiResource(() => dataQualityApi.getSummary({ table_id: tableId }), [tableId]);
   
+  // Component State
+  const [activeTab, setActiveTab] = useState(0);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [filters, setFilters] = useState({ processing_date_hour: "", status: "", severity_level: "" });
+
   const schema = tableRes.data?.schema_name?.toLowerCase();
   const showRules = schema === "gold" || schema === "silver";
   const showAnomaly = schema === "silver";
@@ -77,11 +71,12 @@ const DataQuality = () => {
       else if (type === "rule") await dataQualityApi.resolveRule(id);
       else if (type === "anomaly") await dataQualityApi.resolveAnomaly(id);
 
+      toast.success("Alert resolved successfully");
       resultsRes.reload();
       summaryRes.reload();
     } catch (error) {
       console.error(error);
-      alert("Resolve failed");
+      toast.error("Resolve failed");
     }
   };
 
@@ -117,39 +112,37 @@ const DataQuality = () => {
         </Box>
 
         {/* Filter Bar */}
-        {currentType !== "anomaly" && (
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default' }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth size="small" type="datetime-local" label="Processing Date" InputLabelProps={{ shrink: true }}
-                  inputProps={{ step: 1 }}
-                  value={filters.processing_date_hour} onChange={(e) => handleFilterChange("processing_date_hour", e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Result</InputLabel>
-                  <Select value={filters.status} label="Result" onChange={(e) => handleFilterChange("status", e.target.value)}>
-                    <MenuItem value="">All Results</MenuItem>
-                    <MenuItem value="pass">Pass</MenuItem>
-                    <MenuItem value="fail">Fail</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Severity</InputLabel>
-                  <Select value={filters.severity_level} label="Severity" onChange={(e) => handleFilterChange("severity_level", e.target.value)}>
-                    <MenuItem value="">All Severity</MenuItem>
-                    <MenuItem value="warning">Warning</MenuItem>
-                    <MenuItem value="critical">Critical</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default' }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth size="small" type="datetime-local" label="Processing Date" InputLabelProps={{ shrink: true }}
+                inputProps={{ step: 1 }}
+                value={filters.processing_date_hour} onChange={(e) => handleFilterChange("processing_date_hour", e.target.value)}
+              />
             </Grid>
-          </Paper>
-        )}
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Result</InputLabel>
+                <Select value={filters.status} label="Result" onChange={(e) => handleFilterChange("status", e.target.value)}>
+                  <MenuItem value="">All Results</MenuItem>
+                  <MenuItem value="pass">Pass</MenuItem>
+                  <MenuItem value="fail">Fail</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Severity</InputLabel>
+                <Select value={filters.severity_level} label="Severity" onChange={(e) => handleFilterChange("severity_level", e.target.value)}>
+                  <MenuItem value="">All Severity</MenuItem>
+                  <MenuItem value="warning">Warning</MenuItem>
+                  <MenuItem value="critical">Critical</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Paper>
 
         {/* Results Content */}
         <StateBox loading={resultsRes.loading} error={resultsRes.error} empty={!(resultsRes.data?.items || []).length}>
@@ -377,6 +370,7 @@ const AnomalyTab = ({ results, total, page, pageSize, setPage, setPageSize, hand
             <TableRow sx={{ bgcolor: 'primary.main' }}>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Date</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Result</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Severity</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>AUC</TableCell>
               <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Action</TableCell>
             </TableRow>
@@ -395,6 +389,19 @@ const AnomalyTab = ({ results, total, page, pageSize, setPage, setPageSize, hand
                   </Typography>
                 </TableCell>
                 <TableCell><StatusChip value={r.status} /></TableCell>
+                <TableCell>
+                  {r.severity_level ? (
+                    <Chip 
+                      label={r.severity_level} 
+                      size="small" 
+                      variant="outlined" 
+                      color={r.severity_level === 'critical' ? 'error' : 'warning'} 
+                      sx={{ fontWeight: 600, textTransform: 'capitalize' }} 
+                    />
+                  ) : (
+                    '-'
+                  )}
+                </TableCell>
                 <TableCell><Typography variant="body2" fontWeight={700}>{r.actual_value !== null ? Number(r.actual_value).toFixed(4) : "N/A"}</Typography></TableCell>
                 <TableCell align="center">
                   <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>

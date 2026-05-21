@@ -16,18 +16,18 @@ logger = logging.getLogger(__name__)
 
 JOB_NAME = "transform_data"
 
-ICEBERG_CATALOG = "iceberg"
+CATALOG_NAME = "iceberg"
 SOURCE_SCHEMA = "silver"
 SOURCE_TABLE = "cleaned_yellow_tripdata"
 TARGET_SCHEMA = "gold"
 TRIP_HOURLY_METRICS_TABLE = "trip_hourly_metrics"
 LOCATION_HOURLY_METRICS_TABLE = "location_hourly_metrics"
 
-ICEBERG_REST_URI = "http://iceberg-rest:8181"
-ICEBERG_WAREHOUSE = "s3://lakehouse/"
-MINIO_ENDPOINT = "http://minio:9000"
-MINIO_ACCESS_KEY = "admin"
-MINIO_SECRET_KEY = "miniopassword"
+REST_URI = "http://iceberg-rest:8181"
+CATALOG_WAREHOUSE = "s3://lakehouse/"
+STORAGE_ENDPOINT = "http://minio:9000"
+STORAGE_ACCESS_KEY = "admin"
+STORAGE_SECRET_KEY = "miniopassword"
 
 SPARK_DRIVER_CORES = "2"
 SPARK_DRIVER_MEMORY = "4g"
@@ -78,22 +78,22 @@ def create_spark_session():
         .config("spark.default.parallelism", SPARK_DEFAULT_PARALLELISM)
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}", "org.apache.iceberg.spark.SparkCatalog")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.type", "rest")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.uri", ICEBERG_REST_URI)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.warehouse", ICEBERG_WAREHOUSE)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.endpoint", MINIO_ENDPOINT)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.access-key-id", MINIO_ACCESS_KEY)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.secret-access-key", MINIO_SECRET_KEY)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.path-style-access", "true")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.region", "us-east-1")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.type", "rest")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.uri", REST_URI)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.warehouse", CATALOG_WAREHOUSE)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.endpoint", STORAGE_ENDPOINT)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.access-key-id", STORAGE_ACCESS_KEY)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.secret-access-key", STORAGE_SECRET_KEY)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.path-style-access", "true")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.region", "us-east-1")
         .getOrCreate()
     )
 
 
 def read_silver_batch(spark, source_table, processing_date_hour):
-    table = f"{ICEBERG_CATALOG}.{SOURCE_SCHEMA}.{source_table}"
+    table = f"{CATALOG_NAME}.{SOURCE_SCHEMA}.{source_table}"
     logger.info("Reading silver table=%s | processing_date_hour=%s", table, processing_date_hour)
     return spark.sql(f"""
         SELECT *
@@ -191,7 +191,7 @@ def build_location_hourly_metrics(df, zone_df):
 
 
 def write_to_gold(df, table_name):
-    table = f"{ICEBERG_CATALOG}.{TARGET_SCHEMA}.{table_name}"
+    table = f"{CATALOG_NAME}.{TARGET_SCHEMA}.{table_name}"
     logger.info("Writing gold table=%s", table)
     df.writeTo(table).overwritePartitions()
 

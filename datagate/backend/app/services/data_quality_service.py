@@ -17,17 +17,17 @@ from app.schemas.data_quality_schema import (
 
 
 CHECK_TYPE_TO_RESULT_TYPE = {
-    "metadata_threshold": ResultType.METADATA,
-    "profiling_threshold": ResultType.PROFILING,
+    "metadata": ResultType.METADATA,
+    "profiling": ResultType.PROFILING,
     "rule": ResultType.RULE,
-    "anomaly_auc": ResultType.ANOMALY,
+    "anomaly": ResultType.ANOMALY,
 }
 
 RESULT_TYPE_TO_CHECK_TYPES = {
-    ResultType.METADATA: ["metadata_threshold"],
-    ResultType.PROFILING: ["profiling_threshold"],
+    ResultType.METADATA: ["metadata"],
+    ResultType.PROFILING: ["profiling"],
     ResultType.RULE: ["rule"],
-    ResultType.ANOMALY: ["anomaly_auc"],
+    ResultType.ANOMALY: ["anomaly"],
 }
 
 
@@ -211,7 +211,7 @@ class DataQualityService:
         query = self.db.query(QualityCheckResult)
         if table_id:
             query = query.filter(QualityCheckResult.table_id == table_id)
-        non_anomaly_query = query.filter(QualityCheckResult.check_type != "anomaly_auc")
+        non_anomaly_query = query.filter(QualityCheckResult.check_type != "anomaly")
         anomaly_rows = self._anomaly_query(table_id=table_id)
 
         total = non_anomaly_query.count() + len(anomaly_rows)
@@ -287,7 +287,7 @@ class DataQualityService:
         return row
 
     def get_metadata_detail(self, result_id: str) -> MetadataResultDetail:
-        row = self._get_result_or_404(result_id, "metadata_threshold")
+        row = self._get_result_or_404(result_id, "metadata")
         return MetadataResultDetail(
             id=row.id,
             table_id=row.table_id,
@@ -309,7 +309,7 @@ class DataQualityService:
         )
 
     def get_profiling_detail(self, result_id: str) -> ProfilingResultDetail:
-        row = self._get_result_or_404(result_id, "profiling_threshold")
+        row = self._get_result_or_404(result_id, "profiling")
         return ProfilingResultDetail(
             id=row.id,
             table_id=row.table_id,
@@ -365,7 +365,7 @@ class DataQualityService:
             )
             .filter(
                 QualityCheckResult.id == result_id,
-                QualityCheckResult.check_type == "anomaly_auc",
+                QualityCheckResult.check_type == "anomaly",
             )
             .first()
         )
@@ -413,7 +413,7 @@ class DataQualityService:
             processing_date_hour=anomaly_result.processing_date_hour,
             is_resolved=verify.is_resolved if verify else False,
             auc_score=verify.actual_value if verify else anomaly_result.auc_score,
-            auc_threshold=verify.min_threshold if verify else None,
+            auc_threshold=verify.max_threshold if verify else None,
             model_config_params={
                 "learning_rate": model_parameter.learning_rate,
                 "num_leaves": model_parameter.num_leaves,
@@ -440,7 +440,7 @@ class DataQualityService:
         row = (
             self.db.query(QualityCheckResult)
             .filter(
-                QualityCheckResult.id == result_id,
+                (QualityCheckResult.id == result_id) | (QualityCheckResult.anomaly_result_id == result_id),
                 QualityCheckResult.check_type.in_(
                     RESULT_TYPE_TO_CHECK_TYPES[enum_result_type]
                 ),

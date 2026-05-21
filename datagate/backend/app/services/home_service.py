@@ -85,7 +85,10 @@ class HomeService:
         tables = (
             self.db.query(Table)
             .join(Connection)
-            .filter(Connection.is_active.is_(True))
+            .filter(
+                Connection.is_active.is_(True),
+                Table.is_active.is_(True)
+            )
             .order_by(Table.schema_name, Table.table_name)
             .all()
         )
@@ -110,7 +113,10 @@ class HomeService:
         query = (
             self.db.query(Table)
             .join(Connection)
-            .filter(Connection.is_active.is_(True))
+            .filter(
+                Connection.is_active.is_(True),
+                Table.is_active.is_(True)
+            )
         )
         if schema_name:
             query = query.filter(Table.schema_name == schema_name)
@@ -180,7 +186,10 @@ class HomeService:
         table_query = (
             self.db.query(Table)
             .join(Connection)
-            .filter(Connection.is_active.is_(True))
+            .filter(
+                Connection.is_active.is_(True),
+                Table.is_active.is_(True)
+            )
         )
         if connection_id:
             table_query = table_query.filter(Table.connection_id == connection_id)
@@ -221,16 +230,16 @@ class HomeService:
         table_id: str | None = None,
     ) -> list[dict]:
         type_map = {
-            "metadata": ["metadata_threshold"],
-            "profiling": ["profiling_threshold"],
+            "metadata": ["metadata"],
+            "profiling": ["profiling"],
             "rule": ["rule"],
-            "anomaly": ["anomaly_auc"],
+            "anomaly": ["anomaly"],
         }
         reverse_type_map = {
-            "metadata_threshold": "metadata",
-            "profiling_threshold": "profiling",
+            "metadata": "metadata",
+            "profiling": "profiling",
             "rule": "rule",
-            "anomaly_auc": "anomaly",
+            "anomaly": "anomaly",
         }
         query = self.db.query(QualityCheckResult)
         if result_type:

@@ -13,11 +13,6 @@ export const modelParametersApi = {
   // Advanced Features
   getTemplate: () => api.get(`${BASE_URL}/template`),
   uploadJson: (tableId, data) => api.post(`${BASE_URL}/upload-json`, data, { params: { table_id: tableId } }),
-
-  // Observability
-  aucTimeline: (tableId) => api.get(`${BASE_URL}/auc-results`, { params: { table_id: tableId } }),
-  shap: (aucResultId) => api.get(`${BASE_URL}/auc-results/${aucResultId}/shap`),
-  tableParameters: (tableId) => api.get(`${BASE_URL}`, { params: { table_id: tableId } }),
 };
 
 export const anomalyJobConfigsApi = {

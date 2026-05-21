@@ -37,7 +37,8 @@ import {
   UploadFileOutlined,
   ArrowBackOutlined,
 } from "@mui/icons-material";
-import { useSelector } from "react-redux";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 import { toast } from "react-toastify";
 import { anomalyJobConfigsApi } from "~/apis/modelConfigsApi";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
@@ -80,14 +81,9 @@ const toNumber = (value, fallback = 0) => {
 
 function Config() {
   const confirm = useConfirm();
-  const { user } = useSelector((state) => state.auth);
-  const isAdmin = user?.roles?.some((role) => role === "Admin" || role?.name === "Admin");
-  const canUpdate =
-    isAdmin ||
-    user?.permissions?.some((permission) => permission === "model_config:update" || permission?.code === "model_config:update");
-  const canDelete =
-    isAdmin ||
-    user?.permissions?.some((permission) => permission === "model_config:delete" || permission?.code === "model_config:delete");
+  const { hasPermission } = useRBAC();
+  const canUpdate = hasPermission(PermissionCode.MODEL_CONFIG_MANAGE);
+  const canDelete = hasPermission(PermissionCode.MODEL_CONFIG_MANAGE);
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);

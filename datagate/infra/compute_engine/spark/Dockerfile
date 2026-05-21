@@ -19,7 +19,5 @@ RUN cd /opt/spark/jars && \
     curl -L -O https://repo1.maven.org/maven2/io/spray/spray-json_2.12/1.3.5/spray-json_2.12-1.3.5.jar
     
 COPY requirements.txt /opt/spark/requirements.txt
-
 RUN pip3 install --no-cache-dir -r /opt/spark/requirements.txt
-
 USER spark

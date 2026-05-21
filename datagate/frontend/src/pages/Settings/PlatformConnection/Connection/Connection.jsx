@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Box, Button, Typography, Switch, Grid, Chip, Paper, Stack
+  Box, Button, Typography, Switch, Grid, Chip, Paper, Stack, CircularProgress
 } from "@mui/material";
-import { DeleteOutline, EditOutlined } from "@mui/icons-material";
+import { DeleteOutline, EditOutlined, BugReportOutlined } from "@mui/icons-material";
 import { connectionsApi } from "~/apis/connectionsApi";
 import { toast } from "react-toastify";
 
@@ -10,6 +10,23 @@ import { useConfirm } from "material-ui-confirm";
 
 function Connection({ connection, canUpdate, canDelete, onEdit, onReload, onDeleted }) {
   const confirm = useConfirm();
+  const [testing, setTesting] = useState(false);
+
+  const handleTest = async () => {
+    setTesting(true);
+    try {
+      const res = await connectionsApi.test(connection.id);
+      if (res.data.success) {
+        toast.success(res.data.message);
+      } else {
+        toast.error(res.data.message);
+      }
+    } catch (err) {
+      toast.error("Test failed: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const handleToggleActive = async () => {
     try {
@@ -44,7 +61,7 @@ function Connection({ connection, canUpdate, canDelete, onEdit, onReload, onDele
           toast.error("Failed to delete connection: " + (err.response?.data?.detail || err.message));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   return (
@@ -81,54 +98,54 @@ function Connection({ connection, canUpdate, canDelete, onEdit, onReload, onDele
             )}
           </Stack>
         </Grid>
-        
+
         <Grid item xs={12}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>DESCRIPTION</Typography>
           <Typography variant="body2">{connection.description || "N/A"}</Typography>
         </Grid>
 
         <Grid item xs={12}>
-          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Trino Configuration</Typography>
+          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Query Engine Configuration</Typography>
         </Grid>
         <Grid item xs={12} md={4}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>HOST</Typography>
-          <Typography variant="body2">{connection.trino_host}</Typography>
+          <Typography variant="body2">{connection.query_engine_host}</Typography>
         </Grid>
         <Grid item xs={12} md={4}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>PORT</Typography>
-          <Typography variant="body2">{connection.trino_port}</Typography>
+          <Typography variant="body2">{connection.query_engine_port}</Typography>
         </Grid>
         <Grid item xs={12} md={4}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>USER</Typography>
-          <Typography variant="body2">{connection.trino_user}</Typography>
+          <Typography variant="body2">{connection.query_engine_user}</Typography>
         </Grid>
 
         <Grid item xs={12}>
-          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Iceberg Configuration</Typography>
+          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Catalog Configuration</Typography>
         </Grid>
         <Grid item xs={12} md={4}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>CATALOG NAME</Typography>
-          <Typography variant="body2">{connection.iceberg_catalog_name}</Typography>
+          <Typography variant="body2">{connection.catalog_name}</Typography>
         </Grid>
         <Grid item xs={12} md={4}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>REST URL</Typography>
-          <Typography variant="body2">{connection.iceberg_rest_url}</Typography>
+          <Typography variant="body2">{connection.rest_url}</Typography>
         </Grid>
         <Grid item xs={12} md={4}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>WAREHOUSE</Typography>
-          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{connection.iceberg_warehouse}</Typography>
+          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{connection.catalog_warehouse}</Typography>
         </Grid>
 
         <Grid item xs={12}>
-          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Storage (MinIO/S3) Configuration</Typography>
+          <Typography variant="h6" color="primary" fontWeight={700} sx={{ mt: 2, mb: 2, borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>Storage Configuration</Typography>
         </Grid>
         <Grid item xs={12} md={6}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>ENDPOINT URL</Typography>
-          <Typography variant="body2">{connection.minio_endpoint_url}</Typography>
+          <Typography variant="body2">{connection.storage_endpoint_url}</Typography>
         </Grid>
         <Grid item xs={12} md={6}>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>ACCESS KEY</Typography>
-          <Typography variant="body2">{connection.minio_access_key}</Typography>
+          <Typography variant="body2">{connection.storage_access_key}</Typography>
         </Grid>
       </Grid>
     </Paper>

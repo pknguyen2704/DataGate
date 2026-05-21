@@ -10,6 +10,7 @@ import { Edit, Delete, InfoOutlined, Add, VisibilityOutlined } from "@mui/icons-
 import { metricsApi } from "~/apis/metricsApi";
 import { useApiResource } from "~/hooks/useApiResource";
 import { StateBox } from "~/components/Common/DataDisplay";
+import { toast } from "react-toastify";
 
 import { useConfirm } from "material-ui-confirm";
 
@@ -29,21 +30,28 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
   const anomalyRes = useApiResource(() => metricsApi.listAnomaly(tableId), [tableId]);
 
   const handleOpenDialog = useCallback((item = null) => {
+    if (!item && anomalyRes.data?.items?.length > 0) {
+      toast.warning("Anomaly threshold already exists for this table. You can edit the existing one.");
+      return;
+    }
     setEditingId(item?.id || null);
     if (item) {
-      setFormData({ ...item });
+      setFormData({
+        ...item,
+        auc_threshold: item.auc_threshold !== null && item.auc_threshold !== undefined ? item.auc_threshold.toString() : ""
+      });
     } else {
       setFormData({
         table_id: tableId,
         metric_name: 'auc_score',
         severity_level: 'warning',
         is_active: true,
-        auc_threshold: 0.8,
+        auc_threshold: '0.8',
         description: ''
       });
     }
     setOpenDialog(true);
-  }, [tableId]);
+  }, [tableId, anomalyRes.data?.items]);
 
   const handleOpenDetail = (row) => {
     setSelectedDetail(row);
@@ -69,18 +77,34 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
 
   const handleSave = async () => {
     try {
-      const data = { ...formData };
+      const parsedVal = formData.auc_threshold === '' || formData.auc_threshold === undefined || formData.auc_threshold === null
+        ? null
+        : parseFloat(formData.auc_threshold);
+
+      if (parsedVal === null || isNaN(parsedVal) || parsedVal < 0 || parsedVal > 1) {
+        toast.error("AUC Threshold must be a number between 0.0 and 1.0");
+        return;
+      }
+
+      const data = {
+        ...formData,
+        auc_threshold: parsedVal
+      };
+
       if (editingId) {
         await metricsApi.updateAnomaly(editingId, data);
+        toast.success("Anomaly threshold updated successfully");
       } else {
         await metricsApi.createAnomaly(data);
+        toast.success("Anomaly threshold created successfully");
       }
 
       setOpenDialog(false);
+      setEditingId(null);
       anomalyRes.reload();
     } catch (error) {
       console.error("Save failed:", error);
-      alert(error.response?.data?.detail || "Failed to save threshold");
+      toast.error(error.response?.data?.detail || "Failed to save threshold");
     }
   };
 
@@ -95,10 +119,11 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
       .then(async () => {
         try {
           await metricsApi.deleteAnomaly(id);
+          toast.success("Anomaly threshold deleted successfully");
           anomalyRes.reload();
         } catch (error) {
           console.error(error);
-          alert("Delete failed");
+          toast.error("Delete failed");
         }
       })
       .catch(() => {});
@@ -113,13 +138,14 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
       delete data.created_by_user;
       delete data.last_modified_by_user;
       await metricsApi.updateAnomaly(data.id, data);
+      toast.success(`Threshold ${newActive ? "activated" : "deactivated"} successfully`);
       anomalyRes.reload();
       if (selectedDetail && selectedDetail.id === item.id) {
         setSelectedDetail(prev => ({ ...prev, is_active: newActive }));
       }
     } catch (error) {
       console.error(error);
-      alert("Toggle status failed");
+      toast.error("Toggle status failed");
     }
   };
 
@@ -204,18 +230,21 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
         </TableContainer>
       </StateBox>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={() => { setOpenDialog(false); setEditingId(null); }} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? "Edit Threshold" : "Create Threshold"}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                type="number"
                 label="AUC Threshold (0.0 - 1.0)"
-                value={formData.auc_threshold || ''}
-                onChange={(e) => setFormData({ ...formData, auc_threshold: parseFloat(e.target.value) })}
-                inputProps={{ step: 0.01, min: 0, max: 1 }}
+                value={formData.auc_threshold ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || /^[0-9.]*$/.test(val)) {
+                    setFormData({ ...formData, auc_threshold: val });
+                  }
+                }}
                 required
               />
             </Grid>
@@ -244,7 +273,7 @@ const AnomalyDetection = ({ tableId, canManage, searchQuery, filters, addTrigger
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); }}>Cancel</Button>
           <Button onClick={handleSave} variant="contained" color="primary">Save</Button>
         </DialogActions>
       </Dialog>

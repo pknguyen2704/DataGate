@@ -13,15 +13,15 @@ class TrinoClient:
         if self.conn:
             return self.conn
         auth = None
-        if self.connection.trino_password:
+        if self.connection.query_engine_password:
             auth = BasicAuthentication(
-                self.connection.trino_user, self.connection.trino_password
+                self.connection.query_engine_user, self.connection.query_engine_password
             )
         self.conn = connect(
-            host=self.connection.trino_host,
-            port=self.connection.trino_port,
-            user=self.connection.trino_user,
-            catalog=self.connection.iceberg_catalog_name,
+            host=self.connection.query_engine_host,
+            port=self.connection.query_engine_port,
+            user=self.connection.query_engine_user,
+            catalog=self.connection.catalog_name,
             http_scheme="http",
             auth=auth,
         )
@@ -45,7 +45,7 @@ class TrinoClient:
         self.execute("SELECT 1 AS ok")
 
     def list_schemas(self, catalog: str | None = None) -> list[str]:
-        target_catalog = catalog or self.connection.iceberg_catalog_name
+        target_catalog = catalog or self.connection.catalog_name
         rows = self.execute(f"SHOW SCHEMAS FROM {target_catalog}")
         schemas = [list(row.values())[0] for row in rows]
         return schemas
@@ -53,7 +53,7 @@ class TrinoClient:
     def list_tables(
         self, catalog: str | None = None, schema: str = "default"
     ) -> list[str]:
-        target_catalog = catalog or self.connection.iceberg_catalog_name
+        target_catalog = catalog or self.connection.catalog_name
         rows = self.execute(f"SHOW TABLES FROM {target_catalog}.{schema}")
         tables = [list(row.values())[0] for row in rows]
         return tables

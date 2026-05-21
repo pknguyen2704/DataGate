@@ -10,8 +10,7 @@ export const connectionsApi = {
   delete: (id) => api.delete(`${BASE_URL}/${id}`),
   activate: (id) => api.post(`${BASE_URL}/${id}/activate`),
   deactivate: (id) => api.post(`${BASE_URL}/${id}/deactivate`),
-  test: (id) => api.post(`${BASE_URL}/${id}/test`),
-  
+
   // Table Discovery
   discover: (id, schema) => api.get(`${BASE_URL}/${id}/discover-tables`, { params: { schema } }),
   

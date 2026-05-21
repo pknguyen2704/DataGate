@@ -1,0 +1,15 @@
+export const PermissionCode = {
+  USER_MANAGE: "user:manage",
+  CONNECTION_MANAGE: "connection:manage",
+  MODEL_CONFIG_VIEW: "model_config:view",
+  MODEL_CONFIG_MANAGE: "model_config:manage",
+  OBSERVABILITY_VIEW: "observability:view",
+  THRESHOLD_VIEW: "threshold:view",
+  THRESHOLD_MANAGE: "threshold:manage",
+  RULE_VIEW: "rule:view",
+  RULE_MANAGE: "rule:manage",
+  QUALITY_VIEW: "quality:view",
+  QUALITY_RESOLVE: "quality:resolve",
+  HOME_VIEW: "home:view",
+  LAB_VIEW: "lab:view",
+};

@@ -10,7 +10,8 @@ import {
   EditOutlined, AddOutlined, SaveOutlined,
   PersonOutline, VisibilityOutlined, ArrowBackOutlined, DeleteOutline
 } from "@mui/icons-material";
-import { useSelector } from "react-redux";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 import { usersApi } from "~/apis/usersApi";
 import { rolesApi } from "~/apis/rolesApi";
 import { StateBox, StatusChip } from "~/components/Common/DataDisplay";
@@ -19,10 +20,8 @@ import { toast } from "react-toastify";
 import { useConfirm } from "material-ui-confirm";
 
 function UserManagement() {
-  const { user: currentUser } = useSelector(state => state.auth);
-  const isAdmin = currentUser?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const hasPerm = currentUser?.permissions?.some(p => p === "user:manage" || p?.code === "user:manage");
-  const canManage = isAdmin || hasPerm;
+  const { hasPermission } = useRBAC();
+  const canManage = hasPermission(PermissionCode.USER_MANAGE);
   
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);

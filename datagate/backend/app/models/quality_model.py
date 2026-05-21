@@ -101,7 +101,7 @@ class QualityThreshold(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     table_id = Column(UUID(as_uuid=False), ForeignKey("tables.id", ondelete="CASCADE"), nullable=False)
 
-    metric_scope = Column(String(50), nullable=False)
+    check_type = Column(String(50), nullable=False)
     column_name = Column(String(255), nullable=True)
     metric_name = Column(String(255), nullable=False)
 
@@ -135,9 +135,9 @@ class QualityThreshold(Base):
 
     __table_args__ = (
         Index(
-            "ix_quality_thresholds__table_scope_column_metric",
+            "ix_quality_thresholds__table_type_column_metric",
             "table_id",
-            "metric_scope",
+            "check_type",
             "column_name",
             "metric_name",
             unique=True,
@@ -201,4 +201,22 @@ class QualityCheckResult(Base):
             "processing_date_hour",
         ),
         Index("ix_quality_check_results__is_resolved", "is_resolved"),
+        Index(
+            "uq_quality_check_results__threshold_hour",
+            "table_id",
+            "check_type",
+            "threshold_id",
+            "processing_date_hour",
+            unique=True,
+            postgresql_where="threshold_id IS NOT NULL",
+        ),
+        Index(
+            "uq_quality_check_results__rule_hour",
+            "table_id",
+            "check_type",
+            "rule_id",
+            "processing_date_hour",
+            unique=True,
+            postgresql_where="rule_id IS NOT NULL",
+        ),
     )

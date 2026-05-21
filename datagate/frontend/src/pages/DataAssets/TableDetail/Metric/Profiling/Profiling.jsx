@@ -10,6 +10,7 @@ import { Edit, Delete, InfoOutlined, Add, VisibilityOutlined } from "@mui/icons-
 import { metricsApi } from "~/apis/metricsApi";
 import { useApiResource } from "~/hooks/useApiResource";
 import { StateBox } from "~/components/Common/DataDisplay";
+import { toast } from "react-toastify";
 
 import { useConfirm } from "material-ui-confirm";
 
@@ -88,15 +89,18 @@ const Profiling = ({ tableId, canManage, searchQuery, filters, addTrigger }) => 
 
       if (editingId) {
         await metricsApi.updateProfiling(editingId, data);
+        toast.success("Profiling threshold updated successfully");
       } else {
         await metricsApi.createProfiling(data);
+        toast.success("Profiling threshold created successfully");
       }
 
       setOpenDialog(false);
+      setEditingId(null);
       profilingRes.reload();
     } catch (error) {
       console.error("Save failed:", error);
-      alert(error.response?.data?.detail || "Failed to save threshold");
+      toast.error(error.response?.data?.detail || "Failed to save threshold");
     }
   };
 
@@ -111,10 +115,11 @@ const Profiling = ({ tableId, canManage, searchQuery, filters, addTrigger }) => 
       .then(async () => {
         try {
           await metricsApi.deleteProfiling(id);
+          toast.success("Profiling threshold deleted successfully");
           profilingRes.reload();
         } catch (error) {
           console.error(error);
-          alert("Delete failed");
+          toast.error("Delete failed");
         }
       })
       .catch(() => {});
@@ -129,13 +134,14 @@ const Profiling = ({ tableId, canManage, searchQuery, filters, addTrigger }) => 
       delete data.created_by_user;
       delete data.last_modified_by_user;
       await metricsApi.updateProfiling(data.id, data);
+      toast.success(`Threshold ${newActive ? "activated" : "deactivated"} successfully`);
       profilingRes.reload();
       if (selectedDetail && selectedDetail.id === item.id) {
         setSelectedDetail(prev => ({ ...prev, is_active: newActive }));
       }
     } catch (error) {
       console.error(error);
-      alert("Toggle status failed");
+      toast.error("Toggle status failed");
     }
   };
 
@@ -228,7 +234,7 @@ const Profiling = ({ tableId, canManage, searchQuery, filters, addTrigger }) => 
         </TableContainer>
       </StateBox>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={() => { setOpenDialog(false); setEditingId(null); }} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? "Edit Threshold" : "Create Threshold"}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -239,6 +245,7 @@ const Profiling = ({ tableId, canManage, searchQuery, filters, addTrigger }) => 
                 value={formData.column_name || ''}
                 onChange={(e) => setFormData({ ...formData, column_name: e.target.value })}
                 required
+                disabled={!!editingId}
               />
             </Grid>
             <Grid item xs={12}>
@@ -249,6 +256,7 @@ const Profiling = ({ tableId, canManage, searchQuery, filters, addTrigger }) => 
                 value={formData.metric_name || ''}
                 onChange={(e) => setFormData({ ...formData, metric_name: e.target.value })}
                 required
+                disabled={!!editingId}
               >
                 {METRIC_TYPES.map(m => (
                   <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
@@ -300,7 +308,7 @@ const Profiling = ({ tableId, canManage, searchQuery, filters, addTrigger }) => 
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); }}>Cancel</Button>
           <Button onClick={handleSave} variant="contained" color="primary">Save</Button>
         </DialogActions>
       </Dialog>

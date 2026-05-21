@@ -100,7 +100,10 @@ class ObservabilityService:
         rows = (
             self.db.query(Table)
             .join(Connection)
-            .filter(Connection.is_active.is_(True))
+            .filter(
+                Connection.is_active.is_(True),
+                Table.is_active.is_(True)
+            )
             .order_by(Table.schema_name, Table.table_name)
             .all()
         )
@@ -120,7 +123,10 @@ class ObservabilityService:
         rows = (
             self.db.query(Table)
             .join(Connection)
-            .filter(Connection.is_active.is_(True))
+            .filter(
+                Connection.is_active.is_(True),
+                Table.is_active.is_(True)
+            )
             .all()
         )
         connections = (

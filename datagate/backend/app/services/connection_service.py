@@ -1,4 +1,3 @@
-import re
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -6,7 +5,6 @@ from app.core.trino_client import TrinoClient
 from app.models import Connection, Table
 from app.schemas.connection_schema import (
     ConnectionCreate,
-    ConnectionTestResult,
     ConnectionUpdate,
 )
 
@@ -22,16 +20,16 @@ class ConnectionService:
         return Connection(
             connection_name=data.connection_name,
             description=data.description,
-            trino_host=data.trino_host,
-            trino_port=data.trino_port,
-            trino_user=data.trino_user,
-            trino_password=data.trino_password,
-            iceberg_rest_url=data.iceberg_rest_url,
-            iceberg_catalog_name=data.iceberg_catalog_name,
-            iceberg_warehouse=data.iceberg_warehouse,
-            minio_endpoint_url=data.minio_endpoint_url,
-            minio_access_key=data.minio_access_key,
-            minio_secret_key=data.minio_secret_key,
+            query_engine_host=data.query_engine_host,
+            query_engine_port=data.query_engine_port,
+            query_engine_user=data.query_engine_user,
+            query_engine_password=data.query_engine_password,
+            rest_url=data.rest_url,
+            catalog_name=data.catalog_name,
+            catalog_warehouse=data.catalog_warehouse,
+            storage_endpoint_url=data.storage_endpoint_url,
+            storage_access_key=data.storage_access_key,
+            storage_secret_key=data.storage_secret_key,
             is_active=data.is_active,
             created_by=str(creator_id),
         )
@@ -49,46 +47,6 @@ class ConnectionService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Connection name already exists",
             )
-
-    def _validate_connection(self, connection: Connection) -> None:
-        client = TrinoClient(connection)
-        try:
-            client.test()
-            client.list_schemas(connection.iceberg_catalog_name)
-        except Exception as exc:
-            # Clean up error message (remove HTML if present, truncate if too long)
-            error_msg = str(exc)
-            if "<html>" in error_msg.lower():
-                # Try to extract message from trino HttpError format: error 405: b'<html>...'
-                match = re.search(r"error (\d+):", error_msg)
-                status_code = f" (Status {match.group(1)})" if match else ""
-                error_msg = f"Server responded with an error{status_code}. This usually happens when the port is incorrect or pointing to a different service."
-
-            # Truncate very long messages
-            if len(error_msg) > 250:
-                error_msg = error_msg[:247] + "..."
-
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Connection test failed: {error_msg}",
-            ) from exc
-        finally:
-            client.close()
-
-    def _has_connection_config_changed(self, update_data: dict) -> bool:
-        fields = {
-            "trino_host",
-            "trino_port",
-            "trino_user",
-            "trino_password",
-            "iceberg_rest_url",
-            "iceberg_catalog_name",
-            "iceberg_warehouse",
-            "minio_endpoint_url",
-            "minio_access_key",
-            "minio_secret_key",
-        }
-        return any(field in update_data for field in fields)
 
     def list_connections(
         self, page: int = 1, page_size: int = 50, is_active: bool | None = None
@@ -137,7 +95,6 @@ class ConnectionService:
     def create_connection(self, data: ConnectionCreate, creator_id: str) -> Connection:
         self._validate_name_unique(data.connection_name)
         connection = self._build_connection(data, creator_id)
-        self._validate_connection(connection)
         self.db.add(connection)
         self.db.commit()
         self.db.refresh(connection)
@@ -154,17 +111,11 @@ class ConnectionService:
             )
         for field, value in update_data.items():
             # Skip empty passwords/secrets to avoid overwriting with empty string
-            if field in ["trino_password", "minio_secret_key"] and not value:
+            if field in ["query_engine_password", "storage_secret_key"] and not value:
                 continue
             setattr(connection, field, value)
         if modifier_id:
             connection.last_modified_by = modifier_id
-        if self._has_connection_config_changed(update_data):
-            try:
-                self._validate_connection(connection)
-            except HTTPException:
-                self.db.rollback()
-                raise
         self.db.commit()
         self.db.refresh(connection)
         return connection
@@ -188,26 +139,23 @@ class ConnectionService:
         self.db.delete(connection)
         self.db.commit()
 
-    def test_connection(self, connection_id: str) -> ConnectionTestResult:
-        connection = self.get_connection_or_404(connection_id)
-        self._validate_connection(connection)
-        return ConnectionTestResult(
-            success=True,
-            message=f"Connection '{connection.connection_name}' is reachable",
-        )
-
     def list_catalogs(self, connection_id: str) -> list[str]:
         connection = self.get_connection_or_404(connection_id)
-        return [connection.iceberg_catalog_name]
+        return [connection.catalog_name]
 
     def list_schemas(self, connection_id: str) -> list[str]:
         connection = self.get_connection_or_404(connection_id)
         client = TrinoClient(connection)
         try:
-            schemas = client.list_schemas(connection.iceberg_catalog_name)
+            schemas = client.list_schemas(connection.catalog_name)
             return [
                 schema for schema in schemas if schema.lower() not in SYSTEM_SCHEMAS
             ]
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to connect to query engine: {str(e)}",
+            )
         finally:
             client.close()
 
@@ -215,8 +163,8 @@ class ConnectionService:
         self, connection_id: str, schema: str, catalog: str | None = None
     ) -> list[str]:
         connection = self.get_connection_or_404(connection_id)
-        target_catalog = catalog or connection.iceberg_catalog_name
-        if target_catalog != connection.iceberg_catalog_name:
+        target_catalog = catalog or connection.catalog_name
+        if target_catalog != connection.catalog_name:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Table discovery only supports the catalog configured on the connection.",
@@ -224,6 +172,11 @@ class ConnectionService:
         client = TrinoClient(connection)
         try:
             return client.list_tables(target_catalog, schema)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to connect to query engine: {str(e)}",
+            )
         finally:
             client.close()
 

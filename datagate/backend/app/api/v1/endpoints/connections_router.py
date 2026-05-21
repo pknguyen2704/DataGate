@@ -10,7 +10,6 @@ from app.schemas.connection_schema import (
     ConnectionCreate,
     ConnectionListOut,
     ConnectionOut,
-    ConnectionTestResult,
     ConnectionUpdate,
 )
 from app.services.connection_service import ConnectionService
@@ -63,14 +62,6 @@ def update_connection(
 ):
     return service.update_connection(str(connection_id), body, str(current_user.id))
 
-
-@connections_router.post("/{connection_id}/test", response_model=ConnectionTestResult)
-def test_connection(
-    connection_id: UUID,
-    service: ConnectionService = Depends(get_connection_service),
-    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
-):
-    return service.test_connection(str(connection_id))
 
 
 @connections_router.post("/{connection_id}/deactivate", response_model=ConnectionOut)
@@ -127,3 +118,16 @@ def remove_managed_table(
 ):
     service.remove_managed_table(str(table_id))
     return None
+
+
+@connections_router.delete(
+    "/{connection_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_connection(
+    connection_id: UUID,
+    service: ConnectionService = Depends(get_connection_service),
+    _user: User = Depends(require_permission(PermissionCode.CONNECTION_MANAGE)),
+):
+    service.delete_connection(str(connection_id))
+    return None
+

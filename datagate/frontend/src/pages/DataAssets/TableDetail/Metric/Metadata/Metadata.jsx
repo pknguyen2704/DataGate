@@ -10,6 +10,7 @@ import { Edit, Delete, InfoOutlined, Add, VisibilityOutlined } from "@mui/icons-
 import { metricsApi } from "~/apis/metricsApi";
 import { useApiResource } from "~/hooks/useApiResource";
 import { StateBox } from "~/components/Common/DataDisplay";
+import { toast } from "react-toastify";
 
 import { useConfirm } from "material-ui-confirm";
 
@@ -85,15 +86,18 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
 
       if (editingId) {
         await metricsApi.updateMetadata(editingId, data);
+        toast.success("Metadata threshold updated successfully");
       } else {
         await metricsApi.createMetadata(data);
+        toast.success("Metadata threshold created successfully");
       }
 
       setOpenDialog(false);
+      setEditingId(null);
       metadataRes.reload();
     } catch (error) {
       console.error("Save failed:", error);
-      alert(error.response?.data?.detail || "Failed to save threshold");
+      toast.error(error.response?.data?.detail || "Failed to save threshold");
     }
   };
 
@@ -108,10 +112,11 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
       .then(async () => {
         try {
           await metricsApi.deleteMetadata(id);
+          toast.success("Metadata threshold deleted successfully");
           metadataRes.reload();
         } catch (error) {
           console.error(error);
-          alert("Delete failed");
+          toast.error("Delete failed");
         }
       })
       .catch(() => {});
@@ -126,13 +131,14 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
       delete data.created_by_user;
       delete data.last_modified_by_user;
       await metricsApi.updateMetadata(data.id, data);
+      toast.success(`Threshold ${newActive ? "activated" : "deactivated"} successfully`);
       metadataRes.reload();
       if (selectedDetail && selectedDetail.id === item.id) {
         setSelectedDetail(prev => ({ ...prev, is_active: newActive }));
       }
     } catch (error) {
       console.error(error);
-      alert("Toggle status failed");
+      toast.error("Toggle status failed");
     }
   };
 
@@ -222,7 +228,7 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
         </TableContainer>
       </StateBox>
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={() => { setOpenDialog(false); setEditingId(null); }} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? "Edit Threshold" : "Create Threshold"}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -234,6 +240,7 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
                 value={formData.metric_name || ''}
                 onChange={(e) => setFormData({ ...formData, metric_name: e.target.value })}
                 required
+                disabled={!!editingId}
               >
                 {METRIC_TYPES.map(m => (
                   <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
@@ -285,7 +292,7 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); }}>Cancel</Button>
           <Button onClick={handleSave} variant="contained" color="primary">Save</Button>
         </DialogActions>
       </Dialog>

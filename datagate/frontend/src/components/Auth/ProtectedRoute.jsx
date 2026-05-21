@@ -1,9 +1,9 @@
-import { useSelector } from 'react-redux'
 import { Box, CircularProgress } from '@mui/material'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useRBAC } from '~/rbac/useRBAC'
 
 const ProtectedRoute = ({ permission }) => {
-  const { isAuthenticated, loading, user } = useSelector((state) => state.auth)
+  const { isAuthenticated, loading, hasPermission } = useRBAC();
   const location = useLocation();
 
   if (loading) {
@@ -31,8 +31,8 @@ const ProtectedRoute = ({ permission }) => {
     )
   }
 
-  // Permission check
-  if (permission && !user?.permissions?.includes(permission)) {
+  // Centralized Permission check
+  if (permission && !hasPermission(permission)) {
     return <Navigate to="/app/home" replace />;
   }
 

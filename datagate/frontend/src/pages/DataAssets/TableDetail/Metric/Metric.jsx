@@ -7,7 +7,8 @@ import { Search, FilterList, Add } from "@mui/icons-material";
 import { useParams } from "react-router-dom";
 import { dataAssetsApi } from "~/apis/dataAssetsApi";
 import { useApiResource } from "~/hooks/useApiResource";
-import { useSelector } from "react-redux";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 
 // Sub-components
 import Metadata from "./Metadata/Metadata";
@@ -23,12 +24,8 @@ const Metric = () => {
     severity: ""
   });
   const [addTrigger, setAddTrigger] = useState(0); // Counter to trigger add in children
-  const { user } = useSelector(state => state.auth);
-
-  // Check permission: threshold:manage
-  const isAdmin = user?.roles?.some(r => r === "Admin" || r?.name === "Admin");
-  const hasThresholdPerm = user?.permissions?.some(p => p === "threshold:manage" || p?.code === "threshold:manage");
-  const canManage = isAdmin || hasThresholdPerm;
+  const { hasPermission } = useRBAC();
+  const canManage = hasPermission(PermissionCode.THRESHOLD_MANAGE);
 
   // API Resources (only for schema check)
   const tableRes = useApiResource(() => dataAssetsApi.get(tableId), [tableId]);
@@ -36,6 +33,7 @@ const Metric = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+    setAddTrigger(0);
   };
 
   return (
@@ -64,7 +62,7 @@ const Metric = () => {
       {/* Filter Bar */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, bgcolor: 'background.default' }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} sm={6}>
             <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
               <Select
@@ -78,7 +76,7 @@ const Metric = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} sm={6}>
             <FormControl fullWidth size="small">
               <InputLabel>Severity</InputLabel>
               <Select
@@ -91,22 +89,6 @@ const Metric = () => {
                 <MenuItem value="critical">Critical</MenuItem>
               </Select>
             </FormControl>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Button 
-              fullWidth 
-              variant="contained" 
-              startIcon={<FilterList />}
-              sx={{ 
-                bgcolor: 'primary.main', 
-                color: 'white',
-                '&:hover': { bgcolor: 'primary.dark' },
-                fontWeight: 700,
-                borderRadius: 1.5
-              }}
-            >
-              Filter
-            </Button>
           </Grid>
         </Grid>
       </Paper>

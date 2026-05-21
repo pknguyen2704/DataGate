@@ -8,8 +8,4 @@ export const rulesApi = {
   delete: (id) => api.delete(`/rules/${id}`),
   approve: (id) => api.post(`/rules/${id}/approve`),
   deactivate: (id) => api.post(`/rules/${id}/deactivate`),
-  
-  // Verify results
-  listVerifyResults: (params) => api.get("/rules/verify-results/all", { params }),
-  resolveVerify: (id) => api.patch(`/rules/verify-results/${id}/resolve`),
 };

@@ -2,7 +2,6 @@ FROM apache/airflow:2.11.2-python3.10
 
 USER root
 
-# Cài đặt system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         openjdk-17-jdk \
@@ -13,14 +12,12 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Cấu hình Java
 RUN mkdir -p /opt/java \
     && ln -s /usr/lib/jvm/java-17-openjdk-amd64 /opt/java/openjdk
 
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-# Cài đặt Spark
 RUN curl -fL https://downloads.apache.org/spark/spark-3.5.8/spark-3.5.8-bin-hadoop3.tgz -o /tmp/spark.tgz \
     && tar -xzf /tmp/spark.tgz -C /opt/ \
     && mv /opt/spark-3.5.8-bin-hadoop3 /opt/spark \
@@ -29,7 +26,6 @@ RUN curl -fL https://downloads.apache.org/spark/spark-3.5.8/spark-3.5.8-bin-hado
 ENV SPARK_HOME=/opt/spark
 ENV PATH="${SPARK_HOME}/bin:${PATH}"
 
-# Cài đặt Spark jars
 RUN mkdir -p /opt/spark/jars && \
     cd /opt/spark/jars && \
     curl -L -O https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.10/postgresql-42.7.10.jar && \
@@ -43,26 +39,14 @@ RUN mkdir -p /opt/spark/jars && \
     curl -L -O https://repo1.maven.org/maven2/com/microsoft/ml/lightgbm/lightgbmlib/3.3.510/lightgbmlib-3.3.510.jar && \
     curl -L -O https://repo1.maven.org/maven2/io/spray/spray-json_2.12/1.3.5/spray-json_2.12-1.3.5.jar
 
-# Cấp quyền cho user airflow
 RUN chown -R airflow:root /opt/spark
-
-# Cài đặt Python dependencies
 COPY requirements.txt /requirements.txt
 
 USER airflow
-
 RUN pip install --no-cache-dir -r /requirements.txt
 
 USER root
-
-# Copy source code DataGate
-RUN mkdir -p /opt/datagate
-
-COPY datagate /opt/datagate
-
-RUN chown -R airflow:root /opt/datagate
+COPY --chown=airflow:root tasks /opt/airflow/datagate
 
 USER airflow
-
-ENV DATAGATE_HOME=/opt/datagate
-ENV PYTHONPATH="/opt:${DATAGATE_HOME}"
+ENV PYTHONPATH="/opt/airflow"

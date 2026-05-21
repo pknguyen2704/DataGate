@@ -1,8 +1,9 @@
 import { Box, Typography, Paper, List, ListItemButton, ListItemIcon, ListItemText, Divider } from "@mui/material";
 import { SettingsInputComponentOutlined, ModelTrainingOutlined, PeopleOutlined } from "@mui/icons-material";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
 import { useEffect, useMemo } from "react";
+import { useRBAC } from "~/rbac/useRBAC";
+import { PermissionCode } from "~/rbac/permission";
 
 const SETTINGS_BASE_PATH = "/app/settings";
 
@@ -11,29 +12,21 @@ const SETTINGS_MENU = [
     text: "Platform Connections",
     icon: <SettingsInputComponentOutlined />,
     path: `${SETTINGS_BASE_PATH}/connections`,
-    permission: "connection:manage",
+    permission: PermissionCode.CONNECTION_MANAGE,
   },
   {
     text: "Anomaly Configurations",
     icon: <ModelTrainingOutlined />,
     path: `${SETTINGS_BASE_PATH}/model-configs`,
-    permission: "model_config:view",
+    permission: PermissionCode.MODEL_CONFIG_VIEW,
   },
   {
     text: "Users",
     icon: <PeopleOutlined />,
     path: `${SETTINGS_BASE_PATH}/users`,
-    permission: "user:manage",
+    permission: PermissionCode.USER_MANAGE,
   },
 ];
-
-const isAdminUser = (user) => user?.roles?.some((role) => role === "Admin" || role?.name === "Admin");
-
-const hasPermission = (user, permission) => {
-  if (!permission || isAdminUser(user)) return true;
-
-  return user?.permissions?.some((item) => item === permission || item?.code === permission);
-};
 
 const settingsShellSx = {
   display: "flex",
@@ -70,11 +63,11 @@ const navItemSx = {
 const SettingsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useSelector((state) => state.auth);
+  const { hasPermission } = useRBAC();
 
   const visibleItems = useMemo(
-    () => SETTINGS_MENU.filter((item) => hasPermission(user, item.permission)),
-    [user]
+    () => SETTINGS_MENU.filter((item) => hasPermission(item.permission)),
+    [hasPermission]
   );
 
   useEffect(() => {

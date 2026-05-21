@@ -28,18 +28,18 @@ class Connection(Base):
     connection_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
 
-    trino_host = Column(String(255), nullable=False)
-    trino_port = Column(Integer, default=8080, nullable=False)
-    trino_user = Column(String(255), nullable=False)
-    trino_password = Column(Text, nullable=True)
+    query_engine_host = Column(String(255), nullable=False)
+    query_engine_port = Column(Integer, default=8080, nullable=False)
+    query_engine_user = Column(String(255), nullable=False)
+    query_engine_password = Column(Text, nullable=True)
 
-    iceberg_rest_url = Column(String(255), nullable=False)
-    iceberg_catalog_name = Column(String(255), nullable=False)
-    iceberg_warehouse = Column(String(255), nullable=False)
+    rest_url = Column(String(255), nullable=False)
+    catalog_name = Column(String(255), nullable=False)
+    catalog_warehouse = Column(String(255), nullable=False)
 
-    minio_endpoint_url = Column(String(255), nullable=False)
-    minio_access_key = Column(String(255), nullable=False)
-    minio_secret_key = Column(Text, nullable=False)
+    storage_endpoint_url = Column(String(255), nullable=False)
+    storage_access_key = Column(String(255), nullable=False)
+    storage_secret_key = Column(Text, nullable=False)
 
     is_active = Column(Boolean, default=True, nullable=False)
     created_by = Column(

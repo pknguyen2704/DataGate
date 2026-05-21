@@ -20,7 +20,7 @@ class MetricsService:
         return {
             "id": threshold.id,
             "table_id": threshold.table_id,
-            "auc_threshold": threshold.min_threshold,
+            "auc_threshold": threshold.max_threshold,
             "severity_level": threshold.severity_level,
             "is_active": threshold.is_active,
             "description": threshold.description,
@@ -34,13 +34,13 @@ class MetricsService:
 
     def _list_thresholds(
         self,
-        metric_scope: str,
+        check_type: str,
         table_id: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ):
         query = self.db.query(QualityThreshold).filter(
-            QualityThreshold.metric_scope == metric_scope
+            QualityThreshold.check_type == check_type
         )
         if table_id:
             query = query.filter(QualityThreshold.table_id == table_id)
@@ -56,14 +56,14 @@ class MetricsService:
             .limit(page_size)
             .all()
         )
-        if metric_scope == "anomaly":
+        if check_type == "anomaly":
             items = [self._anomaly_threshold_payload(item) for item in items]
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-    def _get_threshold(self, threshold_id: str, metric_scope: str | None = None):
+    def _get_threshold(self, threshold_id: str, check_type: str | None = None):
         query = self.db.query(QualityThreshold).filter(QualityThreshold.id == threshold_id)
-        if metric_scope:
-            query = query.filter(QualityThreshold.metric_scope == metric_scope)
+        if check_type:
+            query = query.filter(QualityThreshold.check_type == check_type)
         threshold = query.first()
         if not threshold:
             raise HTTPException(
@@ -78,7 +78,7 @@ class MetricsService:
     def _create_threshold(
         self,
         data,
-        metric_scope: str,
+        check_type: str,
         user_id: str,
         column_name: str | None = None,
         metric_name: str | None = None,
@@ -92,7 +92,7 @@ class MetricsService:
             self.db.query(QualityThreshold)
             .filter(
                 QualityThreshold.table_id == table_id,
-                QualityThreshold.metric_scope == metric_scope,
+                QualityThreshold.check_type == check_type,
                 QualityThreshold.column_name == column_name,
                 QualityThreshold.metric_name == metric_name,
             )
@@ -106,7 +106,7 @@ class MetricsService:
 
         threshold = QualityThreshold(
             table_id=table_id,
-            metric_scope=metric_scope,
+            check_type=check_type,
             column_name=column_name,
             metric_name=metric_name,
             min_threshold=min_threshold
@@ -126,11 +126,11 @@ class MetricsService:
         self.db.refresh(threshold)
         return threshold
 
-    def _update_threshold(self, threshold_id: str, data, metric_scope: str, user_id: str):
-        threshold = self._get_threshold(threshold_id, metric_scope)
+    def _update_threshold(self, threshold_id: str, data, check_type: str, user_id: str):
+        threshold = self._get_threshold(threshold_id, check_type)
         update_data = data.model_dump(exclude_unset=True)
         if "auc_threshold" in update_data:
-            update_data["min_threshold"] = update_data.pop("auc_threshold")
+            update_data["max_threshold"] = update_data.pop("auc_threshold")
         for field, value in update_data.items():
             setattr(threshold, field, value)
         threshold.last_modified_by = user_id
@@ -138,8 +138,8 @@ class MetricsService:
         self.db.refresh(threshold)
         return threshold
 
-    def _delete_threshold(self, threshold_id: str, metric_scope: str):
-        threshold = self._get_threshold(threshold_id, metric_scope)
+    def _delete_threshold(self, threshold_id: str, check_type: str):
+        threshold = self._get_threshold(threshold_id, check_type)
         self.db.delete(threshold)
         self.db.commit()
 
@@ -198,7 +198,7 @@ class MetricsService:
                 "anomaly",
                 user_id,
                 metric_name="auc_score",
-                min_threshold=data.auc_threshold,
+                max_threshold=data.auc_threshold,
             )
         )
 

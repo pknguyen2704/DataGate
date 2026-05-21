@@ -66,7 +66,7 @@ class Config:
     grafana_url: str = _strip_url(
         _get_env("GRAFANA_URL", default="http://localhost:3000")
     )
-    grafana_dashboard_uid: str = _get_env("GRAFANA_DASHBOARD_UID", default="ads54vs")
+    grafana_dashboard_uid: str = _get_env("GRAFANA_DASHBOARD_UID", default="datagate")
     grafana_dashboard_slug: str = _strip_url(
         _get_env(
             "GRAFANA_DASHBOARD_SLUG",

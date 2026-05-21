@@ -58,7 +58,7 @@ function ListTable({ connectionId, connectionData, canUpdateTable, canCreateTabl
     setAdding(true);
     try {
       await connectionsApi.addManagedTable(connectionId, {
-        catalog: connectionData.iceberg_catalog_name,
+        catalog: connectionData.catalog_name,
         schema: selectedSchema,
         table_name: selectedTable
       });
@@ -91,7 +91,7 @@ function ListTable({ connectionId, connectionData, canUpdateTable, canCreateTabl
           toast.error("Removal failed");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   return (

@@ -24,13 +24,13 @@ SOURCE_JDBC_DRIVER = "org.postgresql.Driver"
 SOURCE_DB_USER = "admin"
 SOURCE_DB_PASSWORD = "postgrespassword"
 
-ICEBERG_CATALOG = "iceberg"
-ICEBERG_REST_URI = "http://iceberg-rest:8181"
-ICEBERG_WAREHOUSE = "s3://lakehouse/"
+CATALOG_NAME = "iceberg"
+REST_URI = "http://iceberg-rest:8181"
+CATALOG_WAREHOUSE = "s3://lakehouse/"
 
-MINIO_ENDPOINT = "http://minio:9000"
-MINIO_ACCESS_KEY = "admin"
-MINIO_SECRET_KEY = "miniopassword"
+STORAGE_ENDPOINT = "http://minio:9000"
+STORAGE_ACCESS_KEY = "admin"
+STORAGE_SECRET_KEY = "miniopassword"
 SPARK_DRIVER_CORES = "2"
 SPARK_DRIVER_MEMORY = "4g"
 SPARK_EXECUTOR_INSTANCES = "2"
@@ -75,16 +75,16 @@ def create_spark_session():
         .config("spark.default.parallelism", SPARK_DEFAULT_PARALLELISM)
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}", "org.apache.iceberg.spark.SparkCatalog")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.type", "rest")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.uri", ICEBERG_REST_URI)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.warehouse", ICEBERG_WAREHOUSE)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.endpoint", MINIO_ENDPOINT)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.access-key-id", MINIO_ACCESS_KEY)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.secret-access-key", MINIO_SECRET_KEY)
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.path-style-access", "true")
-        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.s3.region", "us-east-1")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.type", "rest")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.uri", REST_URI)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.warehouse", CATALOG_WAREHOUSE)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.endpoint", STORAGE_ENDPOINT)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.access-key-id", STORAGE_ACCESS_KEY)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.secret-access-key", STORAGE_SECRET_KEY)
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.path-style-access", "true")
+        .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.region", "us-east-1")
 
         .getOrCreate()
     )
@@ -121,7 +121,7 @@ def read_source_batch(spark, source_table, processing_date_hour):
     )
 
 def write_to_bronze(df, target_table):
-    full_target_table = f"{ICEBERG_CATALOG}.{TARGET_SCHEMA}.{target_table}"
+    full_target_table = f"{CATALOG_NAME}.{TARGET_SCHEMA}.{target_table}"
     logger.info("Writing bronze table=%s", full_target_table)
     df.writeTo(full_target_table).overwritePartitions()
 

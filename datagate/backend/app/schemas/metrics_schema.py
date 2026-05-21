@@ -83,7 +83,7 @@ class ProfilingThresholdListOut(PaginatedResponse[ProfilingThresholdOut]):
 
 
 class AnomalyThresholdBase(BaseModel):
-    auc_threshold: float = Field(..., ge=0, le=1)
+    auc_threshold: float | None = Field(default=None, ge=0, le=1)
     severity_level: SeverityLevel = SeverityLevel.WARNING
     is_active: bool = True
     description: str | None = None

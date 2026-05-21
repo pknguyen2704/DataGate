@@ -1,75 +1,77 @@
 services:
-  # datagate_database:
-  #   image: postgres:16
-  #   container_name: datagate_database
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - datagate_postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 10
-  #     start_period: 10s
-  #   restart: unless-stopped
-  #   networks:
-  #     - datagate-net
+  datagate_database:
+    image: postgres:18
+    container_name: datagate_database
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - datagate_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - datagate-net
 
-  # datagate_backend:
-  #   image: datagatesolution/datagate-backend:1.0.0
-  #   container_name: datagate_backend
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "8000:8000"
-  #   depends_on:
-  #     datagate_migrate:
-  #       condition: service_completed_successfully
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 10s
-  #   restart: unless-stopped
-  #   networks:
-  #     - datagate-net
+  datagate_backend:
+    image: datagatesolution/datagate-backend:1.0.0
+    container_name: datagate_backend
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      datagate_migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - datagate-net
 
-  # datagate_migrate:
-  #   image: datagatesolution/datagate-backend:1.0.0
-  #   container_name: datagate_migrate
-  #   env_file:
-  #     - .env
-  #   command: ["sh", "-c", "alembic upgrade head && python -m app.db.initial_data"]
-  #   depends_on:
-  #     datagate_database:
-  #       condition: service_healthy
-  #   networks:
-  #     - datagate-net
+  datagate_migrate:
+    image: datagatesolution/datagate-backend:1.0.0
+    container_name: datagate_migrate
+    env_file:
+      - .env
+    command: >
+      sh -c "alembic upgrade head && python -m app.db.initial_data"
+    depends_on:
+      datagate_database:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - datagate-net
 
-  # datagate_frontend:
-  #   image: datagatesolution/datagate-frontend:1.0.0
-  #   container_name: datagate_frontend
-  #   ports:
-  #     - "2704:80"
-  #   depends_on:
-  #     datagate_backend:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-  #   networks:
-  #     - datagate-net
+  datagate_frontend:
+    image: datagatesolution/datagate-frontend:1.0.0
+    container_name: datagate_frontend
+    ports:
+      - "2704:80"
+    depends_on:
+      datagate_backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - datagate-net
 
   datagate_notebook:
     image: datagatesolution/datagate-notebook:1.0.0
     container_name: datagate_notebook
     ports:
-      - "8888:8888" # Jupyter Lab UI
-      - "4040:4040" # Spark UI 1
-      - "4041:4041" # Spark UI 2
-      - "4042:4042" # Spark UI 3
+      - "8888:8888"
+      - "4040:4040"
+      - "4041:4041"
+      - "4042:4042"
     env_file:
       - .env
     volumes:

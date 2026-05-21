@@ -466,16 +466,16 @@ Request tạo connection:
 {
   "connection_name": "Local Lakehouse",
   "description": "Kết nối lakehouse thực nghiệm",
-  "trino_host": "trino",
-  "trino_port": 8080,
-  "trino_user": "admin",
-  "trino_password": "...",
-  "iceberg_rest_url": "http://iceberg-rest:8181",
-  "iceberg_catalog_name": "iceberg",
-  "iceberg_warehouse": "s3://warehouse",
-  "minio_endpoint_url": "http://minio:9000",
-  "minio_access_key": "...",
-  "minio_secret_key": "..."
+  "query_engine_host": "trino",
+  "query_engine_port": 8080,
+  "query_engine_user": "admin",
+  "query_engine_password": "...",
+  "rest_url": "http://iceberg-rest:8181",
+  "catalog_name": "iceberg",
+  "catalog_warehouse": "s3://warehouse",
+  "storage_endpoint_url": "http://storage:9000",
+  "storage_access_key": "...",
+  "storage_secret_key": "..."
 }
 ```
 
