@@ -35,10 +35,10 @@ DataGate relies on four core pillars for data quality monitoring:
 - **Metrics Monitoring**: Tracking and alerting on key statistical metrics over time (e.g., uniqueness, completeness, specific segment health).
 
 ### Intelligent Anomaly Detection
-- Leverages XGBoost and SHAP for explainable ML models.
+- Leverages LightGBM and SHAP for explainable ML models.
 - Dynamically adapts to data seasonality and trends to minimize alert fatigue.
 - Correlates anomalies across multiple columns and segments to pinpoint root causes.
-- Provides granular Anomaly Scores at the cell, row, column, and table levels.
+- Provides granular Anomaly Scores at the column levels.
 
 ## Architecture & Tech Stack
 
