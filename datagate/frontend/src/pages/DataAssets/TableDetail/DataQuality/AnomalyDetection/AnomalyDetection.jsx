@@ -74,12 +74,12 @@ const AnomalyDetection = ({ detailData }) => {
           </Stack>
         </Paper>
 
-        {detailData?.model_config_params && (
+        {detailData?.anomaly_config_params && (
           <Box>
             <Typography variant="caption" color="text.secondary" fontWeight={700}>MODEL CONFIGURATION</Typography>
             <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: '#ffffff', borderRadius: 3 }}>
               <Grid container spacing={2}>
-                {Object.entries(detailData.model_config_params).map(([k, v]) => {
+                {Object.entries(detailData.anomaly_config_params).map(([k, v]) => {
                   const displayValue = formatConfigValue(v);
 
                   return (

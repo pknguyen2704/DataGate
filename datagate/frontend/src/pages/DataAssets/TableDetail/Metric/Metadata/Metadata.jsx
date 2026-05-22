@@ -35,6 +35,7 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
   const [formData, setFormData] = useState({});
   const [openDetailDialog, setOpenDetailDialog] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const metadataRes = useApiResource(() => metricsApi.listMetadata(tableId), [tableId]);
 
@@ -79,6 +80,8 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
   }, [addTrigger, handleOpenDialog]);
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       const data = { ...formData };
       if (data.min_threshold === '') data.min_threshold = null;
@@ -98,6 +101,8 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
     } catch (error) {
       console.error("Save failed:", error);
       toast.error(error.response?.data?.detail || "Failed to save threshold");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -292,8 +297,10 @@ const Metadata = ({ tableId, canManage, searchQuery, filters, addTrigger }) => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setOpenDialog(false); setEditingId(null); }}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained" color="primary">Save</Button>
+          <Button disabled={saving} onClick={() => { setOpenDialog(false); setEditingId(null); }}>Cancel</Button>
+          <Button disabled={saving} onClick={() => { setSaving(true); handleSave(); }} variant="contained" color="primary">
+            {saving ? "Saving..." : "Save"}
+          </Button>
         </DialogActions>
       </Dialog>
 

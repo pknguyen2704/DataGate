@@ -41,8 +41,8 @@ const INITIAL_PARAMS = {
 function ModelParameter() {
   const confirm = useConfirm();
   const { hasPermission } = useRBAC();
-  const canUpdate = hasPermission(PermissionCode.MODEL_CONFIG_MANAGE);
-  const canDelete = hasPermission(PermissionCode.MODEL_CONFIG_MANAGE);
+  const canUpdate = hasPermission(PermissionCode.ANOMALY_CONFIG_MANAGE);
+  const canDelete = hasPermission(PermissionCode.ANOMALY_CONFIG_MANAGE);
   const canManage = canUpdate; // Use update as the base for manage UI elements
   
   const [page, setPage] = useState(0);

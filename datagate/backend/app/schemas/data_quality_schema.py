@@ -115,7 +115,7 @@ class AnomalyResultDetail(BaseModel):
     is_resolved: bool
     auc_score: float | None = None
     auc_threshold: float | None = None
-    model_config_params: dict | None = None
+    anomaly_config_params: dict | None = None
     top_features: list[dict] = Field(default_factory=list)
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

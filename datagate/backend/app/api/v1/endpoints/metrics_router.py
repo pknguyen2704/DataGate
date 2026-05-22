@@ -35,7 +35,7 @@ def list_metadata_thresholds(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     return service.list_metadata_thresholds(
         table_id=table_id, page=page, page_size=page_size
@@ -61,7 +61,7 @@ def create_metadata_threshold(
 def get_metadata_threshold(
     threshold_id: UUID,
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     return service.get_metadata_threshold(str(threshold_id))
 
@@ -98,7 +98,7 @@ def list_profiling_thresholds(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     return service.list_profiling_thresholds(
         table_id=table_id, page=page, page_size=page_size
@@ -124,7 +124,7 @@ def create_profiling_threshold(
 def get_profiling_threshold(
     threshold_id: UUID,
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     return service.get_profiling_threshold(str(threshold_id))
 
@@ -161,7 +161,7 @@ def list_anomaly_thresholds(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     return service.list_anomaly_thresholds(
         table_id=table_id, page=page, page_size=page_size
@@ -187,7 +187,7 @@ def create_anomaly_threshold(
 def get_anomaly_threshold(
     threshold_id: UUID,
     service: MetricsService = Depends(get_metrics_service),
-    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.THRESHOLD_MANAGE)),
 ):
     return service.get_anomaly_threshold(str(threshold_id))
 

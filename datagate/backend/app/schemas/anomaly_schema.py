@@ -57,7 +57,7 @@ class ModelParameterListOut(PaginatedResponse[ModelParameterOut]):
     pass
 
 
-class ModelConfigBase(BaseModel):
+class AnomalyConfigBase(BaseModel):
     table_id: UUID
     batch_time_col: str = Field(..., min_length=1, max_length=255)
     required_history_days: int = Field(..., ge=1)
@@ -72,11 +72,11 @@ class ModelConfigBase(BaseModel):
     description: str | None = None
 
 
-class ModelConfigCreate(ModelConfigBase):
+class AnomalyConfigCreate(AnomalyConfigBase):
     pass
 
 
-class ModelConfigUpdate(BaseModel):
+class AnomalyConfigUpdate(BaseModel):
     batch_time_col: str | None = Field(default=None, min_length=1, max_length=255)
     required_history_days: int | None = Field(default=None, ge=1)
     previous_batch_hours: int | None = Field(default=None, ge=1)
@@ -90,7 +90,7 @@ class ModelConfigUpdate(BaseModel):
     description: str | None = None
 
 
-class ModelConfigOut(ModelConfigBase):
+class AnomalyConfigOut(AnomalyConfigBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
@@ -102,7 +102,7 @@ class ModelConfigOut(ModelConfigBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ModelConfigListOut(PaginatedResponse[ModelConfigOut]):
+class AnomalyConfigListOut(PaginatedResponse[AnomalyConfigOut]):
     pass
 
 

@@ -171,7 +171,7 @@ const SideBar = ({ isCollapsed }) => {
       {hasAnyPermission([
         PermissionCode.USER_MANAGE,
         PermissionCode.CONNECTION_MANAGE,
-        PermissionCode.MODEL_CONFIG_VIEW
+        PermissionCode.ANOMALY_CONFIG_MANAGE
       ]) && (
         <List sx={{ px: 1, pb: 1, pt: 0.5 }}>
           <Tooltip title={isCollapsed ? "Settings" : ""} placement="right">

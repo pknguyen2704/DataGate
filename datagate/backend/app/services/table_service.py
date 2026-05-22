@@ -149,12 +149,12 @@ class TableService:
         latest_hours = self.get_latest_processing_hours(table_ids)
 
         # Batch fetch anomaly configs
-        model_configs = (
+        anomaly_configs = (
             self.db.query(AnomalyConfig.table_id)
             .filter(AnomalyConfig.table_id.in_(table_ids))
             .all()
         )
-        anomaly_table_ids = {str(r[0]) for r in model_configs}
+        anomaly_table_ids = {str(r[0]) for r in anomaly_configs}
 
         for table in tables:
             tid = str(table.id)

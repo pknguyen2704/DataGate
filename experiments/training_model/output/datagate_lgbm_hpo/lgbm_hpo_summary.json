@@ -1,0 +1,64 @@
+{
+    "table": "iceberg.silver.cleaned_yellow_tripdata",
+    "batch_time_col": "processing_date_hour",
+    "target_processing_date_hour": "2025-01-15 12:00:00",
+    "history_processing_date_hours": [
+        "2025-01-01 12:00:00",
+        "2025-01-08 12:00:00",
+        "2025-01-14 12:00:00",
+        "2025-01-15 00:00:00"
+    ],
+    "selected_source": "optuna",
+    "baseline_result": {
+        "valid_auc": 0.692070224712314,
+        "test_auc": 0.6788467695969007,
+        "fit_seconds": 8.771638631820679,
+        "best_iteration": 113,
+        "best_iteration_source": "getBoosterBestIteration",
+        "booster_total_iterations": 114
+    },
+    "final_result": {
+        "valid_auc": 0.6955632942576108,
+        "test_auc": 0.6826122426271053,
+        "fit_seconds": 4.958683729171753,
+        "best_iteration": 110,
+        "best_iteration_source": "getBoosterBestIteration",
+        "booster_total_iterations": 111
+    },
+    "feature_cols": [
+        "passenger_count",
+        "trip_distance",
+        "fare_amount",
+        "extra",
+        "mta_tax",
+        "tip_amount",
+        "tolls_amount",
+        "improvement_surcharge",
+        "total_amount",
+        "congestion_surcharge",
+        "airport_fee",
+        "cbd_congestion_fee",
+        "store_and_fwd_flag",
+        "payment_type"
+    ],
+    "numeric_cols": [
+        "passenger_count",
+        "trip_distance",
+        "fare_amount",
+        "extra",
+        "mta_tax",
+        "tip_amount",
+        "tolls_amount",
+        "improvement_surcharge",
+        "total_amount",
+        "congestion_surcharge",
+        "airport_fee",
+        "cbd_congestion_fee"
+    ],
+    "categorical_cols": [
+        "store_and_fwd_flag",
+        "payment_type"
+    ],
+    "production_params_path": "/opt/spark/work-dir/training_model/output/datagate_lgbm_hpo/lgbm_hpo_params.json",
+    "optuna_trials_path": "/opt/spark/work-dir/training_model/output/datagate_lgbm_hpo/optuna_trials.csv"
+}

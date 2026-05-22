@@ -36,13 +36,13 @@ from .table_schema import (
     TableLiteOut,
 )
 
-from .model_schema import (
+from .anomaly_schema import (
     ModelParameterCreate,
     ModelParameterUpdate,
     ModelParameterOut,
-    ModelConfigCreate,
-    ModelConfigUpdate,
-    ModelConfigOut,
+    AnomalyConfigCreate,
+    AnomalyConfigUpdate,
+    AnomalyConfigOut,
     AUCManualThresholdCreate,
     AUCManualThresholdUpdate,
     AUCManualThresholdOut,

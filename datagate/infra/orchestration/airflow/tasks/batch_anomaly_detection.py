@@ -202,7 +202,7 @@ def get_anomaly_config(pg_hook, table_id):
             exclude_cols,
             categorical_cols,
             numeric_cols
-        FROM model_configs
+        FROM anomaly_configs
         WHERE table_id = %s
         LIMIT 1
         """,
@@ -211,7 +211,7 @@ def get_anomaly_config(pg_hook, table_id):
     if row is None:
         return None
     cfg = {
-        "model_config_id": str(row[0]),
+        "anomaly_config_id": str(row[0]),
         "batch_time_col": validate_name(row[1], "batch_time_col"),
     }
     cfg.update(

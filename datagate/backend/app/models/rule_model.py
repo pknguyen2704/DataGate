@@ -21,11 +21,11 @@ class Rule(Base):
     severity_level = Column(String(50), nullable=False, default="warning")
 
     column_name = Column(String(255), nullable=True)
-    constraint_name = Column(String(512), nullable=True)
+    constraint_name = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
-    current_value = Column(String(255), nullable=True)
-    suggesting_rule = Column(String(255), nullable=True)
-    code_for_constraint = Column(String(512), nullable=False)
+    current_value = Column(Text, nullable=True)
+    suggesting_rule = Column(Text, nullable=True)
+    code_for_constraint = Column(Text, nullable=False)
     frequency = Column(Integer, nullable=False, default=1)
 
     created_by = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

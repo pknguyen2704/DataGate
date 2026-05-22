@@ -11,8 +11,8 @@ def gen_uuid() -> str:
     return str(uuid.uuid4())
 
 
-class ModelConfig(Base):
-    __tablename__ = "model_configs"
+class AnomalyConfig(Base):
+    __tablename__ = "anomaly_configs"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     table_id = Column(
@@ -53,7 +53,7 @@ class ModelConfig(Base):
     created_by_user = relationship("User", foreign_keys=[created_by])
     last_modified_by_user = relationship("User", foreign_keys=[last_modified_by])
 
-    __table_args__ = (Index("ix_model_configs__table_id", "table_id", unique=True),)
+    __table_args__ = (Index("ix_anomaly_configs__table_id", "table_id", unique=True),)
 
 
 class ModelParameter(Base):
@@ -96,7 +96,6 @@ class ModelParameter(Base):
     __table_args__ = (Index("ix_model_parameters__table_id", "table_id", unique=True),)
 
 
-AnomalyConfig = ModelConfig
 
 
 class AnomalyResult(Base):

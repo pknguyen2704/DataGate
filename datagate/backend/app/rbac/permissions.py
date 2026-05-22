@@ -1,16 +1,13 @@
 class PermissionCode:
     USER_MANAGE = "user:manage"              # Admin
     CONNECTION_MANAGE = "connection:manage"  # Admin only
-    MODEL_CONFIG_VIEW = "model_config:view"  # All
-    MODEL_CONFIG_MANAGE = "model_config:manage"  # Admin, Engineer
+    ANOMALY_CONFIG_MANAGE = "anomaly_config:manage"  # Admin, Engineer
     # Metadata & Profiling
     OBSERVABILITY_VIEW = "observability:view"  # All
     # Warning Thresholds
-    THRESHOLD_VIEW = "threshold:view"        # All
-    THRESHOLD_MANAGE = "threshold:manage"    # Admin, Engineer
+    THRESHOLD_MANAGE = "threshold:manage"    # All (Create/Update/Delete/View)
     # Data Rules
-    RULE_VIEW = "rule:view"                  # All
-    RULE_MANAGE = "rule:manage"              # All (Create/Update/Approve/Deactivate/Delete)
+    RULE_MANAGE = "rule:manage"              # All (Create/Update/Approve/Deactivate/Delete/View)
     # Data Quality Results
     QUALITY_VIEW = "quality:view"            # All
     QUALITY_RESOLVE = "quality:resolve"      # Admin, Engineer
@@ -30,13 +27,8 @@ ALL_PERMISSIONS = [
         "group": "Connection Management",
     },
     {
-        "code": PermissionCode.MODEL_CONFIG_VIEW,
-        "name": "View Model Parameters",
-        "group": "Model Configuration",
-    },
-    {
-        "code": PermissionCode.MODEL_CONFIG_MANAGE,
-        "name": "Manage Model Parameters (Create/Update/Delete)",
+        "code": PermissionCode.ANOMALY_CONFIG_MANAGE,
+        "name": "Manage Model Parameters (Create/Update/Delete/View)",
         "group": "Model Configuration",
     },
     {
@@ -45,23 +37,14 @@ ALL_PERMISSIONS = [
         "group": "Observability",
     },
     {
-        "code": PermissionCode.THRESHOLD_VIEW,
-        "name": "View Warning Thresholds",
-        "group": "Quality Configuration",
-    },
-    {
         "code": PermissionCode.THRESHOLD_MANAGE,
-        "name": "Manage Warning Thresholds (Create/Update/Delete)",
-        "group": "Quality Configuration",
-    },
-    {
-        "code": PermissionCode.RULE_VIEW,
-        "name": "View Data Rules",
-        "group": "Rule Management",
+        "name": "Manage Thresholds",
+        "description": "Allows creating, updating, deleting, and viewing thresholds",
+        "module": "Metadata & Profiling",
     },
     {
         "code": PermissionCode.RULE_MANAGE,
-        "name": "Manage Rules (Create/Update/Approve/Deactivate/Delete)",
+        "name": "Manage Rules (Create/Update/Approve/Deactivate/Delete/View)",
         "group": "Rule Management",
     },
     {

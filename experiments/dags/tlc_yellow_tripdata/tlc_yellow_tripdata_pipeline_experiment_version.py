@@ -19,8 +19,8 @@ from datagate.batch_profiling_metric_verification import batch_profiling_metric_
 from datagate.batch_anomaly_verification import batch_anomaly_verification
 from datagate.data_quality_gate import data_quality_gate
 
-SIM_START = "2025-01-18 12:00:00"
-SIM_END = "2025-01-19 00:00:00"
+SIM_START = "2025-01-19 00:00:00"
+SIM_END = "2025-01-22 00:00:00"
 SIM_STEP_HOURS = 12
 SIM_VAR_NAME = "yellow_tripdata_next_processing_date_hour"
 

@@ -82,8 +82,8 @@ const toNumber = (value, fallback = 0) => {
 function Config() {
   const confirm = useConfirm();
   const { hasPermission } = useRBAC();
-  const canUpdate = hasPermission(PermissionCode.MODEL_CONFIG_MANAGE);
-  const canDelete = hasPermission(PermissionCode.MODEL_CONFIG_MANAGE);
+  const canUpdate = hasPermission(PermissionCode.ANOMALY_CONFIG_MANAGE);
+  const canDelete = hasPermission(PermissionCode.ANOMALY_CONFIG_MANAGE);
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);

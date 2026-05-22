@@ -17,8 +17,8 @@ const SETTINGS_MENU = [
   {
     text: "Anomaly Configurations",
     icon: <ModelTrainingOutlined />,
-    path: `${SETTINGS_BASE_PATH}/model-configs`,
-    permission: PermissionCode.MODEL_CONFIG_VIEW,
+    path: `${SETTINGS_BASE_PATH}/anomaly-configs`,
+    permission: PermissionCode.ANOMALY_CONFIG_MANAGE,
   },
   {
     text: "Users",

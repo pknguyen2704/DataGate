@@ -27,7 +27,7 @@ def get_rule_service(db: Session = Depends(get_db)) -> RuleService:
 @rules_router.get("/managed-tables", response_model=list[TableLiteOut])
 def list_managed_tables(
     service: RuleService = Depends(get_rule_service),
-    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.get_managed_tables()
 
@@ -43,7 +43,7 @@ def list_rules(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
     service: RuleService = Depends(get_rule_service),
-    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.list_rules(
         table_id=str(table_id) if table_id else None,
@@ -62,7 +62,7 @@ def list_rule_verify_results(
     table_id: UUID | None = Query(default=None),
     limit: int | None = Query(default=None, ge=1, le=200),
     service: RuleService = Depends(get_rule_service),
-    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.list_verify_results(str(table_id) if table_id else None, limit)
 
@@ -89,7 +89,7 @@ def create_rule(
 def get_rule(
     rule_id: UUID,
     service: RuleService = Depends(get_rule_service),
-    _user: User = Depends(require_permission(PermissionCode.RULE_VIEW)),
+    _user: User = Depends(require_permission(PermissionCode.RULE_MANAGE)),
 ):
     return service.get_rule_or_404(str(rule_id))
 

@@ -13,7 +13,7 @@ import TableDetail from "~/pages/DataAssets/TableDetail/index.jsx";
 import Settings from "~/pages/Settings/Settings";
 import { ObservabilityTab, MetricsTab, RulesTab, QualityTab } from "~/pages/DataAssets/TableDetail/index.jsx";
 import PlatformConnection from "~/pages/Settings/PlatformConnection/PlatformConnection";
-import ModelConfig from "~/pages/Settings/AnomalyConfig/AnomalyConfig";
+import AnomalyConfig from "~/pages/Settings/AnomalyConfig/AnomalyConfig";
 import UserManagement from "~/pages/Settings/UserManagement/UserManagement";
 
 function App() {
@@ -56,8 +56,8 @@ function App() {
               <Route path="connections" element={<PlatformConnection />} />
             </Route>
 
-            <Route element={<ProtectedRoute permission="model_config:view" />}>
-              <Route path="model-configs" element={<ModelConfig />} />
+            <Route element={<ProtectedRoute permission="anomaly_config:manage" />}>
+              <Route path="anomaly-configs" element={<AnomalyConfig />} />
             </Route>
             
             <Route element={<ProtectedRoute permission="user:manage" />}>

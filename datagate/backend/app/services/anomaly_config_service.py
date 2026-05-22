@@ -5,9 +5,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import AnomalyConfig, AnomalyResult, ModelParameter, SHAPResult, Table
-from app.schemas.model_schema import (
-    ModelConfigCreate,
-    ModelConfigUpdate,
+from app.schemas.anomaly_schema import (
+    AnomalyConfigCreate,
+    AnomalyConfigUpdate,
     ModelParameterCreate,
     ModelParameterUpdate,
 )
@@ -48,7 +48,7 @@ def _is_int(value) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-class ModelConfigService:
+class AnomalyConfigService:
     def __init__(self, db: Session):
         self.db = db
 
@@ -402,7 +402,7 @@ class ModelConfigService:
         self.db.refresh(config)
         return self._model_parameter_payload(config)
 
-    def list_model_configs(
+    def list_anomaly_configs(
         self,
         table_id: str | None = None,
         page: int = 1,
@@ -438,7 +438,7 @@ class ModelConfigService:
         return self._anomaly_config_payload(self.get_anomaly_config_or_404(config_id))
 
     def create_anomaly_config(
-        self, data: ModelConfigCreate, user_id: str
+        self, data: AnomalyConfigCreate, user_id: str
     ) -> AnomalyConfig:
         table_id = str(data.table_id)
         self._get_table_or_404(table_id)
@@ -468,7 +468,7 @@ class ModelConfigService:
         return self._anomaly_config_payload(config)
 
     def update_anomaly_config(
-        self, config_id: str, data: ModelConfigUpdate, user_id: str
+        self, config_id: str, data: AnomalyConfigUpdate, user_id: str
     ) -> AnomalyConfig:
         config = self.get_anomaly_config_or_404(config_id)
         update_data = data.model_dump(exclude_unset=True)

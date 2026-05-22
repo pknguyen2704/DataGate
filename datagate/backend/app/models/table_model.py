@@ -42,7 +42,7 @@ class Table(Base):
         "QualityCheckResult", back_populates="table", cascade="all, delete-orphan"
     )
     anomaly_config = relationship(
-        "ModelConfig",
+        "AnomalyConfig",
         back_populates="table",
         uselist=False,
         cascade="all, delete-orphan",

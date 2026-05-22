@@ -414,7 +414,7 @@ class DataQualityService:
             is_resolved=verify.is_resolved if verify else False,
             auc_score=verify.actual_value if verify else anomaly_result.auc_score,
             auc_threshold=verify.max_threshold if verify else None,
-            model_config_params={
+            anomaly_config_params={
                 "learning_rate": model_parameter.learning_rate,
                 "num_leaves": model_parameter.num_leaves,
                 "max_depth": model_parameter.max_depth,

@@ -1,6 +1,6 @@
 import api from "./api";
 
-const BASE_URL = "/settings/model-configs";
+const BASE_URL = "/settings/anomaly-configs";
 
 export const modelParametersApi = {
   // Settings CRUD

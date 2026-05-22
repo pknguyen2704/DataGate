@@ -5,7 +5,7 @@ import SettingsSuggestOutlined from "@mui/icons-material/SettingsSuggestOutlined
 import ModelParameter from "./ModelParameter/ModelParameter";
 import Config from "./Config/Config";
 
-function ModelConfig() {
+function AnomalyConfig() {
   const [tab, setTab] = React.useState(0);
 
   return (
@@ -25,4 +25,4 @@ function ModelConfig() {
   );
 }
 
-export default ModelConfig;
+export default AnomalyConfig;

@@ -8,5 +8,5 @@ from .quality_model import (
     QualityCheckResult,
     QualityThreshold,
 )
-from .anomaly_model import AnomalyConfig, AnomalyResult, ModelConfig, ModelParameter, SHAPResult
+from .anomaly_model import AnomalyConfig, AnomalyResult, ModelParameter, SHAPResult
 from .rule_model import Rule
