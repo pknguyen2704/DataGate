@@ -104,11 +104,12 @@ The frontend will be available at `http://localhost:5173` and the backend API at
 
 ## Machine Learning Approach
 
-Unlike traditional monitoring that relies purely on static rules (which miss unknown errors and cause false positives), DataGate employs an automated sampling and classification strategy:
-1. **Sampling**: Randomly sample data from "today" vs. historical baselines (yesterday, last week).
-2. **Feature Encoding**: Convert complex data types into numerical features.
-3. **Classification**: Train an XGBoost classifier to distinguish "today's" data from historical data. If the model can easily tell the difference, a significant structural change (anomaly) has occurred.
-4. **Explainability**: SHAP values are extracted to compute anomaly scores and highlight exactly which columns/segments caused the anomaly, providing clear insights into the root cause.
+Unlike traditional monitoring that relies purely on static rules (which miss unknown errors and cause false positives), DataGate employs an automated **Self-Supervised Learning (Adversarial Validation)** strategy. By using a **Supervised** algorithm to solve an **Unsupervised** anomaly detection problem, DataGate can detect data drift without requiring true anomaly labels:
+
+1. **Sampling & Labeling**: Randomly sample data from "today" and historical baselines (yesterday, last week), then assign artificial labels (e.g., `1` for today, `0` for history).
+2. **Feature Encoding**: Convert complex data types into numerical features suitable for tree-based models.
+3. **Classification (LightGBM)**: Train a LightGBM binary classifier to distinguish "today's" data from historical data. If the model can easily separate the two (high accuracy/AUC), it indicates a significant structural change or data drift has occurred in today's data.
+4. **Explainability (SHAP)**: SHAP values are extracted to compute anomaly scores and highlight exactly which columns or segments caused the anomaly, providing clear insights into the root cause.
 
 ## Contributing
 
