@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**DataGate** is a comprehensive Data Quality Management and Observability platform designed to ensure the reliability, accuracy, and health of your data infrastructure. By combining Unsupervised Machine Learning (UML) with traditional rule-based and metrics monitoring, DataGate provides a robust and scalable solution for modern data stacks.
+**DataGate** is a comprehensive Data Quality Management and Observability platform designed to ensure the reliability, accuracy, and health of your data infrastructure. By combining Self-Supervised Learning (SSL) with traditional rule-based and metrics monitoring, DataGate provides a robust and scalable solution for modern data stacks.
 
 </div>
 
@@ -30,7 +30,7 @@
 
 DataGate relies on four core pillars for data quality monitoring:
 - **Data Observability**: Comprehensive metadata tracking (row counts, null rates, schema changes, updates).
-- **Unsupervised Machine Learning (UML)**: Automated anomaly detection to find hidden patterns and distribution changes without manual labeling or rule configuration.
+- **Self-Supervised Learning**: Automated anomaly detection to find hidden patterns and distribution changes without manual labeling or rule configuration.
 - **Rule-Based Testing**: User-defined business rules for deterministic quality checks and critical constraints.
 - **Metrics Monitoring**: Tracking and alerting on key statistical metrics over time (e.g., uniqueness, completeness, specific segment health).
 
