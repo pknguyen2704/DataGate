@@ -34,6 +34,5 @@ class RuleSource(str, Enum):
 
 
 class RuleStatus(str, Enum):
-    PENDING = "pending"
     ACTIVE = "active"
     INACTIVE = "inactive"

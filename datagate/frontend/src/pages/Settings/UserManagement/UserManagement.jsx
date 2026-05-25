@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  Box, Button, Table, TableBody, TableCell, TableHead, TableRow, 
-  Paper, Stack, IconButton, Dialog, DialogTitle, DialogContent, 
+import {
+  Box, Button, Table, TableBody, TableCell, TableHead, TableRow,
+  Paper, Stack, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField,
   Typography, Tooltip, MenuItem, Select, FormControl, InputLabel,
   TablePagination, TableContainer, Grid
@@ -22,16 +22,16 @@ import { useConfirm } from "material-ui-confirm";
 function UserManagement() {
   const { hasPermission } = useRBAC();
   const canManage = hasPermission(PermissionCode.USER_MANAGE);
-  
+
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [selectedId, setSelectedId] = useState(null);
-  
-  const users = useApiResource(() => usersApi.list({ 
-    page: page + 1, 
-    page_size: pageSize 
+
+  const users = useApiResource(() => usersApi.list({
+    page: page + 1,
+    page_size: pageSize
   }), [page, pageSize]);
-  
+
   const roles = useApiResource(() => rolesApi.list());
   const confirm = useConfirm();
 
@@ -67,7 +67,7 @@ function UserManagement() {
           toast.error(error.response?.data?.detail || "Failed to delete user");
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   let userItems = [];
@@ -78,15 +78,15 @@ function UserManagement() {
   const selectedUser = userItems.find(u => u.id === selectedId);
 
   const userDialog = (
-    <UserDialog 
-      open={openUser} 
+    <UserDialog
+      open={openUser}
       onClose={() => {
         setOpenUser(false);
         if (selectedId) {
           users.reload();
         }
-      }} 
-      user={editingUser} 
+      }}
+      user={editingUser}
       roles={roles.data?.items || []}
       onSuccess={() => users.reload()}
     />
@@ -328,18 +328,18 @@ function UserDialog({ open, onClose, user, roles, onSuccess }) {
       <DialogTitle sx={{ fontWeight: 700 }}>{user ? "Edit User" : "Create New User"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField label="Username" fullWidth size="small" value={form.username} onChange={e => setForm({...form, username: e.target.value})} disabled={!!user} />
-          <TextField label="Full Name" fullWidth size="small" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} />
-          <TextField label="Email" fullWidth size="small" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+          <TextField label="Username" fullWidth size="small" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} disabled={!!user} />
+          <TextField label="Full Name" fullWidth size="small" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
+          <TextField label="Email" fullWidth size="small" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           <TextField
             label={user ? "New Password (leave blank to keep current)" : "Password"}
             type="password"
             fullWidth
             size="small"
             value={form.password}
-            onChange={e => setForm({...form, password: e.target.value})}
+            onChange={e => setForm({ ...form, password: e.target.value })}
           />
-          
+
           <FormControl fullWidth size="small">
             <InputLabel id="user-role-label">Role</InputLabel>
             <Select

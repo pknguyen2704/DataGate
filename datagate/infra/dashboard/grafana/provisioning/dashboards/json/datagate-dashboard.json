@@ -5,18 +5,16 @@
     "name": "datagate",
     "namespace": "default",
     "uid": "datagate",
-    "resourceVersion": "1779250365021988",
-    "generation": 2,
-    "creationTimestamp": "2026-05-20T04:12:22Z",
+    "resourceVersion": "1779659076691013",
+    "generation": 1,
+    "creationTimestamp": "2026-05-24T21:44:36Z",
     "labels": {
-      "grafana.app/deprecatedInternalID": "3309710149754880"
+      "grafana.app/deprecatedInternalID": "520464695959552"
     },
     "annotations": {
-      "grafana.app/createdBy": "user:efmlk7ecgz474c",
+      "grafana.app/createdBy": "user:cfmriu0w5y7lsf",
       "grafana.app/folder": "",
-      "grafana.app/saved-from-ui": "Grafana v13.0.1 (a100054f)",
-      "grafana.app/updatedBy": "user:efmlk7ecgz474c",
-      "grafana.app/updatedTimestamp": "2026-05-20T04:12:45Z"
+      "grafana.app/saved-from-ui": "Grafana v13.0.1 (a100054f)"
     }
   },
   "spec": {
@@ -2194,7 +2192,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT\n  processing_date_hour AS \"time\",\n  batch_added_rows AS \"Added Rows\"\nFROM batch_table_metadata\nWHERE table_id = '$table_id'\n  AND $__timeFilter(processing_date_hour AT TIME ZONE 'Asia/Ho_Chi_Minh')\nORDER BY 1;",
+                        "rawSql": "SELECT\n  processing_date_hour AT TIME ZONE 'Asia/Ho_Chi_Minh' AS \"time\",\n  batch_added_rows AS \"Added Rows\"\nFROM batch_table_metadata\nWHERE table_id = '$table_id'\n  AND $__timeFilter(processing_date_hour AT TIME ZONE 'Asia/Ho_Chi_Minh')\nORDER BY 1;",
                         "sql": {
                           "columns": [
                             {
@@ -2890,8 +2888,8 @@
         "spec": {
           "name": "table_id",
           "current": {
-            "text": "7e07f5e2-fead-4e1b-94b6-00bbe9267c37",
-            "value": "7e07f5e2-fead-4e1b-94b6-00bbe9267c37"
+            "text": "f6df23d4-3d1e-4a03-9f2d-9ee7d7dff6de",
+            "value": "f6df23d4-3d1e-4a03-9f2d-9ee7d7dff6de"
           },
           "label": "Table ID",
           "hide": "hideVariable",

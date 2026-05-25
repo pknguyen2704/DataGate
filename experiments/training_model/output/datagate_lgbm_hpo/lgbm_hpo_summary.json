@@ -10,16 +10,16 @@
     ],
     "selected_source": "optuna",
     "baseline_result": {
-        "valid_auc": 0.6937012629117365,
-        "test_auc": 0.6932477390541675,
-        "fit_seconds": 8.64333724975586,
-        "best_iteration": 73
+        "valid_auc": 0.7011417611882385,
+        "test_auc": 0.6884645115769921,
+        "fit_seconds": 9.826108455657959,
+        "best_iteration": 195
     },
     "final_result": {
-        "valid_auc": 0.695845544772919,
-        "test_auc": 0.6911595278744359,
-        "fit_seconds": 5.776059865951538,
-        "best_iteration": 66
+        "valid_auc": 0.7035678626811201,
+        "test_auc": 0.6940986074867257,
+        "fit_seconds": 6.415442943572998,
+        "best_iteration": 372
     },
     "feature_cols": [
         "passenger_count",

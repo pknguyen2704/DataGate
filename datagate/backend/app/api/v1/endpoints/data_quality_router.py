@@ -33,6 +33,7 @@ def list_results(
     status: str | None = Query(default=None),
     severity_level: str | None = Query(default=None),
     result_type: str | None = Query(default=None),
+    is_resolved: bool | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     service: DataQualityService = Depends(get_dq_service),
@@ -54,6 +55,7 @@ def list_results(
         status if status and status.strip() else None,
         severity_level if severity_level and severity_level.strip() else None,
         result_type if result_type and result_type.strip() else None,
+        is_resolved,
         page,
         page_size,
     )

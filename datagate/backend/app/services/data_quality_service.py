@@ -42,6 +42,7 @@ class DataQualityService:
         status_val: str | None = None,
         severity_level: str | None = None,
         result_type: str | None = None,
+        is_resolved: bool | None = None,
     ):
         query = self.db.query(QualityCheckResult).options(
             joinedload(QualityCheckResult.table),
@@ -61,6 +62,8 @@ class DataQualityService:
             query = query.filter(QualityCheckResult.status == status_val)
         if severity_level:
             query = query.filter(QualityCheckResult.severity_level == severity_level)
+        if is_resolved is not None:
+            query = query.filter(QualityCheckResult.is_resolved == is_resolved)
         if result_type:
             try:
                 enum_result_type = ResultType(result_type)
@@ -126,6 +129,7 @@ class DataQualityService:
         processing_date_hour: datetime | None = None,
         status_val: str | None = None,
         severity_level: str | None = None,
+        is_resolved: bool | None = None,
     ):
         query = self.db.query(AnomalyResult).options(
             joinedload(AnomalyResult.table),
@@ -157,6 +161,16 @@ class DataQualityService:
                 if row.quality_check_results
                 and row.quality_check_results[0].severity_level == severity_level
             ]
+        if is_resolved is not None:
+            rows = [
+                row
+                for row in rows
+                if (
+                    row.quality_check_results[0].is_resolved
+                    if row.quality_check_results
+                    else False
+                ) == is_resolved
+            ]
         return rows
 
     def list_results(
@@ -167,6 +181,7 @@ class DataQualityService:
         status_val: str | None = None,
         severity_level: str | None = None,
         result_type: str | None = None,
+        is_resolved: bool | None = None,
         page: int = 1,
         page_size: int = 50,
     ):
@@ -176,6 +191,7 @@ class DataQualityService:
                 processing_date_hour=processing_date_hour,
                 status_val=status_val,
                 severity_level=severity_level,
+                is_resolved=is_resolved,
             )
             total = len(rows)
             paged_rows = rows[(page - 1) * page_size : page * page_size]
@@ -192,6 +208,7 @@ class DataQualityService:
             status_val=status_val,
             severity_level=severity_level,
             result_type=result_type,
+            is_resolved=is_resolved,
         )
         total = query.count()
         rows = (

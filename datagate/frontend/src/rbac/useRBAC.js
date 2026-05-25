@@ -1,6 +1,5 @@
 import { useSelector } from "react-redux";
 import { useCallback } from "react";
-import { PermissionCode } from "./permission";
 
 export const useRBAC = () => {
   const { user, isAuthenticated, loading } = useSelector((state) => state.auth);

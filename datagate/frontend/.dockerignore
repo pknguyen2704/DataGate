@@ -10,3 +10,4 @@ README.md
 *.log
 .vite
 .eslintcache
+api_test.md

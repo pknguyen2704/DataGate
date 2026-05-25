@@ -41,14 +41,11 @@ class RuleService:
                 )
             )
 
-        # Map status to is_active/source
         if rule_status:
             if rule_status == "active":
                 query = query.filter(Rule.is_active.is_(True))
-            elif rule_status == "pending":
-                query = query.filter(Rule.is_active.is_(False), Rule.source == "system")
             elif rule_status == "inactive":
-                query = query.filter(Rule.is_active.is_(False), Rule.source == "manual")
+                query = query.filter(Rule.is_active.is_(False))
 
         if severity_level:
             query = query.filter(Rule.severity_level == severity_level)
@@ -96,7 +93,7 @@ class RuleService:
             )
 
         rule_dict = data.model_dump()
-        # If manual, active by default. If system, inactive (pending) by default.
+        # If manual, active by default. If system, inactive by default.
         if rule_dict.get("source") == "system":
             rule_dict["is_active"] = False
         else:

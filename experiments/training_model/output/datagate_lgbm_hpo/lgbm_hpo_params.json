@@ -1,14 +1,14 @@
 {
-    "learning_rate": 0.07626422678969352,
-    "num_leaves": 127,
-    "max_depth": 6,
+    "learning_rate": 0.04996426683192924,
+    "num_leaves": 15,
+    "max_depth": 8,
     "min_data_in_leaf": 20,
-    "bagging_fraction": 0.9476659699420406,
-    "bagging_freq": 0,
-    "feature_fraction": 0.9464422206054043,
-    "lambda_l1": 0.007675851848841717,
-    "lambda_l2": 4.201056173420004,
-    "min_gain_to_split": 0.13659563436200556,
-    "max_bin": 127,
-    "num_iterations": 66
+    "bagging_fraction": 0.9882032417524725,
+    "bagging_freq": 3,
+    "feature_fraction": 0.7453660619025745,
+    "lambda_l1": 0.018578570514702422,
+    "lambda_l2": 1.0213089766867304e-08,
+    "min_gain_to_split": 0.0019935121644415466,
+    "max_bin": 63,
+    "num_iterations": 372
 }

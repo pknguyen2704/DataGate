@@ -88,7 +88,7 @@ class ModelParameter(Base):
 
     table = relationship("Table")
     results = relationship(
-        "AnomalyResult", back_populates="model_parameter", cascade="all, delete-orphan"
+        "AnomalyResult", back_populates="model_parameter"
     )
     created_by_user = relationship("User", foreign_keys=[created_by])
     last_modified_by_user = relationship("User", foreign_keys=[last_modified_by])
@@ -107,8 +107,8 @@ class AnomalyResult(Base):
     )
     model_parameter_id = Column(
         UUID(as_uuid=False),
-        ForeignKey("model_parameters.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("model_parameters.id", ondelete="SET NULL"),
+        nullable=True,
     )
 
     processing_date_hour = Column(DateTime, nullable=False)

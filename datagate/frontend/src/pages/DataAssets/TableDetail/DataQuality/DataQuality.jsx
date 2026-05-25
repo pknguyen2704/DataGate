@@ -37,7 +37,7 @@ const DataQuality = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [filters, setFilters] = useState({ processing_date_hour: "", status: "", severity_level: "" });
+  const [filters, setFilters] = useState({ processing_date_hour: "", status: "", severity_level: "", is_resolved: "" });
 
   const schema = tableRes.data?.schema_name?.toLowerCase();
   const showRules = schema === "gold" || schema === "silver";
@@ -55,6 +55,7 @@ const DataQuality = () => {
     table_id: tableId, 
     result_type: currentType,
     ...filters,
+    is_resolved: filters.is_resolved === "true" ? true : filters.is_resolved === "false" ? false : undefined,
     page: page + 1,
     page_size: pageSize
   }), [tableId, currentType, filters, page, pageSize]);
@@ -114,14 +115,14 @@ const DataQuality = () => {
         {/* Filter Bar */}
         <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default' }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth size="small" type="datetime-local" label="Processing Date" InputLabelProps={{ shrink: true }}
                 inputProps={{ step: 1 }}
                 value={filters.processing_date_hour} onChange={(e) => handleFilterChange("processing_date_hour", e.target.value)}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Result</InputLabel>
                 <Select value={filters.status} label="Result" onChange={(e) => handleFilterChange("status", e.target.value)}>
@@ -131,13 +132,23 @@ const DataQuality = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Severity</InputLabel>
                 <Select value={filters.severity_level} label="Severity" onChange={(e) => handleFilterChange("severity_level", e.target.value)}>
                   <MenuItem value="">All Severity</MenuItem>
                   <MenuItem value="warning">Warning</MenuItem>
                   <MenuItem value="critical">Critical</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Resolved Status</InputLabel>
+                <Select value={filters.is_resolved} label="Resolved Status" onChange={(e) => handleFilterChange("is_resolved", e.target.value)}>
+                  <MenuItem value="">All Statuses</MenuItem>
+                  <MenuItem value="true">Resolved</MenuItem>
+                  <MenuItem value="false">Unresolved</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

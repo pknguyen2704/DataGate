@@ -12,7 +12,6 @@ const statusColors = {
   error: datagateColors.error,
   warning: datagateColors.warning,
   success: datagateColors.success,
-  pending: "#6366F1",
   default: "#64748B",
 };
 
@@ -87,7 +86,6 @@ export const StatusChip = ({ value }) => {
   const isError = !isActive && ["fail", "failure", "critical", "inactive", "no"].some((text) => normalized.includes(text));
   const isWarning = ["warning", "warn"].some((text) => normalized.includes(text));
   const isSuccess = !isInactive && ["pass", "success", "active", "yes"].some((text) => normalized.includes(text));
-  const isPending = normalized.includes("pending");
   const isDefault = normalized.includes("unknown") || normalized.includes("manual");
 
   let label = normalized.toUpperCase();
@@ -100,9 +98,7 @@ export const StatusChip = ({ value }) => {
       ? "warning"
       : isSuccess
         ? "success"
-        : isPending
-          ? "primary"
-          : "default";
+        : "default";
 
   return (
     <Chip
