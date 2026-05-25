@@ -391,20 +391,15 @@ def read_batch(spark, table_name, hour, label, seed, anomaly_cfg):
 
 def comparison_hours(target_hour, anomaly_cfg):
     target_dt = to_dt(target_hour)
-
     hours = [target_dt - timedelta(hours=anomaly_cfg["previous_batch_hours"])]
     hours += [target_dt - timedelta(days=days) for days in anomaly_cfg["history_days"]]
-
     return [to_ts(hour) for hour in sorted(set(hours))]
 
 
 def build_work_df(spark, table_name, target_hour, anomaly_cfg):
     seed = anomaly_cfg["random_state"]
-
-    pos = read_batch(spark,table_name, target_hour,1,seed,anomaly_cfg)
-
+    pos = read_batch(spark, table_name, target_hour, 1, seed, anomaly_cfg)
     pos_count = pos.count()
-
     if pos_count == 0:
         logger.info(
             "Skip anomaly detection: target batch is empty | table=%s | hour=%s",
@@ -412,9 +407,7 @@ def build_work_df(spark, table_name, target_hour, anomaly_cfg):
             target_hour,
         )
         return None
-
     neg_parts = []
-
     for index, hour in enumerate(comparison_hours(target_hour, anomaly_cfg)):
         if not batch_exists(spark, table_name, anomaly_cfg["batch_time_col"], hour):
             logger.info(
@@ -423,16 +416,13 @@ def build_work_df(spark, table_name, target_hour, anomaly_cfg):
                 hour,
             )
             continue
-
-        part = read_batch(spark,table_name,hour,0,seed + index + 1,anomaly_cfg)
-
+        part = read_batch(spark, table_name, hour, 0, seed + index + 1, anomaly_cfg)
         logger.info(
             "Historical batch loaded | table=%s | hour=%s | rows=%s",
             table_name,
             hour,
             part.count(),
         )
-
         neg_parts.append(part)
 
     if not neg_parts:
@@ -443,41 +433,27 @@ def build_work_df(spark, table_name, target_hour, anomaly_cfg):
         return None
 
     neg = neg_parts[0]
-
     for part in neg_parts[1:]:
         neg = neg.unionByName(part, allowMissingColumns=True)
-
     df = pos.unionByName(neg, allowMissingColumns=True).persist(
         StorageLevel.MEMORY_AND_DISK
     )
-
     logger.info("Training dataset built | table=%s | rows=%s", table_name, df.count())
     return df
 
 
 def split_df(df, anomaly_cfg):
-    random_state = anomaly_cfg["random_state"]
     test_size = anomaly_cfg["test_size"]
-
-    df = df.withColumn("_r", F.rand(random_state))
-
-    test = df.filter(F.col("_r") < test_size).drop("_r")
-    train = df.filter(F.col("_r") >= test_size).drop("_r")
+    train_size = 1 - test_size
+    seed = anomaly_cfg["random_state"]
+    train, test = df.randomSplit([train_size, test_size], seed=seed)
 
     for name, part in [("train", train), ("test", test)]:
-        labels = part.select("label").distinct().count()
         rows = part.count()
-
-        logger.info(
-            "Split checked | name=%s | rows=%s | labels=%s",
-            name,
-            rows,
-            labels,
-        )
-
+        labels = part.select("label").distinct().count()
+        logger.info("Split checked | name=%s | rows=%s | labels=%s", name, rows, labels)
         if rows == 0:
             raise ValueError(f"{name} split is empty.")
-
         if labels < 2:
             raise ValueError(f"{name} split does not contain both labels.")
 
@@ -574,7 +550,6 @@ class FeaturePipeline:
     def transform(self, df):
         for col in self.num_cols:
             df = df.withColumn(col, F.col(col).cast("double"))
-
         for col in self.cat_cols:
             df = df.withColumn(col, F.col(col).cast("string"))
 
@@ -586,21 +561,16 @@ class FeaturePipeline:
             F.col("label").cast("double").alias("label"),
         )
 
-
 def build_features(train, test, anomaly_cfg):
     pipeline = FeaturePipeline(anomaly_cfg).fit(train)
-
     train_f = pipeline.transform(train).persist(StorageLevel.MEMORY_AND_DISK)
     test_f = pipeline.transform(test).persist(StorageLevel.MEMORY_AND_DISK)
-
     logger.info(
         "Feature data cached | train=%s | test=%s",
         train_f.count(),
         test_f.count(),
     )
-
     return pipeline, train_f, test_f
-
 
 def train_lgbm(train, test, cfg, cat_slots, runtime_cfg):
     lgbm_train = train.repartition(runtime_cfg["num_tasks"]).persist(
@@ -873,7 +843,6 @@ def run_anomaly_detection(spark, pg_hook, table, processing_date_hour, runtime_c
         table["full_table_name"],
         processing_date_hour,
     )
-
     anomaly_cfg = get_anomaly_config(pg_hook, table["table_id"])
     if anomaly_cfg is None:
         logger.info(
@@ -883,7 +852,6 @@ def run_anomaly_detection(spark, pg_hook, table, processing_date_hour, runtime_c
             processing_date_hour,
         )
         return
-
     if not has_enough_history(
         spark,
         table["full_table_name"],
@@ -891,9 +859,7 @@ def run_anomaly_detection(spark, pg_hook, table, processing_date_hour, runtime_c
         anomaly_cfg=anomaly_cfg,
     ):
         return
-
     cfg = get_model_parameter(pg_hook, table["table_id"])
-
     if cfg is None:
         logger.info(
             "Skip anomaly detection: missing model parameter | table=%s | table_id=%s | hour=%s",
@@ -909,11 +875,9 @@ def run_anomaly_detection(spark, pg_hook, table, processing_date_hour, runtime_c
     pred = None
 
     try:
-        work_df = build_work_df(spark,table["full_table_name"],processing_date_hour,anomaly_cfg)
-
+        work_df = build_work_df(spark, table["full_table_name"], processing_date_hour,anomaly_cfg)
         if work_df is None:
             return
-
         train_df, test_df = split_df(work_df, anomaly_cfg)
         pipeline, train_f, test_f = build_features(train_df, test_df, anomaly_cfg)
 
@@ -926,11 +890,8 @@ def run_anomaly_detection(spark, pg_hook, table, processing_date_hour, runtime_c
         )
 
         auc_score = evaluate_auc(pred)
-
         result_id = save_auc_result(pg_hook,table["table_id"],cfg,runtime_cfg,anomaly_cfg,pipeline.output_feature_cols,processing_date_hour,auc_score=auc_score,)
-
         save_shap(pg_hook,result_id,processing_date_hour,rows=shap_summary(pred, pipeline.output_feature_cols))
-
         logger.info(
             "Completed anomaly detection result | table=%s | auc=%s",
             table["full_table_name"],
@@ -989,7 +950,6 @@ def close_hook_connection(hook):
 def stop_spark_session(spark, spark_timeout_seconds, py4j_timeout_seconds):
     if spark is None:
         return
-
     spark_context = getattr(spark, "sparkContext", None)
     gateway = getattr(spark_context, "_gateway", None)
 
@@ -1050,17 +1010,12 @@ def main():
 
     try:
         pg_hook = PostgresHook(postgres_conn_id=args.datagate_db_conn_id)
-
         connection_config = get_connection_config(pg_hook, connection_name)
-
         tables = get_active_tables(pg_hook, connection_config["connection_id"], connection_config["catalog_name"], schema_name)
-
         if not tables:
             logger.info("Job pass: no active tables found | schema=%s", schema_name)
             return 0
-
         spark = create_spark_session(connection_config)
-
         for table in tables:
             run_anomaly_detection(spark, pg_hook, table, processing_date_hour, runtime_cfg)
 
@@ -1069,7 +1024,6 @@ def main():
             schema_name,
             processing_date_hour,
         )
-
         return 0
 
     except Exception:

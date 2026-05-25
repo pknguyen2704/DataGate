@@ -35,6 +35,7 @@ DATAGATE_DB_CONN_ID = "datagate_db_default"
 SLACK_AIRFLOW_FAILURES_CONN_ID = "slack_airflow_failures"
 SLACK_DQ_CONN_ID = "slack_dq"
 
+# SPARK CONFIG
 DATAGATE_SPARK_CONF = {
     "spark.driver.cores": "2",
     "spark.driver.memory": "4g",

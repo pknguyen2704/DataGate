@@ -189,17 +189,14 @@ def build_location_hourly_metrics(df, zone_df):
         )
     )
 
-
 def write_to_gold(df, table_name):
     table = f"{CATALOG_NAME}.{TARGET_SCHEMA}.{table_name}"
     logger.info("Writing gold table=%s", table)
     df.writeTo(table).overwritePartitions()
 
-
 def stop_spark_session(spark):
     if spark is None:
         return
-
     with suppress(Exception):
         spark.catalog.clearCache()
     with suppress(Exception):

@@ -120,7 +120,6 @@ def cast_columns(df):
         df = df.withColumn(col, F.col(col).cast("bigint"))
     for col in DOUBLE_COLS:
         df = df.withColumn(col, F.col(col).cast("double"))
-
     df = df.withColumn("store_and_fwd_flag", F.upper(F.trim(F.col("store_and_fwd_flag").cast("string"))))
     df = df.withColumn("store_and_fwd_flag", F.when(F.col("store_and_fwd_flag").isin("", "<NA>", "NAN", "NONE", "NULL"), None).otherwise(F.col("store_and_fwd_flag")))
     df = df.withColumn("ratecode_id", F.when(F.col("ratecode_id").isNull(), F.lit(99)).otherwise(F.col("ratecode_id")))
@@ -168,7 +167,6 @@ def write_to_silver(df, target_table):
 def stop_spark_session(spark):
     if spark is None:
         return
-
     with suppress(Exception):
         spark.catalog.clearCache()
     with suppress(Exception):
@@ -180,11 +178,9 @@ def stop_spark_session(spark):
 def main():
     start = perf_counter()
     args = parse_args()
-
     source_table = validate_table_name(SOURCE_TABLE, "SOURCE_TABLE")
     target_table = validate_table_name(TARGET_TABLE, "TARGET_TABLE")
     processing_date_hour = normalize_datetime(args.processing_date_hour)
-
     spark = None
 
     try:

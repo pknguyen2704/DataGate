@@ -1,9 +1,7 @@
 import argparse
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
-
 
 PROFILE_COLS = [
     "trip_distance",
@@ -14,10 +12,8 @@ PROFILE_COLS = [
     "store_and_fwd_flag",
 ]
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
-
     parser.add_argument("--file", required=True)
     parser.add_argument("--output-file", required=True)
     parser.add_argument("--event-col", default="tpep_dropoff_datetime")
@@ -27,92 +23,60 @@ def parse_args():
     parser.add_argument("--overwrite", action="store_true")
 
     args = parser.parse_args()
-
     args.file = Path(args.file)
     args.output_file = Path(args.output_file)
-
-    # Allow both 0.3 and 30 for 30%
-    if args.dirty_ratio > 1:
-        args.dirty_ratio = args.dirty_ratio / 100
-
-    if args.dirty_ratio < 0 or args.dirty_ratio > 1:
-        raise ValueError("--dirty-ratio must be between 0 and 1, or 0 and 100.")
 
     args.dirty_date_hours = [
         pd.to_datetime(x.strip())
         for x in args.dirty_date_hours.split(",")
         if x.strip()
     ]
-
     return args
 
 
+# Date_hour normalization
 def get_date_hour(df, event_col):
-    """
-    Create date_hour from event time.
-    If minute >= 45, move to next hour.
-    """
     event_time = pd.to_datetime(df[event_col])
-
     add_hour = (event_time.dt.minute >= 45).astype(int)
     date_hour = event_time + pd.to_timedelta(add_hour, unit="h")
-
     return date_hour.dt.floor("h")
 
 
+# Batch window normalization for processing_date_hour
+# 2025-01-27 12:00:00 -> [2025-01-27 00:00:00, 2025-01-27 12:00:00)
+# 2025-01-28 00:00:00 -> [2025-01-27 12:00:00, 2025-01-28 00:00:00)
 def get_window(batch_time):
-    """
-    Convert processing batch time to real data window.
-
-    2025-01-27 12:00:00 -> [2025-01-27 00:00:00, 2025-01-27 12:00:00)
-    2025-01-28 00:00:00 -> [2025-01-27 12:00:00, 2025-01-28 00:00:00)
-    """
     if batch_time.hour == 12:
         start_time = batch_time.normalize()
         end_time = batch_time
-
     elif batch_time.hour == 0:
         start_time = batch_time - pd.Timedelta(hours=12)
         end_time = batch_time
-
     else:
         raise ValueError(f"Only support 00:00 and 12:00 batch: {batch_time}")
-
     return start_time, end_time
 
 
 def build_dirty_mask(date_hour, dirty_date_hours):
-    """
-    Select rows belonging to all dirty batch windows.
-    """
     mask = pd.Series(False, index=date_hour.index)
-
     print("\n[DIRTY WINDOWS]")
-
     for batch_time in dirty_date_hours:
         start_time, end_time = get_window(batch_time)
-
         one_window_mask = (date_hour >= start_time) & (date_hour < end_time)
         mask = mask | one_window_mask
-
         print(
             f"- {batch_time} covers [{start_time}, {end_time}) "
             f"| rows={one_window_mask.sum()}"
         )
-
     return mask
 
 
+# Profile of selected columns
 def profile(df, title):
-    """
-    Print simple profile for selected columns.
-    """
     print("\n" + "=" * 100)
     print(title)
     print("=" * 100)
-
     rows = []
-
     for col in PROFILE_COLS:
         if col not in df.columns:
             continue
@@ -137,10 +101,8 @@ def profile(df, title):
     print(pd.DataFrame(rows).to_string(index=False))
 
 
+# Make dirty for numeric column (large values)
 def dirty_numeric_col(df, dirty_rows, selected_before, col, factor=10):
-    """
-    Make numeric values abnormally large based on real max value.
-    """
     if col not in df.columns:
         return
 
@@ -171,29 +133,15 @@ def dirty_fixed_value(df, dirty_rows, col, value):
 
 def main():
     args = parse_args()
-
-    if args.output_file.exists() and not args.overwrite:
-        raise FileExistsError(f"Output file exists: {args.output_file}")
-
     print(f"[READ] {args.file}")
     df = pd.read_parquet(args.file)
-
     date_hour = get_date_hour(df, args.event_col)
-
     dirty_mask = build_dirty_mask(
         date_hour=date_hour,
         dirty_date_hours=args.dirty_date_hours,
     )
-
     selected_rows = df.index[dirty_mask]
-
-    if len(selected_rows) == 0:
-        raise ValueError("No rows found in selected dirty windows.")
-
     dirty_count = round(len(selected_rows) * args.dirty_ratio)
-
-    if dirty_count == 0 and args.dirty_ratio > 0:
-        dirty_count = 1
 
     rng = np.random.default_rng(args.dirty_seed)
 
@@ -226,9 +174,7 @@ def main():
 
     # Change categorical distribution
     dirty_fixed_value(df_dirty, dirty_rows, "store_and_fwd_flag", "Y")
-
     selected_after = df_dirty.loc[selected_rows].copy()
-
     profile(selected_after, "PROFILE AFTER DIRTY DATA")
 
     print(f"\n[WRITE] {args.output_file}")

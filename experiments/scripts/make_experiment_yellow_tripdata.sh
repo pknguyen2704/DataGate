@@ -8,7 +8,7 @@ uv run python ./scripts/make_experiment_yellow_tripdata.py \
   --file "${SOURCE_FILE}" \
   --output-file "${DIRTY_FILE}" \
   --event-col "tpep_dropoff_datetime" \
-  --dirty-date-hours "2025-01-18 12:00:00, 2025-01-19 00:00:00, 2025-01-20 12:00:00" \
-  --dirty-ratio 70 \
+  --dirty-date-hours "2025-01-18 12:00:00, 2025-01-20 12:00:00, 2025-01-22 12:00:00" \
+  --dirty-ratio 0.7 \
   --dirty-seed 2025 \
   --overwrite

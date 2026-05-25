@@ -85,7 +85,6 @@ def create_spark_session():
         .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.secret-access-key", STORAGE_SECRET_KEY)
         .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.path-style-access", "true")
         .config(f"spark.sql.catalog.{CATALOG_NAME}.s3.region", "us-east-1")
-
         .getOrCreate()
     )
 
@@ -129,7 +128,6 @@ def write_to_bronze(df, target_table):
 def stop_spark_session(spark):
     if spark is None:
         return
-
     with suppress(Exception):
         spark.catalog.clearCache()
     with suppress(Exception):
@@ -141,7 +139,6 @@ def stop_spark_session(spark):
 def main():
     start_time = perf_counter()
     args = parse_args()
-
     source_table = validate_table_name(SOURCE_TABLE, "SOURCE_TABLE")
     target_table = validate_table_name(TARGET_TABLE, "TARGET_TABLE")
     processing_date_hour = normalize_datetime(args.processing_date_hour)
@@ -151,7 +148,6 @@ def main():
     try:
         spark = create_spark_session()
         source_df = read_source_batch(spark, source_table, processing_date_hour)
-
         bronze_df = source_df.withColumn(
             "processing_date_hour",
             to_timestamp(lit(processing_date_hour)),
